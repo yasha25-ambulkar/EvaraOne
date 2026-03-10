@@ -18,10 +18,9 @@ build/
 .env.local
 .env.production
 
-# Firebase Secrets
+# Firebase Secrets (actual credential files, NOT the loader)
 serviceAccount.json
 firebase-service-account.json
-firebase-secure.js
 backend/serviceAccount.json
 
 # Databases & Caches

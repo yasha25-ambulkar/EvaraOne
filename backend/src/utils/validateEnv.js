@@ -6,8 +6,7 @@
 const REQUIRED_VARS = [
     "FIREBASE_PROJECT_ID",
     "FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY",
-    "REDIS_URL"
+    "FIREBASE_PRIVATE_KEY"
 ];
 
 function validateEnv() {
