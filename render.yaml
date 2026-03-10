@@ -36,7 +36,7 @@ services:
           property: connectionString
 
   # 3. Frontend Static Site
-  - type: static
+  - type: web
     name: evara-tech-frontend
     env: static
     region: ohio
