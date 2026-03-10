@@ -1,34 +1,19 @@
 {
-  "name": "evara-monorepo",
-  "private": true,
+  "name": "evara-one",
   "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "install:backend": "cd backend && npm install --production",
     "install:client": "cd client && npm install",
-    "install:server": "cd backend && npm install",
-    "setup": "npm run install:client && npm run install:server",
-    "dev:server": "npm run dev --prefix backend",
-    "dev:client": "npm run dev --prefix client",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "start": "npm run dev",
-    "build": "cd client && npm install && npm run build",
-    "db:types": "supabase gen typescript --project-id tihrvotigvaozizlcxse > client/src/types/database.types.ts",
-    "openclaw": "npx openclaw@latest",
-    "mcp:openclaw": "npx -y @freema/openclaw-mcp",
-    "prepare": "husky"
+    "build:client": "cd client && npm run build",
+    "build": "npm run install:backend && npm run install:client && npm run build:client",
+    "start": "cd backend && node src/server.js",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd client && npm run dev\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1",
-    "supabase": "^2.76.15"
-  },
-  "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "firebase-admin": "^13.7.0",
-    "morgan": "^1.10.1",
-    "zod": "^4.3.6"
+    "concurrently": "^8.2.2"
   }
 }

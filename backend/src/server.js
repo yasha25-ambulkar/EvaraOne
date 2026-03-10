@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const adminRoutes = require("./routes/admin.routes.js");
 const { getDashboardSummary, getHierarchy, getAuditLogs } = require("./controllers/admin.controller.js");
@@ -32,23 +33,33 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       "https://app.evaratech.com",
       "http://localhost:8080",
-      "http://localhost:5173"
+      "http://localhost:5173",
+      "http://localhost:3000"
     ];
 
-// Pre-flight CORS and Security
-app.use(cors({
-  origin: allowedOrigins,
+// In production on Railway, allow same-origin requests
+const corsOptions = {
+  origin: process.env.NODE_ENV === "production" 
+    ? (origin, callback) => {
+        // Allow requests with no origin (same-origin, mobile apps, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || origin.endsWith('.railway.app')) {
+          return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+      }
+    : allowedOrigins,
   credentials: true
-}));
+};
+
+// Pre-flight CORS and Security
+app.use(cors(corsOptions));
 
 // Relax Helmet for development/local communication if needed
-// Helmet temporarily disabled for debugging Network Error
-/*
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
-*/
 
 app.use(express.json());
 app.use(morgan("combined"));
@@ -146,10 +157,6 @@ telemetryEvents.on("telemetry_broadcast", (payload) => {
     }
 });
 
-app.use((req, res, next) => {
-  console.log(`[Router] Incoming ${req.method} ${req.url}`);
-  next();
-});
 
 // Sentry Handlers
 
@@ -158,6 +165,16 @@ app.use("/api/v1/admin", requireAuth, adminRoutes);
 
 // Node telemetry and analytics routes
 const nodesRoutes = require("./routes/nodes.routes.js");
+// Health Check Endpoint
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV
+  });
+});
+
 app.use("/api/v1/nodes", requireAuth, nodesRoutes);
 
 // Other routes that frontend service calls
@@ -167,7 +184,27 @@ app.get("/api/v1/stats/dashboard/summary", requireAuth, getDashboardSummary);
 // Stats route fallback
 app.get("/api/v1/stats/zones", requireAuth, (req, res) => res.json([]));
 
-// Sentry error handler must be before any other error middleware and after all controllers
+// Production: Serve frontend static files (MUST be before error handlers)
+if (process.env.NODE_ENV === "production") {
+    const publicPath = path.join(__dirname, "../../client/dist");
+    const fs = require("fs");
+    if (fs.existsSync(publicPath)) {
+        console.log(`[Server] Serving frontend from ${publicPath}`);
+        app.use(express.static(publicPath));
+        
+        // SPA catch-all: serve index.html for non-API routes
+        app.get("*", (req, res, next) => {
+            if (req.url.startsWith("/api/") || req.url.startsWith("/socket.io/")) {
+                return next();
+            }
+            res.sendFile(path.join(publicPath, "index.html"));
+        });
+    } else {
+        console.warn(`[Server] Frontend build not found at ${publicPath}`);
+    }
+}
+
+// Sentry error handler must be after all controllers and routes
 Sentry.setupExpressErrorHandler(app);
 
 app.use((err, req, res, next) => {

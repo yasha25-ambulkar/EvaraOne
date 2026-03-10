@@ -66,3 +66,9 @@ debug.log
 
 # OS
 Thumbs.db
+
+# Platform-specific (not Railway)
+render.yaml
+fly.toml
+vercel.json
+netlify.toml
