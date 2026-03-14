@@ -27,7 +27,7 @@ const KPIUnitCard = ({
   trendLabel,
   variant = "default",
 }: any) => (
-  <div className="apple-glass-card p-[20px] rounded-[30px] flex-1 flex flex-col justify-center shadow-sm">
+  <div className="apple-glass-card p-[20px] rounded-[20px] flex-1 flex flex-col justify-center shadow-sm">
     <span className="text-[12px] font-[800] text-[#1f2937]/70 uppercase tracking-[0.1em] mb-2">
       {label}
     </span>
@@ -190,7 +190,7 @@ function Dashboard() {
         }}
       ></div>
 
-      <div className="flex-1 w-full px-8 pt-[110px] pb-[40px] overflow-hidden flex flex-col relative z-10 gap-[24px]">
+      <div className="flex-1 w-full px-8 pt-[110px] pb-[40px] overflow-hidden flex flex-col relative z-10 gap-[14px]">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
           <div>
             <h1 className="text-[36px] font-[800] tracking-tight text-[#004ba0] leading-none mb-2">
@@ -204,7 +204,7 @@ function Dashboard() {
         </header>
 
         <div
-          className="flex-1 grid grid-cols-12 gap-[24px] min-h-0"
+          className="flex-1 grid grid-cols-12 gap-[14px] min-h-0"
           style={{ gridTemplateRows: "38% minmax(0, 1fr)" }}
         >
           {/* ROW 1 */}
@@ -229,8 +229,8 @@ function Dashboard() {
             />
           </div>
 
-          <div className="col-span-2 h-full flex flex-col gap-[24px]">
-            <div className="apple-glass-card p-[20px] rounded-[30px] flex-1 flex flex-col justify-center shadow-sm">
+          <div className="col-span-2 h-full flex flex-col gap-[14px]">
+            <div className="apple-glass-card p-[20px] rounded-[20px] flex-1 flex flex-col justify-center shadow-sm">
               <span className="text-[12px] font-[800] text-[#1f2937]/70 uppercase tracking-[0.1em] mb-2">
                 System Health
               </span>
@@ -257,7 +257,7 @@ function Dashboard() {
             />
           </div>
 
-          <div className="col-span-4 h-full relative group rounded-[50px] overflow-hidden border border-white/40 shadow-sm">
+          <div className="col-span-4 h-full relative group rounded-[24px] overflow-hidden border border-white/40 shadow-sm">
             <SharedMap
               devices={mapDevices as any}
               pipelines={[]}
