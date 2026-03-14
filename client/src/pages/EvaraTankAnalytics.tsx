@@ -6,8 +6,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-    TrendingUp, TrendingDown, Timer, Droplets,
-    RefreshCw, Zap, BarChart3, Clock, Calendar, Activity
+    TrendingUp, TrendingDown, Timer, Droplets, Clock, Activity,
+    Wifi, Info, Bell
 } from 'lucide-react';
 import api from '../services/api';
 import { useStaleDataAge } from '../hooks/useStaleDataAge';
@@ -28,9 +28,14 @@ import { useWaterAnalytics } from '../hooks/useWaterAnalytics';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TelemetryPayload {
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
     level_percentage?: number;
     total_liters?: number;
+    created_at?: string;
+    level?: number;
+    percentage?: number;
+    volume?: number;
+    currentVolume?: number;
 }
 
 interface LocalTankConfig {
@@ -104,8 +109,7 @@ const EvaraTankAnalytics = () => {
     const [saveError, setSaveError] = useState<string | null>(null);
     const [showParams, setShowParams] = useState(false);
     const [showNodeInfo, setShowNodeInfo] = useState(false);
-    const [showSecondaryInsights, setShowSecondaryInsights] = useState(false);
-    const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
+
 
     // ── Unified Analytics Data ────────────────────────────────────────────────
     const {
@@ -115,24 +119,24 @@ const EvaraTankAnalytics = () => {
     } = useDeviceAnalytics(hardwareId);
 
     const deviceConfig = ('config' in (unifiedData?.config ?? {})
-        ? (unifiedData!.config as any).config
+        ? (unifiedData!.config as { config: TankConfig }).config
         : undefined) as TankConfig | undefined;
     const telemetryData = (unifiedData?.latest && !('error' in unifiedData.latest)
         ? unifiedData.latest
         : undefined) as TelemetryPayload | undefined;
     const deviceInfo = ('data' in (unifiedData?.info ?? {})
-        ? (unifiedData!.info as any).data
+        ? (unifiedData!.info as { data: NodeInfoData }).data
         : undefined) as NodeInfoData | undefined;
 
-    const tankBehavior = (unifiedData as any)?.tankBehavior;
+
 
     // ── Real-time Telemetry Integration ──────────────────────────────────────
     const { telemetry: realtimeData } = useRealtimeTelemetry(hardwareId || "");
-    const [liveFeeds, setLiveFeeds] = useState<any[]>([]);
+    const [liveFeeds, setLiveFeeds] = useState<TelemetryPayload[]>([]);
 
     // Sync initial history to live feeds
     useEffect(() => {
-        const history = (unifiedData?.history as any)?.feeds || unifiedData?.history || [];
+        const history = (unifiedData?.history as { feeds?: TelemetryPayload[] })?.feeds || [];
         if (history.length > 0) {
             setLiveFeeds(history);
         }
@@ -233,7 +237,7 @@ const EvaraTankAnalytics = () => {
         const data: { time: string; level: number; volume: number }[] = [];
 
         for (const feed of liveFeeds) {
-            const d = new Date(feed.timestamp || feed.created_at);
+            const d = new Date(feed.timestamp || feed.created_at || new Date().toISOString());
             const time = `${d.getHours().toString().padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
             data.push({
                 time,
@@ -245,7 +249,7 @@ const EvaraTankAnalytics = () => {
     }, [liveFeeds]);
 
     const pct = metrics.percentage;
-    const deviceName = deviceInfo?.name || (deviceInfo as any)?.label || 'Tank';
+    const deviceName = deviceInfo?.name || (deviceInfo as { label?: string })?.label || 'Tank';
 
     // ── Computed capacity preview ─────────────────────────────────────────────
     const previewCapacity = useMemo(
@@ -262,8 +266,9 @@ const EvaraTankAnalytics = () => {
             await api.put(`/admin/nodes/${hardwareId}`, localToApiBody(localCfg));
             await queryClient.invalidateQueries({ queryKey: ['device_config', hardwareId] });
             setCfgDirty(false);
-        } catch (err: any) {
-            setSaveError(err.message || 'Failed to save configuration');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to save configuration';
+            setSaveError(message);
         } finally {
             setSaving(false);
         }
@@ -524,9 +529,9 @@ const EvaraTankAnalytics = () => {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch w-full">
                         {/* TANK VISUALIZER */}
-                        <div className="apple-glass-card rounded-[2.5rem] p-6 flex flex-col relative overflow-hidden h-full flex-grow">
+                        <div className="apple-glass-card rounded-[2.5rem] p-6 flex flex-col relative overflow-hidden flex-grow">
                             <div className="flex justify-between items-center mb-2 z-10 w-full">
                                 <div>
                                     <h3 className="text-xl font-semibold m-0 leading-tight">{deviceName}</h3>
@@ -614,17 +619,56 @@ const EvaraTankAnalytics = () => {
                                     <span className="text-[10px] font-medium" style={{ color: '#8E8E93' }}>{staleLabel}</span>
                                 </div>
                             </div>
+
+                            {/* Estimation Cards row - Positioned below Tank visualizer to align with Timeline neighbor */}
+                            <div className="grid grid-cols-2 gap-4 w-full">
+                                <div className="apple-glass-card p-4 rounded-3xl flex flex-col justify-between" style={{ background: 'rgba(255, 149, 0, 0.1)', border: '1px solid rgba(255, 149, 0, 0.2)', minHeight: '130px', boxShadow: '0 8px 32px rgba(255, 149, 0, 0.05)' }}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="p-1.5 rounded-lg" style={{ background: 'rgba(255, 149, 0, 0.15)' }}>
+                                            <Timer size={18} color="#FF9500" />
+                                        </div>
+                                        <Info size={14} color="#8E8E93" className="cursor-help opacity-60 hover:opacity-100" />
+                                    </div>
+                                    <div className="flex flex-col mt-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8E8E93' }}>Est. Time Until Empty</span>
+                                        <span className="text-lg font-black tracking-tight mt-0.5" style={{ color: '#1C1C1E' }}>
+                                            {waterAnalytics.estimatedEmptyTimeMinutes ?
+                                                `${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes / 60)}h ${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes % 60)}m`
+                                                : '--'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="apple-glass-card p-4 rounded-3xl flex flex-col justify-between" style={{ background: 'rgba(10, 132, 255, 0.1)', border: '1px solid rgba(10, 132, 255, 0.2)', minHeight: '130px', boxShadow: '0 8px 32px rgba(10, 132, 255, 0.05)' }}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="p-1.5 rounded-lg" style={{ background: 'rgba(10, 132, 255, 0.15)' }}>
+                                            <Droplets size={18} color="#0A84FF" />
+                                        </div>
+                                        <Info size={14} color="#8E8E93" className="cursor-help opacity-60 hover:opacity-100" />
+                                    </div>
+                                    <div className="flex flex-col mt-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8E8E93' }}>Est. Time Until Full</span>
+                                        <span className="text-lg font-black tracking-tight mt-0.5" style={{ color: '#1C1C1E' }}>
+                                            {waterAnalytics.estimatedFullTimeMinutes ?
+                                                (waterAnalytics.estimatedFullTimeMinutes > 60 ?
+                                                    `${Math.floor(waterAnalytics.estimatedFullTimeMinutes / 60)}h ${Math.floor(waterAnalytics.estimatedFullTimeMinutes % 60)}m`
+                                                    : `${Math.floor(waterAnalytics.estimatedFullTimeMinutes)} min`)
+                                                : '--'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* COMBINED HISTORY CHART AND RATE CARDS */}
-                        <div className="lg:col-span-2 flex flex-col gap-2 w-full h-full">
+                        {/* COLUMN 2 - GRAPHS & INSIGHTS */}
+                        <div className="lg:col-span-2 flex flex-col gap-4 w-full h-full">
                             {/* RATE CARDS */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 w-full">
-                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px' }}>
-                                    <div className="flex items-start">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
+                                    <div className="flex justify-between items-start">
                                         <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(52,199,89,0.15)' }}>
                                             <TrendingUp size={22} color="#34C759" />
                                         </div>
+                                        <Info size={16} color="#8E8E93" className="cursor-help" />
                                     </div>
                                     <div className="flex flex-col mt-auto pt-3 gap-0.5">
                                         <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Fill Rate</p>
@@ -635,11 +679,12 @@ const EvaraTankAnalytics = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px' }}>
-                                    <div className="flex items-start">
+                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
+                                    <div className="flex justify-between items-start">
                                         <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(255,59,48,0.15)' }}>
                                             <TrendingDown size={22} color="#FF3B30" />
                                         </div>
+                                        <Info size={16} color="#8E8E93" className="cursor-help" />
                                     </div>
                                     <div className="flex flex-col mt-auto pt-3 gap-0.5">
                                         <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Consumption</p>
@@ -650,35 +695,31 @@ const EvaraTankAnalytics = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px' }}>
-                                    <div className="flex items-start">
-                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(255,149,0,0.15)' }}>
-                                            <Timer size={22} color="#FF9500" />
+                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(175,82,222,0.15)' }}>
+                                            <Bell size={22} color="#AF52DE" />
                                         </div>
+                                        <Info size={16} color="#8E8E93" className="cursor-help" />
                                     </div>
                                     <div className="flex flex-col mt-auto pt-3 gap-0.5">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Est. Empty</p>
-                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: '#FF9500' }}>
-                                            {waterAnalytics.estimatedEmptyTimeMinutes ?
-                                                `${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes / 60)}h ${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes % 60)}m`
-                                                : '--'}
+                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Alerts</p>
+                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: '#1C1C1E' }}>
+                                            0 <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>Active</span>
                                         </p>
                                     </div>
                                 </div>
-                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px' }}>
-                                    <div className="flex items-start">
+                                <div className="apple-glass-card text-left rounded-[1.5rem] p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
+                                    <div className="flex justify-between items-start">
                                         <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(10,132,255,0.15)' }}>
-                                            <Droplets size={22} color="#0A84FF" />
+                                            <Wifi size={22} color="#0A84FF" />
                                         </div>
+                                        <Info size={16} color="#8E8E93" className="cursor-help" />
                                     </div>
                                     <div className="flex flex-col mt-auto pt-3 gap-0.5">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Est. Full</p>
-                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: '#0A84FF' }}>
-                                            {waterAnalytics.estimatedFullTimeMinutes ?
-                                                (waterAnalytics.estimatedFullTimeMinutes > 60 ?
-                                                    `${Math.floor(waterAnalytics.estimatedFullTimeMinutes / 60)}h ${Math.floor(waterAnalytics.estimatedFullTimeMinutes % 60)}m`
-                                                    : `${Math.floor(waterAnalytics.estimatedFullTimeMinutes)} min`)
-                                                : '--'}
+                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Device Health</p>
+                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: '#34C759' }}>
+                                            Healthy
                                         </p>
                                     </div>
                                 </div>
@@ -693,7 +734,6 @@ const EvaraTankAnalytics = () => {
                                 border: '1px solid rgba(255,255,255,0.35)',
                                 boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
                                 padding: '24px',
-                                height: '100%',
                                 minHeight: '350px'
                             }}>
                                 <div className="flex justify-between items-start">
@@ -752,215 +792,45 @@ const EvaraTankAnalytics = () => {
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                    {/* TANK BEHAVIOR ANALYTICS SECTION */}
-                    <div className="flex flex-col gap-4 mt-2">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Activity size={20} className="text-[#0A84FF]" />
-                            <h2 className="text-xl font-bold m-0" style={{ color: '#1C1C1E' }}>Tank Behavior Analytics</h2>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* REFILL BEHAVIOR CARD */}
-                            <div className="apple-glass-card rounded-[2rem] p-6 flex flex-col gap-4"
-                                style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-                                <div className="flex justify-between items-center">
+                            {/* TODAY'S EVENT TIMELINE - Relocated below graphs */}
+                            <div className="apple-glass-card p-5 rounded-[2rem] mt-1" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+                                <div className="flex justify-between items-center mb-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="p-2 rounded-xl" style={{ background: 'rgba(52,199,89,0.1)' }}>
-                                            <RefreshCw size={18} className="text-[#34C759]" />
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(10,132,255,0.1)' }}>
+                                            <Activity size={18} color="#0A84FF" />
                                         </div>
-                                        <span className="font-bold text-sm" style={{ color: '#3c3c43' }}>Refill Behavior</span>
+                                        <h4 className="m-0 text-sm font-bold uppercase tracking-widest" style={{ color: 'rgba(0,0,0,0.6)' }}>Today's Event Timeline</h4>
                                     </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Today</span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 mt-1">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Refills Today</span>
-                                        <span className="text-2xl font-black" style={{ color: '#1C1C1E' }}>{tankBehavior?.refillAnalytics?.refillsToday ?? 0}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Last Refill</span>
-                                        <span className="text-2xl font-black" style={{ color: '#1C1C1E' }}>{tankBehavior?.refillAnalytics?.lastRefillTime ?? '--'}</span>
+                                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                                        <Clock size={12} />
+                                        <span>LAST 24 HOURS</span>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-2 p-3 rounded-2xl" style={{ background: 'rgba(52,199,89,0.05)', border: '1px solid rgba(52,199,89,0.1)' }}>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] font-bold uppercase" style={{ color: '#34C759' }}>Avg. Refill Duration</span>
-                                        <span className="text-sm font-bold" style={{ color: '#115C29' }}>{tankBehavior?.refillAnalytics?.averageRefillDuration ?? 0} min</span>
-                                    </div>
-                                    {/* Mini Refill Timeline Bar */}
-                                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
-                                        {(tankBehavior?.refillAnalytics?.refillTimeline || [0, 0, 1, 0, 1, 0, 0, 0, 1, 0]).map((active: number, i: number) => (
-                                            <div key={i} className="h-full flex-grow" style={{
-                                                background: active ? '#34C759' : 'transparent',
-                                                borderRight: i < 9 ? '1px solid rgba(0,0,0,0.02)' : 'none'
-                                            }} />
+                                <div className="relative h-24 flex items-center px-4">
+                                    {/* Timeline Base Line */}
+                                    <div className="absolute left-6 right-6 h-0.5 bg-slate-100 rounded-full" />
+                                    
+                                    {/* Event Samples */}
+                                    <div className="relative flex justify-between w-full">
+                                        {[
+                                            { time: '08:15', label: 'Refill', icon: TrendingUp, color: '#34C759', pos: '15%' },
+                                            { time: '12:30', label: 'Peak Use', icon: Activity, color: '#FF3B30', pos: '45%' },
+                                            { time: '15:45', label: 'Stable', icon: Activity, color: '#0A84FF', pos: '70%' },
+                                            { time: '19:20', label: 'Refill', icon: TrendingUp, color: '#34C759', pos: '90%' }
+                                        ].map((event, idx) => (
+                                            <div key={idx} className="absolute flex flex-col items-center group cursor-pointer" style={{ left: event.pos, transform: 'translateX(-50%)' }}>
+                                                <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm mb-2 transition-transform group-hover:scale-125" style={{ background: event.color }} />
+                                                <div className="apple-glass-card p-1.5 px-2 rounded-lg flex flex-col items-center gap-0.1 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity" style={{ background: 'white', minWidth: '65px', border: `1px solid ${event.color}20` }}>
+                                                    <span className="text-[10px] font-black leading-none" style={{ color: event.color }}>{event.time}</span>
+                                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{event.label}</span>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
-
-                            {/* DAILY CONSUMPTION CARD */}
-                            <div className="apple-glass-card rounded-[2rem] p-6 flex flex-col gap-4"
-                                style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-                                <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-2 rounded-xl" style={{ background: 'rgba(255,59,48,0.1)' }}>
-                                            <BarChart3 size={18} className="text-[#FF3B30]" />
-                                        </div>
-                                        <span className="font-bold text-sm" style={{ color: '#3c3c43' }}>Consumption Analysis</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Trend</span>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Today</span>
-                                            <span className="text-xl font-black" style={{ color: '#1C1C1E' }}>{tankBehavior?.consumptionAnalytics?.todayConsumption?.toLocaleString() ?? 0} L</span>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Yesterday</span>
-                                            <span className="text-sm font-bold" style={{ color: '#3c3c43' }}>{tankBehavior?.consumptionAnalytics?.yesterdayConsumption?.toLocaleString() ?? 0} L</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
-                                        <div className="absolute h-full left-0 top-0 bg-[#FF3B30] rounded-full transition-all duration-1000"
-                                            style={{ width: `${Math.min(100, ((tankBehavior?.consumptionAnalytics?.todayConsumption || 0) / (tankBehavior?.consumptionAnalytics?.averageDailyConsumption || 1)) * 50)}%` }} />
-                                    </div>
-
-                                    <div className="flex justify-between items-center pt-1">
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={12} className="text-[#8E8E93]" />
-                                            <span className="text-[10px] font-bold" style={{ color: '#8E8E93' }}>Avg. Daily</span>
-                                        </div>
-                                        <span className="text-xs font-bold" style={{ color: '#1C1C1E' }}>{tankBehavior?.consumptionAnalytics?.averageDailyConsumption?.toLocaleString() ?? 0} L</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PEAK USAGE CARD */}
-                            <div className="apple-glass-card rounded-[2rem] p-6 flex flex-col gap-4"
-                                style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-                                <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-2 rounded-xl" style={{ background: 'rgba(10,132,255,0.1)' }}>
-                                            <Zap size={18} className="text-[#0A84FF]" />
-                                        </div>
-                                        <span className="font-bold text-sm" style={{ color: '#3c3c43' }}>Peak Usage</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Detected</span>
-                                </div>
-
-                                <div className="flex flex-col gap-1 my-2">
-                                    <div className="flex items-center gap-2">
-                                        <Clock size={16} className="text-[#8E8E93]" />
-                                        <span className="text-2xl font-black" style={{ color: '#1C1C1E' }}>{tankBehavior?.peakUsage?.peakTime || '--'}</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Peak Activity Time</span>
-                                </div>
-
-                                <div className="mt-auto p-4 rounded-2xl flex flex-col items-center justify-center gap-1" style={{ background: 'linear-gradient(135deg, #0A84FF 0%, #007AFF 100%)', boxShadow: '0 10px 20px rgba(10,132,255,0.2)' }}>
-                                    <span className="text-[10px] font-bold uppercase text-white opacity-80">Max Drain Rate</span>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl font-black text-white">{tankBehavior?.peakUsage?.peakDrainRate ?? 0}</span>
-                                        <span className="text-xs font-bold text-white opacity-90">L/min</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* SECONDARY INSIGHTS (Collapsible) */}
-                    <div className="flex flex-col gap-4 mt-6">
-                        <button onClick={() => setShowSecondaryInsights(!showSecondaryInsights)}
-                            className="flex items-center justify-between w-full p-4 rounded-2xl transition-all hover:bg-white/40"
-                            style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer' }}>
-                            <div className="flex items-center gap-2">
-                                <Activity size={20} className="text-[#3c3c43]" />
-                                <h2 className="text-lg font-bold m-0" style={{ color: '#1C1C1E' }}>Device & Alert Insights</h2>
-                            </div>
-                            <span className="font-bold text-[#8E8E93]">{showSecondaryInsights ? '▲' : '▼'}</span>
-                        </button>
-                        
-                        {showSecondaryInsights && (
-                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: 'rgba(255,59,48,0.05)', border: '1px solid rgba(255,59,48,0.1)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#FF3B30' }}>Low Water Alert</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{pct < 20 ? 'Triggered (Below 20%)' : 'Normal'}</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: 'rgba(255,149,0,0.05)', border: '1px solid rgba(255,149,0,0.1)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#FF9500' }}>Overflow Risk</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{pct > 95 ? 'High Risk' : 'Low'}</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: 'rgba(175,82,222,0.05)', border: '1px solid rgba(175,82,222,0.1)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#AF52DE' }}>Rapid Depletion</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{waterAnalytics.drainRateLpm > 50 ? 'Detected' : 'Normal'}</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: 'rgba(10,132,255,0.05)', border: '1px solid rgba(10,132,255,0.1)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#0A84FF' }}>Last Comm.</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{activeTelemetry?.timestamp ? new Date(activeTelemetry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: isOffline ? 'rgba(255,59,48,0.05)' : 'rgba(52,199,89,0.05)', border: isOffline ? '1px solid rgba(255,59,48,0.1)' : '1px solid rgba(52,199,89,0.1)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: isOffline ? '#FF3B30' : '#34C759' }}>Connection</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{isOffline ? 'Disconnected' : 'Active'}</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col justify-center gap-1" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Signal Strength</span>
-                                    <span className="text-sm font-black text-[#1C1C1E] tracking-tight">{(activeTelemetry?.data as any)?.rssi ? `${(activeTelemetry?.data as any).rssi} dBm` : 'Unknown'}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ADVANCED ANALYTICS (Expandable) */}
-                    <div className="flex flex-col gap-4 mt-2">
-                        <button onClick={() => setShowAdvancedAnalytics(!showAdvancedAnalytics)}
-                            className="flex items-center justify-center gap-2 w-full p-3 rounded-full transition-all hover:bg-white/40 font-bold"
-                            style={{ background: 'transparent', border: '1px dashed rgba(0,0,0,0.15)', color: '#3c3c43', cursor: 'pointer' }}>
-                            View Advanced Analytics {showAdvancedAnalytics ? '▲' : '▼'}
-                        </button>
-                        
-                        {showAdvancedAnalytics && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col gap-0.5 justify-center" style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Yesterday's Consump.</span>
-                                    <span className="text-lg font-black text-[#1C1C1E] tracking-tight">{tankBehavior?.consumptionAnalytics?.yesterdayConsumption?.toLocaleString() ?? 0} <span className="text-[12px] font-bold" style={{ color: '#8E8E93' }}>L</span></span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col gap-0.5 justify-center" style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Avg Daily Consump.</span>
-                                    <span className="text-lg font-black text-[#1C1C1E] tracking-tight">{tankBehavior?.consumptionAnalytics?.averageDailyConsumption?.toLocaleString() ?? 0} <span className="text-[12px] font-bold" style={{ color: '#8E8E93' }}>L</span></span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col gap-0.5 justify-center" style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Tank Dimensions</span>
-                                    <span className="text-sm mt-1 font-black text-[#1C1C1E] tracking-tight">{localCfg.lengthM}x{localCfg.breadthM}x{localCfg.heightM}m</span>
-                                </div>
-                                <div className="apple-glass-card p-4 rounded-xl flex flex-col gap-0.5 justify-center" style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#8E8E93' }}>Calibration Data</span>
-                                    <span className="text-sm mt-1 font-black text-[#1C1C1E] tracking-tight">System Offset: 0.0m</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* FUTURE ANALYTICS (Placeholder) */}
-                    <div className="flex flex-col gap-4 mt-6 mb-8 pt-6 border-t border-dashed" style={{ borderColor: 'rgba(0,0,0,0.1)' }}>
-                        <div className="flex items-center justify-between opacity-50 px-2">
-                            <div className="flex items-center gap-2">
-                                <Clock size={18} className="text-[#8E8E93]" />
-                                <h2 className="text-sm uppercase tracking-widest font-bold m-0" style={{ color: '#8E8E93' }}>Future Features In Development</h2>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 opacity-50">
-                            {['Water Usage Forecast', 'Leak Probability', 'Refill Efficiency', 'Event Timeline', 'Comparison Analytics'].map((feat, i) => (
-                                <div key={i} className="apple-glass-card p-3 rounded-xl flex items-center justify-center text-center" style={{ background: 'rgba(255,255,255,0.15)', border: '1px dashed rgba(0,0,0,0.15)' }}>
-                                    <span className="text-[11px] font-bold text-[#808080] tracking-tight">{feat}</span>
-                                </div>
-                            ))}
                         </div>
                     </div>
 
