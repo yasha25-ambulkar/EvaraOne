@@ -305,7 +305,7 @@ const EvaraTankAnalytics = () => {
             color: '#1C1C1E'
         }}>
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
-                <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
+                <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
                     {/* Breadcrumb + Page Heading row */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
@@ -625,7 +625,7 @@ const EvaraTankAnalytics = () => {
                         {/* COLUMN 2 - GRAPHS & INSIGHTS */}
                         <div className="lg:col-span-2 flex flex-col gap-4 w-full h-full">
                             {/* RATE CARDS */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
                                 <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.25)', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(52,199,89,0.15)' }}>
@@ -759,7 +759,7 @@ const EvaraTankAnalytics = () => {
                     </div>
 
                     {/* SECONDARY ROW - ESTIMATIONS & TIMELINE */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full mt-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
                         {/* Estimation Cards */}
                         <div className="grid grid-cols-2 gap-4 w-full">
                             <div className="apple-glass-card p-4 rounded-2xl flex flex-col justify-between" style={{ background: 'rgba(255, 149, 0, 0.1)', border: '1px solid rgba(255, 149, 0, 0.2)', minHeight: '130px', boxShadow: '0 8px 32px rgba(255, 149, 0, 0.05)' }}>
