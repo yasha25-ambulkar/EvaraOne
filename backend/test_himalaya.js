@@ -1,8 +1,15 @@
 const axios = require('axios');
 
+require('dotenv').config();
+
 // HIMALAYA Channel Info (from previous logs/context)
-const channelId = '3275001';
-const apiKey = 'KF4EBSLE9D1ZXTWJ';
+const channelId = process.env.THINGSPEAK_CHANNEL_ID_HIMALAYA || '3275001';
+const apiKey = process.env.THINGSPEAK_API_KEY_HIMALAYA;
+
+if (!apiKey) {
+    console.error("Error: THINGSPEAK_API_KEY_HIMALAYA not defined in .env");
+    process.exit(1);
+}
 
 async function audit() {
     console.log(`Auditing Channel: ${channelId}...`);

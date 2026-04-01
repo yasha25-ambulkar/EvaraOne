@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Settings } from 'lucide-react';
 import flowIcon from '../../public/meter.png';
+import { deviceService } from '../services/DeviceService';
 
 const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => {
     return (
@@ -53,6 +54,23 @@ const GreenTextToggleSwitch = ({ checked, onChange }: { checked: boolean; onChan
 
 const ConfigureFlow = () => {
     const navigate = useNavigate();
+    const { id: deviceId } = useParams<{ id: string }>();
+    const [deviceName, setDeviceName] = useState<string>('');
+
+    useEffect(() => {
+        if (!deviceId) return;
+        const stateData = (window.history.state as any)?.usr?.device;
+        if (stateData) {
+            const name = stateData.label || stateData.device_name || stateData.name || '';
+            if (name) setDeviceName(name);
+        } else {
+            deviceService.getNodeDetails(deviceId).then(data => {
+                const d = data as any;
+                const name = d?.label || d?.device_name || d?.name || '';
+                if (name) setDeviceName(name);
+            }).catch(() => {});
+        }
+    }, [deviceId]);
 
     const [globalStatus, setGlobalStatus] = useState(true);
     const [mapView, setMapView] = useState(false);
@@ -105,7 +123,7 @@ const ConfigureFlow = () => {
                         <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/50">
                             <div className="flex items-center gap-3">
                                 <img src={flowIcon} alt="Flow" className="w-8 h-8 object-contain" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }} />
-                                <h3 className="text-xl font-bold m-0" style={{ color: '#1c2b4f' }}>EvaraFlow Parameters</h3>
+                                <h3 className="text-xl font-bold m-0" style={{ color: '#1c2b4f' }}>{deviceName ? `${deviceName} Parameters` : 'EvaraFlow Parameters'}</h3>
                             </div>
                             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[#34C759]/10 text-[#28a745] border border-[#34C759]/20 shadow-sm">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse"></span>

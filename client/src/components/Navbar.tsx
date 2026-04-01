@@ -131,7 +131,7 @@ const Navbar = () => {
                                         {user.displayName}
                                     </span>
                                     <span className={`text-[10px] font-bold uppercase tracking-wider leading-tight ${user.role === 'superadmin' ? 'text-blue-600' :
-                                            user.role === 'community_admin' ? 'text-emerald-600' : 'text-slate-400'
+                                        user.role === 'community_admin' ? 'text-emerald-600' : 'text-slate-400'
                                         }`}>
                                         {user.role === 'superadmin' ? 'SUPER ADMIN' :
                                             user.role === 'community_admin' ? 'ADMINISTRATION' : 'USER'}

@@ -6,12 +6,12 @@ const axios = require("axios");
 const telemetryCache = require("../services/cacheService.js");
 const cache = require("../config/cache.js");
 const deviceState = require("../services/deviceStateService.js");
-const { 
-    fetchSixHourData, 
-    fetchLatestData, 
-    applyLightSmoothing, 
+const {
+    fetchSixHourData,
+    fetchLatestData,
+    applyLightSmoothing,
     calculateMetrics,
-    getLatestFeed 
+    getLatestFeed
 } = require("../services/thingspeakService.js");
 
 const normalizeThingSpeakTimestamp = (ts) => {
@@ -52,7 +52,7 @@ async function syncNodeStatus(id, type, lastSeen, additionalData = {}) {
     try {
         const typeLower = type.toLowerCase();
         const status = deviceState.calculateDeviceStatus(lastSeen);
-        
+
         const updatePayload = {
             status,
             last_seen: lastSeen,
@@ -98,9 +98,18 @@ exports.getNodes = async (req, res) => {
         let query = db.collection("devices");
 
         if (filterCustomerId) {
+            // Filter by the provided customer ID
             query = query.where("customer_id", "==", filterCustomerId);
+            
+            // Only apply visibility restriction if NOT a Superadmin
+            if (req.user.role !== "superadmin") {
+                query = query.where("isVisibleToCustomer", "!=", false);
+            }
         } else if (req.user.role !== "superadmin") {
-            query = query.where("customer_id", "==", req.user.customer_id);
+            // Customer viewing their own devices — always enforce visibility
+            query = query
+                .where("customer_id", "==", req.user.customer_id)
+                .where("isVisibleToCustomer", "!=", false);
         }
 
         const snapshot = await query.get();
@@ -242,15 +251,15 @@ exports.getNodeTelemetry = async (req, res) => {
         if (["evaraflow", "flow", "flow_meter"].includes(type)) {
             const flowKeys = ['flowField', 'flow_rate', 'flow_rate_field'];
             const totalKeys = ['volumeField', 'current_reading', 'total_reading', 'meter_reading_field'];
-            
-            const flowRateFieldKey = 
-                flowKeys.reduce((acc, k) => acc || fieldMapping[k] || metadata[k], null) || 
-                Object.keys(fieldMapping).find(k => flowKeys.includes(fieldMapping[k])) || 
+
+            const flowRateFieldKey =
+                flowKeys.reduce((acc, k) => acc || fieldMapping[k] || metadata[k], null) ||
+                Object.keys(fieldMapping).find(k => flowKeys.includes(fieldMapping[k])) ||
                 "field4";
 
-            const totalReadingFieldKey = 
-                totalKeys.reduce((acc, k) => acc || fieldMapping[k] || metadata[k], null) || 
-                Object.keys(fieldMapping).find(k => totalKeys.includes(fieldMapping[k])) || 
+            const totalReadingFieldKey =
+                totalKeys.reduce((acc, k) => acc || fieldMapping[k] || metadata[k], null) ||
+                Object.keys(fieldMapping).find(k => totalKeys.includes(fieldMapping[k])) ||
                 "field5";
 
             if (!channelId || !apiKey) {
@@ -363,7 +372,7 @@ exports.getNodeTelemetry = async (req, res) => {
 
         try {
             // Resolve the field key from sensor_field_mapping for tank/deep
-            const sensorFieldKey = fieldMapping.levelField || 
+            const sensorFieldKey = fieldMapping.levelField ||
                 Object.keys(fieldMapping).find(k =>
                     fieldMapping[k] === "water_level_raw_sensor_reading" ||
                     fieldMapping[k] === "water_level_in_cm"
@@ -437,7 +446,7 @@ exports.getNodeGraphData = async (req, res) => {
         const { incremental = false, lastTimestamp } = req.query;
 
         if (!channelId || !apiKey) {
-            return res.status(200).json({ 
+            return res.status(200).json({
                 data: [],
                 metrics: {
                     currentLevel: null,
@@ -452,9 +461,9 @@ exports.getNodeGraphData = async (req, res) => {
         try {
             if (incremental === 'true' && lastTimestamp) {
                 const latestPoint = await fetchLatestData(channelId, apiKey, lastTimestamp);
-                
+
                 if (!latestPoint) {
-                    return res.status(200).json({ 
+                    return res.status(200).json({
                         data: [],
                         lastTimestamp: lastTimestamp,
                         hasNewData: false,
@@ -462,7 +471,7 @@ exports.getNodeGraphData = async (req, res) => {
                     });
                 }
 
-                return res.status(200).json({ 
+                return res.status(200).json({
                     data: [latestPoint],
                     lastTimestamp: latestPoint.timestamp,
                     hasNewData: true,
@@ -470,9 +479,9 @@ exports.getNodeGraphData = async (req, res) => {
                 });
             } else {
                 const fullData = await fetchSixHourData(channelId, apiKey);
-                
+
                 if (!fullData || fullData.length === 0) {
-                    return res.status(200).json({ 
+                    return res.status(200).json({
                         data: [],
                         lastTimestamp: null,
                         hasNewData: false,
@@ -488,8 +497,8 @@ exports.getNodeGraphData = async (req, res) => {
 
                 const smoothedData = applyLightSmoothing(fullData);
                 const metrics = calculateMetrics(smoothedData);
-                
-                return res.status(200).json({ 
+
+                return res.status(200).json({
                     data: smoothedData,
                     lastTimestamp: smoothedData.length > 0 ? smoothedData[smoothedData.length - 1].timestamp : null,
                     hasNewData: smoothedData.length > 0,
@@ -497,7 +506,7 @@ exports.getNodeGraphData = async (req, res) => {
                 });
             }
         } catch (err) {
-            return res.status(200).json({ 
+            return res.status(200).json({
                 data: [],
                 lastTimestamp: lastTimestamp || null,
                 hasNewData: false,
@@ -538,7 +547,7 @@ exports.getNodeAnalytics = async (req, res) => {
         const capacity = metadata.tank_size || 0;
 
         if (!channelId || !apiKey) return res.status(400).json({ error: "Telemetry configuration missing" });
-        
+
         // ── CACHE LAYER ────────────────────────────────────────────────────────
         const analyticsCacheKey = `analytics_${deviceDoc.id}`;
         const cachedAnalytics = await cache.get(analyticsCacheKey);
@@ -554,22 +563,22 @@ exports.getNodeAnalytics = async (req, res) => {
 
         const sampleFeed = feeds[0] || {};
         const definedField = metadata.secondary_field || metadata.water_level_field || metadata.fieldKey || metadata.configuration?.water_level_field || metadata.configuration?.fieldKey;
-        
-        const fieldKey = fieldMapping.levelField || definedField || 
+
+        const fieldKey = fieldMapping.levelField || definedField ||
             Object.keys(fieldMapping).find(k => fieldMapping[k] && fieldMapping[k].includes("water_level")) ||
             (sampleFeed.field1 !== undefined ? "field1" : "field2");
 
         // EXPLICIT FLOW BYPASS - SMART FIELD SCAN
         if (["evaraflow", "flow", "flow_meter"].includes(type)) {
-            let flowRateFieldKey = deviceDoc.data().flow_rate_field || 
+            let flowRateFieldKey = deviceDoc.data().flow_rate_field ||
                 Object.keys(fieldMapping).find(k => fieldMapping[k] === "flow_rate");
-            let totalReadingFieldKey = deviceDoc.data().meter_reading_field || 
+            let totalReadingFieldKey = deviceDoc.data().meter_reading_field ||
                 Object.keys(fieldMapping).find(k => fieldMapping[k] === "current_reading");
 
             // Smart-Scan: If fields are missing/zero in DB, find them in the data
             if (feeds.length > 0) {
                 const latestFeed = getLatestFeed(feeds);
-                
+
                 if (!totalReadingFieldKey || !latestFeed[totalReadingFieldKey]) {
                     // Find largest number (likely the totalizer)
                     let maxVal = -1;
@@ -599,9 +608,9 @@ exports.getNodeAnalytics = async (req, res) => {
 
                 const lastUpdatedAt = latestFeed.created_at;
                 const status = deviceState.calculateDeviceStatus(lastUpdatedAt);
-                
-                const flowResult = { 
-                    node_id: req.params.id, 
+
+                const flowResult = {
+                    node_id: req.params.id,
                     status,
                     lastUpdatedAt,
                     // Return the mapping so frontend knows what we used
@@ -714,9 +723,9 @@ exports.getNodeAnalytics = async (req, res) => {
                 }
                 activeRefillStart = null;
             }
-            
+
             if (isToday && i % 20 === 0) {
-                 refillTimeline.push(volChange > REFILL_THRESHOLD ? 1 : 0);
+                refillTimeline.push(volChange > REFILL_THRESHOLD ? 1 : 0);
             }
         }
 
@@ -738,7 +747,7 @@ exports.getNodeAnalytics = async (req, res) => {
         let processedHistory = feeds.map((f) => {
             const raw = parseFloat(f[fieldKey]);
             if (isNaN(raw)) return null;
-            
+
             // Outlier rejection (e.g. ignore 0 or values > 2x depth as sensor errors)
             if (raw <= 0 || (raw / 100) > (tankDepth * 2)) return null;
 
@@ -746,7 +755,7 @@ exports.getNodeAnalytics = async (req, res) => {
             const height = Math.max(0, tankDepth - dist);
             const levelPct = Math.round(Math.min(100, (height / tankDepth) * 100) * 100) / 100;
             const volume = Math.round(((levelPct * totalCapacity) / 100) * 100) / 100;
-            
+
             return {
                 timestamp: normalizeThingSpeakTimestamp(f.created_at),
                 level: levelPct,
@@ -798,8 +807,8 @@ exports.getNodeAnalytics = async (req, res) => {
         const timeToFull = fillRateLpm > 1 ? Math.round(remainingCap / fillRateLpm) : null;
         const timeToEmpty = drainRateLpm > 1 ? Math.round(latestPoint.volume / drainRateLpm) : null;
 
-        const tankResult = { 
-            node_id: req.params.id, 
+        const tankResult = {
+            node_id: req.params.id,
             status,
             lastUpdatedAt: latestPoint.timestamp,
             currentLevel: latestPoint.level,
@@ -811,7 +820,7 @@ exports.getNodeAnalytics = async (req, res) => {
                 drainRateLpm,
                 timeToFull,
                 timeToEmpty,
-                eventTimeline: events.length > 0 ? events.slice(-5) : [] 
+                eventTimeline: events.length > 0 ? events.slice(-5) : []
             }
         };
 

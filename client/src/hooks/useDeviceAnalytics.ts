@@ -21,6 +21,7 @@ export interface NodeInfoData {
   last_seen: string | null;
   zone_name?: string;
   community_name?: string;
+  customer_config?: any;
 }
 
 export interface AnalyticsData {
@@ -194,6 +195,7 @@ export const useDeviceAnalytics = (hardwareIdOverride?: string, options: { refet
           last_seen: d.last_seen || null,
           zone_name: d.zone_name,
           community_name: d.community_name,
+          customer_config: d.customer_config,
         } as NodeInfoData
       },
       history: {

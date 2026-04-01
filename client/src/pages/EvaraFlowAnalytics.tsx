@@ -54,18 +54,18 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const today = new Date();
             const result = [];
-            
+
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(today);
                 d.setDate(d.getDate() - i);
-                
+
                 const dayData = history.filter(h => h.date && h.date.getDate() === d.getDate() && h.date.getMonth() === d.getMonth());
-                
+
                 let val: number | null = null;
                 if (dayData.length > 0) {
                     val = dayData.reduce((sum, item) => sum + item.value, 0) / dayData.length;
                 }
-                
+
                 result.push({
                     label: days[d.getDay()],
                     current: val,
@@ -76,23 +76,23 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
         } else if (period === 'MONTHLY') {
             const result = [];
             const today = new Date();
-            
+
             for (let i = 3; i >= 0; i--) {
                 const targetDate = new Date(today);
                 targetDate.setDate(targetDate.getDate() - (i * 7));
-                
+
                 const weekData = history.filter(h => {
                     if (!h.date) return false;
                     const diffTime = targetDate.getTime() - h.date.getTime();
                     const diffDays = diffTime / (1000 * 60 * 60 * 24);
                     return diffDays >= 0 && diffDays < 7;
                 });
-                
+
                 let val: number | null = null;
                 if (weekData.length > 0) {
                     val = weekData.reduce((sum, item) => sum + item.value, 0) / weekData.length;
                 }
-                
+
                 result.push({
                     label: `Week ${4 - i}`,
                     current: val,
@@ -175,10 +175,10 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
             </div>
 
             {/* Chart Area */}
-            <div className="flex-1 w-full relative min-h-[220px]" 
-                onMouseEnter={() => setIsHovered(true)} 
+            <div className="flex-1 w-full relative min-h-[220px]"
+                onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}>
-                
+
                 {/* Hover Legend */}
                 <div className={`absolute top-0 right-0 z-20 flex items-center gap-4 transition-all duration-300 pointer-events-none ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
                     <div className="flex items-center gap-2">
@@ -294,9 +294,9 @@ const AlertsCard = ({ flowRate, maxFlowRate, className = "" }: { flowRate: numbe
                 {/* Top Right Red Exclamation Icon */}
                 <div className="w-11 h-11 rounded-[14px] bg-white flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-slate-50">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M11.139 3.564c.394-.682 1.328-.682 1.722 0l8.383 14.5c.395.683-.098 1.54-.861 1.54H3.617c-.763 0-1.256-.857-.861-1.54l8.383-14.5Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="1.5" strokeLinejoin="round"/>
-                        <path d="M12 9v4" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round"/>
-                        <circle cx="12" cy="16.5" r="1.5" fill="#FFFFFF"/>
+                        <path d="M11.139 3.564c.394-.682 1.328-.682 1.722 0l8.383 14.5c.395.683-.098 1.54-.861 1.54H3.617c-.763 0-1.256-.857-.861-1.54l8.383-14.5Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="1.5" strokeLinejoin="round" />
+                        <path d="M12 9v4" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+                        <circle cx="12" cy="16.5" r="1.5" fill="#FFFFFF" />
                     </svg>
                 </div>
             </div>
@@ -389,6 +389,14 @@ const EvaraFlowAnalytics = () => {
     const deviceInfo = ('data' in (unifiedData?.info ?? {})
         ? (unifiedData!.info as any).data
         : undefined) as NodeInfoData | undefined;
+
+    const customerConfig = (deviceInfo as any)?.customer_config || {};
+    const isSuperAdmin = user?.role === 'superadmin';
+
+    const showWaterSecurityParam    = isSuperAdmin || customerConfig.showWaterSecurity    !== false;
+    const showSystemDynamicsParam   = isSuperAdmin || customerConfig.showSystemDynamics   !== false;
+    const showAlertsParam           = isSuperAdmin || customerConfig.showAlerts           !== false;
+    const showConsumptionPatternParam = isSuperAdmin || customerConfig.showConsumptionPattern !== false;
 
     const historyFeeds = (unifiedData?.history as any)?.feeds || [];
     const maxFlowRate = deviceConfig?.max_flow_rate ?? 30;
@@ -722,7 +730,7 @@ const EvaraFlowAnalytics = () => {
                                     {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
                                 </button>
 
-                                <button 
+                                <button
                                     onClick={() => setShowNodeInfo(true)}
                                     className="flex items-center gap-2 px-3 py-1.5 bg-[#AF52DE]/30 hover:bg-[#AF52DE]/40 text-[#6f2da8] border border-[#AF52DE]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
                                 >
@@ -730,7 +738,7 @@ const EvaraFlowAnalytics = () => {
                                     Node Info
                                 </button>
 
-                                <button 
+                                <button
                                     onClick={() => setShowParams(true)}
                                     className="flex items-center gap-2 px-3 py-1.5 bg-[#FF9500]/30 hover:bg-[#FF9500]/40 text-[#d35400] border border-[#FF9500]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
                                 >
@@ -957,10 +965,10 @@ const EvaraFlowAnalytics = () => {
 
                     {/* ── DASHBOARD GRID: Left Column (Meter) | Right Column (Others) ── */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-6">
-                        
+
                         {/* LEFT COLUMN: Analog Brass Meter */}
                         <div className="lg:col-span-1 apple-glass-card rounded-[2rem] p-10 flex flex-col items-center justify-center gap-6 min-h-[460px] h-full relative overflow-hidden">
-                            
+
                             <div className="mt-2 mb-4" />
 
                             <div className="relative w-72 h-72 drop-shadow-2xl flex-shrink-0">
@@ -1043,57 +1051,77 @@ const EvaraFlowAnalytics = () => {
                         {/* RIGHT COLUMN: 3-col grid top row + 1-col full bottom row */}
                         <div className="lg:col-span-2 flex flex-col gap-6 h-full">
                             {/* Top Row: Three equal-height cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+                            <div className="grid gap-[1rem] w-full" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
                                 {/* Water Security Monitoring */}
-                                <div className="apple-glass-card rounded-[2rem] p-4 flex flex-col relative max-h-[280px] overflow-hidden h-full">
-                                    {/* Header */}
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-emerald-600">SYSTEM SHIELD</span>
-                                            <h2 className="text-[17px] font-bold tracking-tight text-black m-0">Water Security Monitoring</h2>
-                                        </div>
-                                    </div>
-
-                                    {/* KPI row: horizontal constraint to guarantee two-column layout */}
-                                    <div className="flex flex-row items-end justify-between gap-4 w-full mb-auto flex-nowrap overflow-hidden">
-                                        
-                                        {/* LEFT: USAGE */}
-                                        <div className="flex flex-col gap-1 min-w-0">
-                                            <div className="flex items-center gap-1">
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                                <span className="text-[11px] font-bold uppercase tracking-widest text-[#94a3b8]">USAGE</span>
+                                {showWaterSecurityParam && (
+                                    <div className="apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden h-full w-full min-h-[180px] max-h-[45vh]">
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-emerald-600">SYSTEM SHIELD</span>
+                                                <h2 className="text-[17px] font-bold tracking-tight text-black m-0">Water Security Monitoring</h2>
                                             </div>
-                                            <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[#005ba1] leading-none tabular-nums truncate">
-                                                {formatKPI(deltaVolumeLitres > 0 ? deltaVolumeLitres : (totalRaw * 1000))}
-                                                <span className="text-[0.8rem] font-medium text-[#94a3b8] ml-0.5">L</span>
-                                            </span>
+                                            {isSuperAdmin && customerConfig.showWaterSecurity === false && (
+                                                <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden</span>
+                                            )}
                                         </div>
 
-                                        {/* RIGHT: FLOW */}
-                                        <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
-                                                <span className="text-[11px] font-bold uppercase tracking-widest text-[#94a3b8]">FLOW</span>
+                                        {/* KPI row: horizontal constraint to guarantee two-column layout */}
+                                        <div className="flex flex-row items-end justify-between gap-4 w-full mb-auto flex-nowrap overflow-hidden">
+
+                                            {/* LEFT: USAGE */}
+                                            <div className="flex flex-col gap-1 min-w-0">
+                                                <div className="flex items-center gap-1">
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
+                                                    <span className="text-[11px] font-bold uppercase tracking-widest text-[#94a3b8]">USAGE</span>
+                                                </div>
+                                                <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[#005ba1] leading-none tabular-nums truncate">
+                                                    {formatKPI(deltaVolumeLitres > 0 ? deltaVolumeLitres : (totalRaw * 1000))}
+                                                    <span className="text-[0.8rem] font-medium text-[#94a3b8] ml-0.5">L</span>
+                                                </span>
+                                            </div>
+
+                                            {/* RIGHT: FLOW */}
+                                            <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
+                                                    <span className="text-[11px] font-bold uppercase tracking-widest text-[#94a3b8]">FLOW</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* System Dynamics (FlowKPI) */}
-                                <div className="max-h-[280px] overflow-hidden h-full min-h-[inherit]">
-                                    <FlowKPICard className="h-full" avgFlow={avgFlowRate} />
-                                </div>
+                                {showSystemDynamicsParam && (
+                                    <div className="h-full w-full min-h-[180px] max-h-[45vh] overflow-hidden relative">
+                                        {isSuperAdmin && customerConfig.showSystemDynamics === false && (
+                                            <span className="absolute top-2 right-2 z-20 text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden</span>
+                                        )}
+                                        <FlowKPICard className="h-full" avgFlow={avgFlowRate} />
+                                    </div>
+                                )}
 
                                 {/* Alerts Card */}
-                                <div className="max-h-[280px] overflow-hidden h-full min-h-[inherit]">
-                                    <AlertsCard className="h-full" flowRate={flowRate} maxFlowRate={maxFlowRate} />
-                                </div>
+                                {showAlertsParam && (
+                                    <div className="h-full w-full min-h-[180px] max-h-[45vh] overflow-hidden relative">
+                                        {isSuperAdmin && customerConfig.showAlerts === false && (
+                                            <span className="absolute top-2 right-2 z-20 text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden</span>
+                                        )}
+                                        <AlertsCard className="h-full" flowRate={flowRate} maxFlowRate={maxFlowRate} />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Bottom row — capped so it doesn't balloon on large screens */}
-                            <div className="flex-1 min-h-[420px] overflow-hidden">
-                                <ConsumptionPatternCard history={flowHistory} />
-                            </div>
+                            {showConsumptionPatternParam && (
+                                <div className="flex-1 min-h-[420px] overflow-hidden relative">
+                                    {isSuperAdmin && customerConfig.showConsumptionPattern === false && (
+                                        <span className="absolute top-4 right-20 z-20 text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
+                                    )}
+                                    <ConsumptionPatternCard history={flowHistory} />
+                                </div>
+                            )}
                         </div>
                     </div>
 

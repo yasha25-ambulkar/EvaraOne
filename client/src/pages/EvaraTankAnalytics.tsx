@@ -260,6 +260,19 @@ const EvaraTankAnalytics = () => {
         ? (unifiedData!.info as { data: NodeInfoData }).data
         : undefined) as NodeInfoData | undefined;
 
+    console.log('deviceInfo:', deviceInfo);
+
+    const customerConfig = (deviceInfo as any)?.customer_config || {};
+    const isSuperAdmin = user?.role === 'superadmin';
+
+    const showTankLevelParam    = isSuperAdmin || customerConfig.showTankLevel    !== false;
+    const showEstimationsParam  = isSuperAdmin || customerConfig.showEstimations  !== false;
+    const showFillRateParam     = isSuperAdmin || customerConfig.showFillRate     !== false;
+    const showConsumptionParam  = isSuperAdmin || customerConfig.showConsumption  !== false;
+    const showAlertsParam       = isSuperAdmin || customerConfig.showAlerts       !== false;
+    const showDeviceHealthParam = isSuperAdmin || customerConfig.showDeviceHealth !== false;
+    const showVolumeParam       = isSuperAdmin || customerConfig.showVolume       !== false;
+
     const { telemetry: realtimeData } = useRealtimeTelemetry(deviceInfo?.id || hardwareId || "");
 
     const [liveFeeds, setLiveFeeds] = useState<TelemetryPayload[]>([]);
@@ -423,7 +436,7 @@ const EvaraTankAnalytics = () => {
     const mergedDataResult = useMemo(() => {
         const history = unifiedData?.history?.feeds || [];
         const deviceType = deviceInfo?.asset_type || 'EvaraTank';
-        
+
         return dataMergingService.mergeDataSources(
             history,
             liveFeeds,
@@ -439,7 +452,7 @@ const EvaraTankAnalytics = () => {
             // Create chart data from processed real-time feeds only
             return dataMergingService.getChartData(liveFeeds as any, 1000, metrics.capacityLitres);
         }
-        
+
         // Fallback to merged data if no real-time data
         return dataMergingService.getChartData(mergedDataResult.mergedData, 1000, metrics.capacityLitres);
     }, [mergedDataResult.mergedData, liveFeeds, activeTelemetry, metrics.capacityLitres]);
@@ -461,13 +474,13 @@ const EvaraTankAnalytics = () => {
         !isOffline  // isDeviceOnline — used for Device Health
     );
 
-    
+
 
     // Analytics logging
 
     const { logData } = useAnalyticsLogger();
 
-    
+
 
     // Log analytics data when it updates (but not too frequently)
 
@@ -622,102 +635,102 @@ const EvaraTankAnalytics = () => {
             color: '#1C1C1E'
         }}>
 
-        <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
+            <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
 
-            <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
+                <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
 
 
-                {/* Breadcrumb + Page Heading row */}
+                    {/* Breadcrumb + Page Heading row */}
 
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
 
-                    <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2">
 
-                        <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: '#888' }}>
+                            <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: '#888' }}>
 
-                            <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
+                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
 
-                                Home
+                                    Home
 
-                            </button>
+                                </button>
 
-                            <span className="material-icons" style={{ fontSize: '16px', color: '#888' }}>chevron_right</span>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#888' }}>chevron_right</span>
 
-                            <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: '#888' }}>
+                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: '#888' }}>
 
-                                All Nodes
+                                    All Nodes
 
-                            </button>
+                                </button>
 
-                            <span className="material-icons" style={{ fontSize: '16px', color: '#888' }}>chevron_right</span>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#888' }}>chevron_right</span>
 
-                            <span className="font-bold" style={{ color: '#222', fontWeight: '700' }}>{deviceName}</span>
+                                <span className="font-bold" style={{ color: '#222', fontWeight: '700' }}>{deviceName}</span>
 
-                        </nav>
+                            </nav>
 
-                        <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: '#1C1C1E' }}>
+                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: '#1C1C1E' }}>
 
-                            {deviceName} Analytics
-                        </h2>
+                                {deviceName} Analytics
+                            </h2>
 
-                        {zoneName && (
-                            <p className="text-xs text-slate-400 m-0 mt-1">
-                                {zoneName}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap pb-1">
-                        {/* Status Button (Pill Style) */}
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isOffline ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#34C759]/30 text-[#1e7e34] border border-[#34C759]/60 shadow-md transition-all duration-300'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-[#34C759] animate-pulse shadow-[0_0_8px_rgba(52,199,89,0.6)]'}`} />
-                            {isOffline ? 'Offline' : 'Online'}
+                            {zoneName && (
+                                <p className="text-xs text-slate-400 m-0 mt-1">
+                                    {zoneName}
+                                </p>
+                            )}
                         </div>
 
-                        {/* Node Info Button */}
-                        <button 
-                            onClick={() => refetch()}
-                            disabled={analyticsFetching}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95 ${analyticsFetching ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff]/10 hover:bg-[#0077ff]/20 text-[#0077ff] border border-[#0077ff]/30'}`}
-                        >
-                            <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
-                                {analyticsFetching ? 'sync' : 'refresh'}
-                            </span>
-                            {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                            {/* Status Button (Pill Style) */}
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isOffline ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#34C759]/30 text-[#1e7e34] border border-[#34C759]/60 shadow-md transition-all duration-300'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-[#34C759] animate-pulse shadow-[0_0_8px_rgba(52,199,89,0.6)]'}`} />
+                                {isOffline ? 'Offline' : 'Online'}
+                            </div>
 
-                        <button 
-                            onClick={() => setShowNodeInfo(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-[#AF52DE]/30 hover:bg-[#AF52DE]/40 text-[#6f2da8] border border-[#AF52DE]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
-                        >
-                            <Info size={12} className="stroke-[2.5px]" />
-                            Node Info
-                        </button>
-
-                        {/* Parameters Button */}
-                        <button 
-                            onClick={() => setShowParams(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-[#FF9500]/30 hover:bg-[#FF9500]/40 text-[#d35400] border border-[#FF9500]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
-                        >
-                            <Settings size={12} className="stroke-[2.5px]" />
-                            Parameters
-                        </button>
-
-                        {/* Delete Button */}
-                        {user?.role === 'superadmin' && (
-                            <button 
-                                onClick={() => setShowDeleteConfirm(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-600 border border-red-500/40 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                            {/* Node Info Button */}
+                            <button
+                                onClick={() => refetch()}
+                                disabled={analyticsFetching}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95 ${analyticsFetching ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff]/10 hover:bg-[#0077ff]/20 text-[#0077ff] border border-[#0077ff]/30'}`}
                             >
-                                <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
-                                Delete Node
+                                <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
+                                    {analyticsFetching ? 'sync' : 'refresh'}
+                                </span>
+                                {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
                             </button>
-                        )}
+
+                            <button
+                                onClick={() => setShowNodeInfo(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[#AF52DE]/30 hover:bg-[#AF52DE]/40 text-[#6f2da8] border border-[#AF52DE]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                            >
+                                <Info size={12} className="stroke-[2.5px]" />
+                                Node Info
+                            </button>
+
+                            {/* Parameters Button */}
+                            <button
+                                onClick={() => setShowParams(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[#FF9500]/30 hover:bg-[#FF9500]/40 text-[#d35400] border border-[#FF9500]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                            >
+                                <Settings size={12} className="stroke-[2.5px]" />
+                                Parameters
+                            </button>
+
+                            {/* Delete Button */}
+                            {user?.role === 'superadmin' && (
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-600 border border-red-500/40 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                >
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
+                                    Delete Node
+                                </button>
+                            )}
+
+                        </div>
 
                     </div>
-
-                </div>
 
                     {/* Parameters Popup Modal */}
                     {showParams && (
@@ -1291,7 +1304,8 @@ const EvaraTankAnalytics = () => {
                         <div className="flex flex-col gap-4 w-full">
 
                             {/* TANK VISUALIZER */}
-                            <div className="apple-glass-card rounded-[2.5rem] p-3 flex flex-col relative overflow-hidden">
+                            {(showTankLevelParam || showVolumeParam) && (
+                                <div className="apple-glass-card rounded-[2.5rem] p-3 flex flex-col relative overflow-hidden">
 
                                 <div className="flex justify-between items-center mb-2 z-10 w-full">
                                     <div>
@@ -1305,128 +1319,129 @@ const EvaraTankAnalytics = () => {
                                     </div>
                                 </div>
 
+                                {showTankLevelParam && (
                                 <div className="flex items-center justify-center py-0 z-10 mt-4 mb-2">
 
-                                <div className="relative" style={{ width: 180, height: 250 }}>
+                                    <div className="relative" style={{ width: 180, height: 250 }}>
 
-                                    <div className="absolute inset-0 rounded-[45px] overflow-hidden z-10 tank-glass"
+                                        <div className="absolute inset-0 rounded-[45px] overflow-hidden z-10 tank-glass"
 
-                                        style={{ border: '2.5px solid rgba(255,255,255,0.65)', boxShadow: '0 16px 36px rgba(0,80,200,0.15), inset 0 1px 0 rgba(255,255,255,0.5)', background: 'rgba(230,240,255,0.18)' }}>
+                                            style={{ border: '2.5px solid rgba(255,255,255,0.65)', boxShadow: '0 16px 36px rgba(0,80,200,0.15), inset 0 1px 0 rgba(255,255,255,0.5)', background: 'rgba(230,240,255,0.18)' }}>
 
-                                        {/* Glass shine left */}
-                                        <div className="absolute top-0 bottom-0 left-2" style={{ width: 14, background: 'linear-gradient(90deg,rgba(255,255,255,0.55),transparent)', filter: 'blur(2px)', zIndex: 30, borderRadius: '45px 0 0 45px' }} />
+                                            {/* Glass shine left */}
+                                            <div className="absolute top-0 bottom-0 left-2" style={{ width: 14, background: 'linear-gradient(90deg,rgba(255,255,255,0.55),transparent)', filter: 'blur(2px)', zIndex: 30, borderRadius: '45px 0 0 45px' }} />
 
-                                        {/* Glass shine right */}
-                                        <div className="absolute top-0 bottom-0 right-1" style={{ width: 7, background: 'linear-gradient(270deg,rgba(255,255,255,0.35),transparent)', filter: 'blur(1px)', zIndex: 30 }} />
+                                            {/* Glass shine right */}
+                                            <div className="absolute top-0 bottom-0 right-1" style={{ width: 7, background: 'linear-gradient(270deg,rgba(255,255,255,0.35),transparent)', filter: 'blur(1px)', zIndex: 30 }} />
 
-                                        {/* Water fill */}
-                                        <div className="absolute bottom-0 left-0 right-0 overflow-hidden z-20"
+                                            {/* Water fill */}
+                                            <div className="absolute bottom-0 left-0 right-0 overflow-hidden z-20"
 
-                                            style={{ height: (telemetryLoading && !metrics.isDataValid) ? '50%' : `${pct}%`, transition: 'height 1.5s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg, #5AC8FA 0%, #0A84FF 35%, #0055D4 70%, #003DAA 100%)' }}>
+                                                style={{ height: (telemetryLoading && !metrics.isDataValid) ? '50%' : `${pct}%`, transition: 'height 1.5s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg, #5AC8FA 0%, #0A84FF 35%, #0055D4 70%, #003DAA 100%)' }}>
 
-                                            {/* Shimmer overlay */}
-                                            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%)', mixBlendMode: 'overlay' }} />
+                                                {/* Shimmer overlay */}
+                                                <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%)', mixBlendMode: 'overlay' }} />
 
-                                            {/* Level text inside water if high enough */}
+                                                {/* Level text inside water if high enough */}
 
-                                            {pct > 15 && (
+                                                {pct > 15 && (
 
-                                                <div className="absolute top-5 left-0 right-0 text-center pointer-events-none z-30"
+                                                    <div className="absolute top-5 left-0 right-0 text-center pointer-events-none z-30"
 
-                                                    style={{
+                                                        style={{
 
-                                                        color: '#ffffff',
+                                                            color: '#ffffff',
 
-                                                        fontSize: '38px',
+                                                            fontSize: '38px',
 
-                                                        fontWeight: 800,
+                                                            fontWeight: 800,
 
-                                                        lineHeight: 1,
+                                                            lineHeight: 1,
 
-                                                        textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                                                            textShadow: '0 2px 8px rgba(0,0,0,0.4)',
 
-                                                        letterSpacing: '-0.5px'
+                                                            letterSpacing: '-0.5px'
 
-                                                    }}>
+                                                        }}>
 
-                                                    {Math.round(pct)}%
-                                                    
-                                                    {/* Enhanced Conditional Processing Indicator */}
-                                                    {(metrics as any).isCorrected && (
-                                                        <div className="absolute -top-1 -right-1 flex flex-col items-center">
-                                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shadow-lg border-2 border-white animate-pulse ${
-                                                                (metrics as any).data_label === 'PREDICTED' 
-                                                                    ? 'bg-red-500' 
+                                                        {Math.round(pct)}%
+
+                                                        {/* Enhanced Conditional Processing Indicator */}
+                                                        {(metrics as any).isCorrected && (
+                                                            <div className="absolute -top-1 -right-1 flex flex-col items-center">
+                                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shadow-lg border-2 border-white animate-pulse ${(metrics as any).data_label === 'PREDICTED'
+                                                                    ? 'bg-red-500'
                                                                     : (metrics as any).data_label === 'CORRECTED'
-                                                                    ? 'bg-orange-500'
-                                                                    : 'bg-blue-500'
-                                                            }`}
-                                                                 title={`Conditional Processing: ${(metrics as any).data_label} - ${(metrics as any).correction_reason || 'Intelligent correction'}`}>
-                                                                <span className="text-white text-[10px] font-black">
-                                                                    {(metrics as any).data_label === 'PREDICTED' ? 'P' : 
-                                                                     (metrics as any).data_label === 'CORRECTED' ? 'C' : '!'}
+                                                                        ? 'bg-orange-500'
+                                                                        : 'bg-blue-500'
+                                                                    }`}
+                                                                    title={`Conditional Processing: ${(metrics as any).data_label} - ${(metrics as any).correction_reason || 'Intelligent correction'}`}>
+                                                                    <span className="text-white text-[10px] font-black">
+                                                                        {(metrics as any).data_label === 'PREDICTED' ? 'P' :
+                                                                            (metrics as any).data_label === 'CORRECTED' ? 'C' : '!'}
+                                                                    </span>
+                                                                </div>
+                                                                <span className={`text-[10px] font-bold mt-1 uppercase tracking-tighter ${(metrics as any).data_label === 'PREDICTED'
+                                                                    ? 'text-red-400'
+                                                                    : (metrics as any).data_label === 'CORRECTED'
+                                                                        ? 'text-orange-400'
+                                                                        : 'text-blue-400'
+                                                                    }`} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                                                    {(metrics as any).data_label || 'CORR'}
                                                                 </span>
+                                                                {(metrics as any).prediction_mode && (
+                                                                    <span className="text-[8px] text-red-300 font-bold">PRED MODE</span>
+                                                                )}
                                                             </div>
-                                                            <span className={`text-[10px] font-bold mt-1 uppercase tracking-tighter ${
-                                                                (metrics as any).data_label === 'PREDICTED' 
-                                                                    ? 'text-red-400' 
-                                                                    : (metrics as any).data_label === 'CORRECTED'
-                                                                    ? 'text-orange-400'
-                                                                    : 'text-blue-400'
-                                                            }`} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                                                                {(metrics as any).data_label || 'CORR'}
-                                                            </span>
-                                                            {(metrics as any).prediction_mode && (
-                                                                <span className="text-[8px] text-red-300 font-bold">PRED MODE</span>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                        )}
+
+                                                    </div>
+
+                                                )}
+
+                                                {/* Animated wave surface */}
+                                                <div className="absolute top-0 w-[200%] left-0 wave-animation" style={{ opacity: 0.55, height: '20px' }}>
+
+                                                    <svg viewBox="0 0 800 40" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
+
+                                                        <path d="M 0,20 Q 100,5 200,20 T 400,20 T 600,20 T 800,20 L 800,40 L 0,40 Z" fill="rgba(255,255,255,0.45)" />
+
+                                                    </svg>
 
                                                 </div>
-
-                                            )}
-
-                                            {/* Animated wave surface */}
-                                            <div className="absolute top-0 w-[200%] left-0 wave-animation" style={{ opacity: 0.55, height: '20px' }}>
-
-                                                <svg viewBox="0 0 800 40" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
-
-                                                    <path d="M 0,20 Q 100,5 200,20 T 400,20 T 600,20 T 800,20 L 800,40 L 0,40 Z" fill="rgba(255,255,255,0.45)" />
-
-                                                </svg>
 
                                             </div>
 
-                                        </div>
 
 
+                                            {/* Level tick marks — right side */}
+                                            <div className="absolute right-2 top-0 bottom-0 flex flex-col justify-between py-4 z-30" style={{ opacity: 0.7, width: 30 }}>
 
-                                        {/* Level tick marks — right side */}
-                                        <div className="absolute right-2 top-0 bottom-0 flex flex-col justify-between py-4 z-30" style={{ opacity: 0.7, width: 30 }}>
+                                                {(['100', '75', '50', '25', '0'] as string[]).map((lbl, i) => (
 
-                                            {(['100', '75', '50', '25', '0'] as string[]).map((lbl, i) => (
+                                                    <div key={i} className="flex items-center justify-end gap-1">
 
-                                                <div key={i} className="flex items-center justify-end gap-1">
+                                                        <span style={{ fontSize: 8, fontWeight: 700, fontFamily: 'monospace', color: pct >= Number(lbl) ? '#e2f0ff' : '#64748b' }}>{lbl}</span>
 
-                                                    <span style={{ fontSize: 8, fontWeight: 700, fontFamily: 'monospace', color: pct >= Number(lbl) ? '#e2f0ff' : '#64748b' }}>{lbl}</span>
+                                                        <div style={{ width: 8, height: 1.5, background: pct >= Number(lbl) ? 'rgba(255,255,255,0.7)' : '#94a3b8', borderRadius: 2 }} />
 
-                                                    <div style={{ width: 8, height: 1.5, background: pct >= Number(lbl) ? 'rgba(255,255,255,0.7)' : '#94a3b8', borderRadius: 2 }} />
+                                                    </div>
 
-                                                </div>
+                                                ))}
 
-                                            ))}
+                                            </div>
 
                                         </div>
 
                                     </div>
 
                                 </div>
-
-                            </div>
+                                )}
 
 
 
                                 <div className="flex flex-col mt-4 pt-0 gap-2 z-10 w-full">
+                                    {showVolumeParam && (
                                     <div className="grid grid-cols-2 gap-2 w-full">
                                         <div className="text-left rounded-xl p-3 flex flex-col justify-center" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)' }}>
                                             <p className="text-[10px] font-bold uppercase tracking-wider m-0 mb-1" style={{ color: '#8E8E93' }}>Total Cap</p>
@@ -1437,15 +1452,15 @@ const EvaraTankAnalytics = () => {
                                             <p className="text-lg font-black m-0 tracking-tight" style={{ color: '#004BA0' }}>{Math.round(metrics.volumeLitres).toLocaleString()} L</p>
                                         </div>
                                     </div>
+                                    )}
 
                                     <div className="text-center w-full mt-0.5">
                                         {latestPoint?.predictions && (latestPoint.predictions.timeToEmpty || latestPoint.predictions.timeToFull) ? (
                                             <div className="flex flex-col gap-1 items-center">
-                                                <div className={`px-4 py-2 rounded-full text-[11px] font-bold flex items-center gap-2 shadow-sm border ${
-                                                    latestPoint.predictions.timeToEmpty 
-                                                    ? 'bg-red-50/80 text-red-600 border-red-100' 
+                                                <div className={`px-4 py-2 rounded-full text-[11px] font-bold flex items-center gap-2 shadow-sm border ${latestPoint.predictions.timeToEmpty
+                                                    ? 'bg-red-50/80 text-red-600 border-red-100'
                                                     : 'bg-green-50/80 text-green-600 border-green-100'
-                                                }`}>
+                                                    }`}>
                                                     <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
                                                         {latestPoint.predictions.timeToEmpty ? 'hourglass_bottom' : 'hourglass_top'}
                                                     </span>
@@ -1460,8 +1475,10 @@ const EvaraTankAnalytics = () => {
                                     </div>
                                 </div>
                             </div>
+                            )}
 
                             {/* Estimation Cards - Moved here below Tank Card */}
+                            {showEstimationsParam && (
                             <div className="grid grid-cols-2 gap-4 w-full">
                                 <div className="apple-glass-card p-4 rounded-2xl flex flex-col justify-between" style={{ background: 'rgba(255, 149, 0, 0.1)', border: '1px solid rgba(255, 149, 0, 0.2)', minHeight: '120px', boxShadow: '0 8px 32px rgba(255, 149, 0, 0.05)' }}>
                                     <div className="flex justify-between items-start">
@@ -1499,6 +1516,7 @@ const EvaraTankAnalytics = () => {
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </div>
 
 
@@ -1508,147 +1526,119 @@ const EvaraTankAnalytics = () => {
                         <div className="lg:col-span-2 flex flex-col gap-4 w-full h-full">
 
                             {/* RATE CARDS */}
-
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-
-                                <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
-
-                                    <div className="flex justify-between items-start">
-
-                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(52,199,89,0.15)' }}>
-
-                                            <TrendingUp size={22} color="#34C759" />
-
-                                        </div>
-
-                                        <button onClick={() => setActiveInfoPopup('fillRate')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
-
-                                            <Info size={16} color="#8E8E93" />
-
-                                        </button>
-
-                                    </div>
-
-                                    <div className="flex flex-col mt-auto pt-3 gap-0.5">
-
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Fill Rate</p>
-
-                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.fillRateLpm > 500 ? '#FF3B30' : '#34C759' }}>
-
-                                            {waterAnalytics.fillRateLpm > 500 ? (
-                                                <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
-                                            ) : waterAnalytics.fillRateLpm > 0 ? (
-                                                <>+{waterAnalytics.fillRateLpm.toFixed(0)} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>L/min</span></>
-                                            ) : waterAnalytics.rateDataValid && waterAnalytics.drainRateLpm === 0 ? (
-                                                <span style={{ fontSize: '16px', color: '#8E8E93' }}>Stable</span>
-                                            ) : '--'}
-
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
-                                <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
-
-                                    <div className="flex justify-between items-start">
-
-                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(255,59,48,0.15)' }}>
-
-                                            <TrendingDown size={22} color="#FF3B30" />
-
-                                        </div>
-
-                                        <button onClick={() => setActiveInfoPopup('consumption')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
-
-                                            <Info size={16} color="#8E8E93" />
-
-                                        </button>
-
-                                    </div>
-
-                                    <div className="flex flex-col mt-auto pt-3 gap-0.5">
-
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Consumption</p>
-
-                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.drainRateLpm > 500 ? '#FF3B30' : '#FF3B30' }}>
-
-                                            {waterAnalytics.drainRateLpm > 500 ? (
-                                                <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
-                                            ) : waterAnalytics.drainRateLpm > 0 ? (
-                                                <>{Math.abs(waterAnalytics.drainRateLpm).toFixed(0)} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>L/min</span></>
-                                            ) : waterAnalytics.rateDataValid && waterAnalytics.fillRateLpm === 0 ? (
-                                                <span style={{ fontSize: '16px', color: '#8E8E93' }}>Stable</span>
-                                            ) : '--'}
-
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
-                                <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
-
-                                    <div className="flex justify-between items-start">
-
-                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(175,82,222,0.15)' }}>
-
-                                            <Bell size={22} color="#AF52DE" />
-
-                                        </div>
-
-                                        <button onClick={() => setActiveInfoPopup('alerts')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
-
-                                            <Info size={16} color="#8E8E93" />
-
-                                        </button>
-
-                                    </div>
-
-                                    <div className="flex flex-col mt-auto pt-3 gap-0.5">
-
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Alerts</p>
-
-                                        <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.alerts.activeCount > 0 ? '#FF3B30' : '#1C1C1E' }}>
-
-                                            {waterAnalytics.alerts.activeCount} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>Active</span>
-
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
-                                <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', minHeight: '130px', position: 'relative' }}>
-
-                                    <div className="flex justify-between items-start">
-
-                                        <div className="flex items-center justify-center rounded-xl w-10 h-10" style={{ background: 'rgba(10,132,255,0.15)' }}>
-
-                                            <Wifi size={22} color="#0A84FF" />
-
-                                        </div>
-
-                                        <button onClick={() => setActiveInfoPopup('deviceHealth')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
-
-                                            <Info size={16} color="#8E8E93" />
-
-                                        </button>
-
-                                    </div>
-
-                                    <div className="flex flex-col mt-auto pt-3 gap-0.5">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Device Health</p>
-                                        <p className={`leading-[1.1] font-black m-0 tracking-tight ${
-                                            waterAnalytics.deviceHealth.status === 'Healthy' ? 'text-[26px]' : 'text-[18px]'
-                                        }`} style={{ color: waterAnalytics.deviceHealth.status === 'Healthy' ? '#34C759' : waterAnalytics.deviceHealth.status === 'Warning' ? '#FF9500' : '#FF3B30' }}>
-                                            {waterAnalytics.deviceHealth.status}
-                                        </p>
-                                    </div>
-
-                                </div>
-
-                            </div>
+ 
+                             <div className="grid gap-[1rem] w-full" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+ 
+                                 {showFillRateParam && (
+                                     <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between h-full w-full min-h-[180px] max-h-[45vh]" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+                                         <div className="flex justify-between items-start">
+                                             <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(52,199,89,0.15)' }}>
+                                                 <TrendingUp size={18} color="#34C759" />
+                                             </div>
+                                             <div className="flex items-center gap-2">
+                                                 {user?.role === 'superadmin' && (deviceConfig as any)?.customer_config?.showFillRate === false && (
+                                                     <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
+                                                 )}
+                                                 <button onClick={() => setActiveInfoPopup('fillRate')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                                                     <Info size={16} color="#8E8E93" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         <div className="flex flex-col mt-auto pt-3 gap-0.5">
+                                             <p className="text-[12px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Fill Rate</p>
+                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.fillRateLpm > 500 ? '#FF3B30' : '#34C759' }}>
+                                                 {waterAnalytics.fillRateLpm > 500 ? (
+                                                     <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
+                                                 ) : waterAnalytics.fillRateLpm > 0 ? (
+                                                     <>+{waterAnalytics.fillRateLpm.toFixed(0)} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>L/min</span></>
+                                                 ) : waterAnalytics.rateDataValid && waterAnalytics.drainRateLpm === 0 ? (
+                                                     <span style={{ fontSize: '16px', color: '#8E8E93' }}>Stable</span>
+                                                 ) : '--'}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 )}
+ 
+                                 {showConsumptionParam && (
+                                     <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between h-full w-full min-h-[180px] max-h-[45vh]" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+                                         <div className="flex justify-between items-start">
+                                             <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(255,59,48,0.15)' }}>
+                                                 <TrendingDown size={18} color="#FF3B30" />
+                                             </div>
+                                             <div className="flex items-center gap-2">
+                                                 {user?.role === 'superadmin' && (deviceConfig as any)?.customer_config?.showConsumption === false && (
+                                                     <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
+                                                 )}
+                                                 <button onClick={() => setActiveInfoPopup('consumption')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                                                     <Info size={16} color="#8E8E93" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         <div className="flex flex-col mt-auto pt-3 gap-0.5">
+                                             <p className="text-[12px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Consumption</p>
+                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.drainRateLpm > 500 ? '#FF3B30' : '#FF3B30' }}>
+                                                 {waterAnalytics.drainRateLpm > 500 ? (
+                                                     <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
+                                                 ) : waterAnalytics.drainRateLpm > 0 ? (
+                                                     <>{Math.abs(waterAnalytics.drainRateLpm).toFixed(0)} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>L/min</span></>
+                                                 ) : waterAnalytics.rateDataValid && waterAnalytics.fillRateLpm === 0 ? (
+                                                     <span style={{ fontSize: '16px', color: '#8E8E93' }}>Stable</span>
+                                                 ) : '--'}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 )}
+ 
+                                 {showAlertsParam && (
+                                     <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between h-full w-full min-h-[180px] max-h-[45vh]" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+                                         <div className="flex justify-between items-start">
+                                             <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(175,82,222,0.15)' }}>
+                                                 <Bell size={18} color="#AF52DE" />
+                                             </div>
+                                             <div className="flex items-center gap-2">
+                                                 {user?.role === 'superadmin' && (deviceConfig as any)?.customer_config?.showAlerts === false && (
+                                                     <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
+                                                 )}
+                                                 <button onClick={() => setActiveInfoPopup('alerts')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                                                     <Info size={16} color="#8E8E93" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         <div className="flex flex-col mt-auto pt-3 gap-0.5">
+                                             <p className="text-[12px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Alerts</p>
+                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.alerts.activeCount > 0 ? '#FF3B30' : '#1C1C1E' }}>
+                                                 {waterAnalytics.alerts.activeCount} <span className="text-[13px] font-bold" style={{ color: '#8E8E93' }}>Active</span>
+                                             </p>
+                                         </div>
+                                     </div>
+                                 )}
+ 
+                                 {showDeviceHealthParam && (
+                                     <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between h-full w-full min-h-[180px] max-h-[45vh]" style={{ background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+                                         <div className="flex justify-between items-start">
+                                             <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(10,132,255,0.15)' }}>
+                                                 <Wifi size={18} color="#0A84FF" />
+                                             </div>
+                                             <div className="flex items-center gap-2">
+                                                 {user?.role === 'superadmin' && (deviceConfig as any)?.customer_config?.showDeviceHealth === false && (
+                                                     <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
+                                                 )}
+                                                 <button onClick={() => setActiveInfoPopup('deviceHealth')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                                                     <Info size={16} color="#8E8E93" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         <div className="flex flex-col mt-auto pt-3 gap-0.5">
+                                             <p className="text-[12px] font-bold uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Device Health</p>
+                                             <p className={`leading-[1.1] font-black m-0 tracking-tight ${waterAnalytics.deviceHealth.status === 'Healthy' ? 'text-[26px]' : 'text-[18px]'
+                                                 }`} style={{ color: waterAnalytics.deviceHealth.status === 'Healthy' ? '#34C759' : waterAnalytics.deviceHealth.status === 'Warning' ? '#FF9500' : '#FF3B30' }}>
+                                                 {waterAnalytics.deviceHealth.status}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 )}
+ 
+                             </div>
 
 
 
@@ -1671,18 +1661,18 @@ const EvaraTankAnalytics = () => {
                                 padding: '24px',
 
                                 minHeight: '350px'
-                                }}>
+                            }}>
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <h4 className="m-0" style={{ fontSize: '18px', fontWeight: 600, color: 'rgba(0,0,0,0.75)' }}>
                                             TANK LEVEL AND VOLUME
                                         </h4>
-                                        
+
                                     </div>
 
                                     <div className="flex items-center gap-4">
 
-                                        <button 
+                                        <button
 
                                             onClick={() => setShowTankLevel(!showTankLevel)}
 
@@ -1698,7 +1688,7 @@ const EvaraTankAnalytics = () => {
 
                                         </button>
 
-                                        <button 
+                                        <button
 
                                             onClick={() => setShowVolume(!showVolume)}
 
@@ -1729,7 +1719,7 @@ const EvaraTankAnalytics = () => {
                                 ) : (
                                     <div className="flex-grow flex flex-col relative justify-end">
 
-                                        <ResponsiveContainer width="100%" height={280}>
+                                        <ResponsiveContainer width="100%" height="100%">
 
                                             <AreaChart data={chartDataForDisplay.slice(-50)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
 
@@ -1792,7 +1782,7 @@ const EvaraTankAnalytics = () => {
                                                                     dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                                                                     timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                                                                 }
-                                                            } catch (_) {}
+                                                            } catch (_) { }
                                                         }
                                                         return (
                                                             <div style={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', background: '#fff', padding: '10px 14px', minWidth: 160 }}>
@@ -1818,132 +1808,132 @@ const EvaraTankAnalytics = () => {
 
                             </div>
 
-                    </div>
-
-                    {/* TODAY'S EVENT TIMELINE - Full Width Bottom Card */}
-                    <div className="lg:col-span-3 apple-glass-card p-8 mt-4 rounded-[2.5rem]" style={{ 
-                        background: 'rgba(255, 255, 255, 0.15)', 
-                        border: '1px solid rgba(255,255,255,0.3)', 
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.06)',
-                        width: '100%'
-                    }}>
-                        <div className="flex justify-between items-center mb-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(10,132,255,0.1)' }}>
-                                    <Activity size={22} color="#0A84FF" />
-                                </div>
-                                <div>
-                                    <h4 className="m-0 text-base font-bold uppercase tracking-widest" style={{ color: 'rgba(0,0,0,0.7)' }}>Today's Event Timeline</h4>
-                                    <p className="text-[10px] font-bold text-slate-400 m-0 mt-0.5">DETAILED LOG OF SYSTEM ACTIVITY</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 text-[11px] font-black text-slate-500">
-                                <Clock size={14} />
-                                <span>LIVE 24H TRACKING</span>
-                            </div>
                         </div>
 
-                        <div className="relative h-48 flex items-center px-8 pb-4">
-                            {/* The Scale Line - DARKENED */}
-                            <div className="absolute left-8 right-8 h-[2.5px] bg-black/30 rounded-full top-[35%] -translate-y-1/2" />
-                            
-                            {/* Scale Ticks (Every 5 units) - DARKENED */}
-                            <div className="absolute left-8 right-8 flex justify-between top-[35%] -translate-y-1/2 px-0 w-[calc(100%-64px)] pointer-events-none">
-                                {Array.from({ length: 21 }).map((_, i) => (
-                                    <div key={i} style={{ 
-                                        width: i % 5 === 0 ? '2.5px' : '1px', 
-                                        height: i % 5 === 0 ? '14px' : '8px', 
-                                        background: 'rgba(0,0,0,0.5)',
-                                        marginTop: i % 5 === 0 ? '-1px' : '0px'
-                                    }} />
-                                ))}
-                            </div>
-
-                            <div className="relative flex flex-col justify-center w-full" style={{ marginTop: '-30px' }}>
-                                <div className="relative flex justify-between w-full" style={{ top: '24px' }}>
-                                {[
-                                    { time: '08:15 AM', label: 'Refill Start', icon: TrendingUp, color: '#34C759', pos: '10%', desc: 'Refill detected' },
-                                    { time: '09:45 AM', label: 'Complete', icon: Activity, color: '#0A84FF', pos: '25%', desc: 'Tank at 95%' },
-                                    { time: '12:30 PM', label: 'Peak Use', icon: Activity, color: '#FF3B30', pos: '45%', desc: 'High usage' },
-                                    { time: '03:45 PM', label: 'Stabilized', icon: Activity, color: '#0A84FF', pos: '65%', desc: 'No flow' },
-                                    { time: '06:20 PM', label: 'Evening Use', icon: Activity, color: '#FF9500', pos: '80%', desc: 'Normal usage' },
-                                    { time: '08:50 PM', label: 'Top-up Start', icon: TrendingUp, color: '#34C759', pos: '95%', desc: 'Auto refill' }
-                                ].map((event, idx) => (
-                                    <div key={idx} className="absolute flex flex-col items-center group cursor-pointer" style={{ left: event.pos, transform: 'translateX(-50%)' }}>
-                                        {/* Point on the line */}
-                                        <div className="w-5 h-5 rounded-full border-[3px] border-white shadow-lg mb-1 transition-all group-hover:scale-125 z-10" style={{ background: event.color }} />
-                                        
-                                        {/* Event Card */}
-                                        <div className="apple-glass-card p-2 px-4 rounded-2xl flex flex-col items-center gap-0.5 shadow-xl opacity-90 group-hover:opacity-100 transition-all group-hover:-translate-y-1 border" 
-                                             style={{ 
-                                                 background: 'rgba(255, 255, 255, 0.98)', 
-                                                 minWidth: '94px', 
-                                                 borderColor: `${event.color}40`,
-                                                 marginTop: '4px'
-                                             }}>
-                                            <span className="text-[12px] font-black leading-none" style={{ color: event.color }}>{event.time}</span>
-                                            <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight text-center">{event.label}</span>
-                                            <span className="text-[8px] font-medium text-slate-400 mt-0.5 uppercase">{event.desc}</span>
-                                        </div>
+                        {/* TODAY'S EVENT TIMELINE - Full Width Bottom Card */}
+                        <div className="lg:col-span-3 apple-glass-card p-8 mt-4 rounded-[2.5rem]" style={{
+                            background: 'rgba(255, 255, 255, 0.15)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.06)',
+                            width: '100%'
+                        }}>
+                            <div className="flex justify-between items-center mb-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(10,132,255,0.1)' }}>
+                                        <Activity size={22} color="#0A84FF" />
                                     </div>
-                                ))}
+                                    <div>
+                                        <h4 className="m-0 text-base font-bold uppercase tracking-widest" style={{ color: 'rgba(0,0,0,0.7)' }}>Today's Event Timeline</h4>
+                                        <p className="text-[10px] font-bold text-slate-400 m-0 mt-0.5">DETAILED LOG OF SYSTEM ACTIVITY</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 text-[11px] font-black text-slate-500">
+                                    <Clock size={14} />
+                                    <span>LIVE 24H TRACKING</span>
+                                </div>
+                            </div>
+
+                            <div className="relative h-48 flex items-center px-8 pb-4">
+                                {/* The Scale Line - DARKENED */}
+                                <div className="absolute left-8 right-8 h-[2.5px] bg-black/30 rounded-full top-[35%] -translate-y-1/2" />
+
+                                {/* Scale Ticks (Every 5 units) - DARKENED */}
+                                <div className="absolute left-8 right-8 flex justify-between top-[35%] -translate-y-1/2 px-0 w-[calc(100%-64px)] pointer-events-none">
+                                    {Array.from({ length: 21 }).map((_, i) => (
+                                        <div key={i} style={{
+                                            width: i % 5 === 0 ? '2.5px' : '1px',
+                                            height: i % 5 === 0 ? '14px' : '8px',
+                                            background: 'rgba(0,0,0,0.5)',
+                                            marginTop: i % 5 === 0 ? '-1px' : '0px'
+                                        }} />
+                                    ))}
+                                </div>
+
+                                <div className="relative flex flex-col justify-center w-full" style={{ marginTop: '-30px' }}>
+                                    <div className="relative flex justify-between w-full" style={{ top: '24px' }}>
+                                        {[
+                                            { time: '08:15 AM', label: 'Refill Start', icon: TrendingUp, color: '#34C759', pos: '10%', desc: 'Refill detected' },
+                                            { time: '09:45 AM', label: 'Complete', icon: Activity, color: '#0A84FF', pos: '25%', desc: 'Tank at 95%' },
+                                            { time: '12:30 PM', label: 'Peak Use', icon: Activity, color: '#FF3B30', pos: '45%', desc: 'High usage' },
+                                            { time: '03:45 PM', label: 'Stabilized', icon: Activity, color: '#0A84FF', pos: '65%', desc: 'No flow' },
+                                            { time: '06:20 PM', label: 'Evening Use', icon: Activity, color: '#FF9500', pos: '80%', desc: 'Normal usage' },
+                                            { time: '08:50 PM', label: 'Top-up Start', icon: TrendingUp, color: '#34C759', pos: '95%', desc: 'Auto refill' }
+                                        ].map((event, idx) => (
+                                            <div key={idx} className="absolute flex flex-col items-center group cursor-pointer" style={{ left: event.pos, transform: 'translateX(-50%)' }}>
+                                                {/* Point on the line */}
+                                                <div className="w-5 h-5 rounded-full border-[3px] border-white shadow-lg mb-1 transition-all group-hover:scale-125 z-10" style={{ background: event.color }} />
+
+                                                {/* Event Card */}
+                                                <div className="apple-glass-card p-2 px-4 rounded-2xl flex flex-col items-center gap-0.5 shadow-xl opacity-90 group-hover:opacity-100 transition-all group-hover:-translate-y-1 border"
+                                                    style={{
+                                                        background: 'rgba(255, 255, 255, 0.98)',
+                                                        minWidth: '94px',
+                                                        borderColor: `${event.color}40`,
+                                                        marginTop: '4px'
+                                                    }}>
+                                                    <span className="text-[12px] font-black leading-none" style={{ color: event.color }}>{event.time}</span>
+                                                    <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight text-center">{event.label}</span>
+                                                    <span className="text-[8px] font-medium text-slate-400 mt-0.5 uppercase">{event.desc}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-            {/* Subtle Loading Indicators — Matches Home Map */}
-            {(analyticsLoading || analyticsFetching) && (
-                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[400] apple-glass-card backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-3 animate-pulse">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                        Syncing Live Data...
-                    </span>
+                    {/* Subtle Loading Indicators — Matches Home Map */}
+                    {(analyticsLoading || analyticsFetching) && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[400] apple-glass-card backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-3 animate-pulse">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                Syncing Live Data...
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            {/* Delete Confirmation Popup */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
+                    onClick={() => !isDeleting && setShowDeleteConfirm(false)}>
+                    <div className="rounded-3xl p-8 flex flex-col w-full max-w-sm text-center"
+                        style={{
+                            background: 'white',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                        }}
+                        onClick={e => e.stopPropagation()}>
+
+                        <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="material-icons" style={{ fontSize: '32px' }}>delete_outline</span>
+                        </div>
+
+                        <h3 className="text-xl font-bold mb-2 text-gray-900">Delete this Node?</h3>
+                        <p className="text-sm text-gray-500 mb-8">
+                            This will permanently remove <strong>{deviceName}</strong> and all its historical telemetry data. This action cannot be undone.
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className={`w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all ${isDeleting ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 active:scale-95'}`}
+                            >
+                                {isDeleting ? 'Deleting...' : 'Yes, Delete Node'}
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={isDeleting}
+                                className="w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
-            </div>
-        </main>
-
-                {/* Delete Confirmation Popup */}
-                {showDeleteConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
-                        onClick={() => !isDeleting && setShowDeleteConfirm(false)}>
-                        <div className="rounded-3xl p-8 flex flex-col w-full max-w-sm text-center"
-                            style={{
-                                background: 'white',
-                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                            }}
-                            onClick={e => e.stopPropagation()}>
-                            
-                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="material-icons" style={{ fontSize: '32px' }}>delete_outline</span>
-                            </div>
-                            
-                            <h3 className="text-xl font-bold mb-2 text-gray-900">Delete this Node?</h3>
-                            <p className="text-sm text-gray-500 mb-8">
-                                This will permanently remove <strong>{deviceName}</strong> and all its historical telemetry data. This action cannot be undone.
-                            </p>
-                            
-                            <div className="flex flex-col gap-3">
-                                <button 
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
-                                    className={`w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all ${isDeleting ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 active:scale-95'}`}
-                                >
-                                    {isDeleting ? 'Deleting...' : 'Yes, Delete Node'}
-                                </button>
-                                <button 
-                                    onClick={() => setShowDeleteConfirm(false)}
-                                    disabled={isDeleting}
-                                    className="w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
         </div>
     );
 };

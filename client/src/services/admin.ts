@@ -189,6 +189,27 @@ class AdminService {
     const response = await api.get("/admin/audit-logs");
     return response.data;
   }
+
+  /**
+   * Toggle visibility of a device for the customer.
+   */
+  async updateDeviceVisibility(id: string, isVisible: boolean): Promise<any> {
+    const response = await api.patch(`/admin/devices/${id}/visibility`, {
+      isVisibleToCustomer: isVisible
+    });
+    return response.data;
+  }
+
+  /**
+   * Update granular parameter visibility for a device.
+   */
+  async updateDeviceParameters(id: string, config: Record<string, boolean>): Promise<any> {
+    const response = await api.patch(`/admin/devices/${id}/parameters`, {
+      customer_config: config
+    });
+    return response.data;
+  }
 }
+
 
 export const adminService = AdminService.getInstance();

@@ -1,9 +1,11 @@
 const router = require("express").Router();
 const {
-    createZone, getZones, getZoneById, updateZone, deleteZone,
-    createCustomer, getCustomers, getCustomerById, updateCustomer, deleteCustomer,
-    createNode, getNodes, updateNode, deleteNode,
-    getDashboardSummary, getHierarchy, getAuditLogs, getDashboardInit
+  createZone, getZones, getZoneById, updateZone, deleteZone,
+  createCustomer, getCustomers, getCustomerById, updateCustomer, deleteCustomer,
+  createNode, getNodes, updateNode, deleteNode,
+  getDashboardSummary, getHierarchy, getAuditLogs, getDashboardInit,
+  updateDeviceVisibility,   // ← NEW: Image 1 - main device toggle
+  updateDeviceParameters    // ← NEW: Image 2 - parameter toggles
 } = require("../controllers/admin.controller.js");
 
 const validateRequest = require("../middleware/validateRequest.js");
@@ -35,6 +37,12 @@ router.post("/nodes", validateRequest(createNodeSchema), auditLog("CREATE_NODE")
 router.get("/nodes", getNodes);
 router.put("/nodes/:id", validateRequest(updateNodeSchema), auditLog("UPDATE_NODE"), updateNode);
 router.delete("/nodes/:id", auditLog("DELETE_NODE"), deleteNode);
+
+// Device Visibility & Parameter Controls (Superadmin only)
+// Image 1: Toggle whether customer can see the device at all
+router.patch("/devices/:id/visibility", auditLog("UPDATE_DEVICE_VISIBILITY"), updateDeviceVisibility);
+// Image 2: Toggle which analytics parameters customer can see inside a device
+router.patch("/devices/:id/parameters", auditLog("UPDATE_DEVICE_PARAMETERS"), updateDeviceParameters);
 
 // Aggregate
 router.get("/dashboard/init", auditLog("ADMIN_DASHBOARD_INIT"), getDashboardInit);

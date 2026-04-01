@@ -14,15 +14,15 @@ import { socket } from "../services/api";
 import { computeDeviceStatus } from "../services/DeviceService";
 import { getTankLevel } from "../utils/telemetryPipeline";
 
-type NodeCategory = 
-  | 'OHT' 
-  | 'Sump' 
-  | 'Borewell' 
-  | 'EvaraTank' 
-  | 'EvaraDeep' 
-  | 'EvaraFlow' 
-  | 'GovtBorewell' 
-  | 'PumpHouse' 
+type NodeCategory =
+  | 'OHT'
+  | 'Sump'
+  | 'Borewell'
+  | 'EvaraTank'
+  | 'EvaraDeep'
+  | 'EvaraFlow'
+  | 'GovtBorewell'
+  | 'PumpHouse'
   | 'FlowMeter';
 type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep';
 
@@ -160,7 +160,7 @@ const ANALYTICS_CONFIG: Record<
 
 const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
   const cfg = CATEGORY_CONFIG[(node.category as NodeCategory) || "OHT"] || CATEGORY_CONFIG["OHT"];
-  
+
   // DRIVER FIX: Compute status in real-time using the same logic as Analytics pages
   const realtimeSnapshot = realtimeStatuses[node.id];
   const effectiveLastSeen = realtimeSnapshot?.timestamp || realtimeSnapshot?.created_at || node.last_seen || node.last_online_at || node.updated_at || null;
@@ -169,14 +169,14 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
-  
+
   // DRIVER FIX: Use the backend's authoritative smoothed level for absolute parity. 
   // This eliminates divergence between Map, List, and Analytics.
   const pct = lastTel.level_percentage ?? getTankLevel(node, lastTel);
 
-  const cardBgStyle = isOnline 
-    ? { background: "linear-gradient(135deg, #f0fce8 0%, #e0f8de 50%, #cbf2ce 100%)" }
-    : { background: "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)" };
+  const cardDynamicClasses = isOnline
+    ? "apple-glass-card bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20"
+    : "apple-glass-card bg-slate-500/5 hover:bg-slate-500/10 border-slate-500/20";
 
   return (
     <Link
@@ -187,8 +187,7 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         device_type: node.category || undefined,
         asset_type: node.asset_type || undefined,
       })}
-      className="group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full border border-black/5"
-      style={cardBgStyle}
+      className={`group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full border ${cardDynamicClasses}`}
     >
       <div className="p-5 flex flex-col flex-1 relative z-10 w-full min-h-[160px] gap-[18px]">
         {/* Top: Icon + Title + Status */}
@@ -206,7 +205,7 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
               </span>
             </div>
           </div>
-          
+
           <span
             className={clsx(
               "flex items-center gap-1.5 text-[10px] font-[900] uppercase tracking-wider px-2.5 py-1.5 rounded-[10px] shadow-sm min-w-max shrink-0 ml-1",
@@ -256,18 +255,17 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         </div>
       </div>
 
-      {/* Footer Gel/Liquid Glass Button */}
+      {/* Footer Nav Button - Glassmorphic */}
       <div
-        className="relative overflow-hidden px-5 py-[13px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1 group-hover:brightness-110"
+        className="relative overflow-hidden px-5 py-[13px] text-center text-[11.5px] font-[900] tracking-[0.15em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#002868]/70"
         style={{
-          background: 'linear-gradient(to bottom, #4B8BF5, #2B66E9)',
-          color: '#FFFFFF',
-          borderTop: '1px solid rgba(255,255,255,0.3)',
-          boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(15,48,150,0.3), 0 -2px 10px rgba(75,139,245,0.2)',
+          background: 'rgba(15, 48, 150, 0.7)',
+          color: '#ffffff',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
         }}
       >
-        <div className="absolute top-0 left-0 w-full h-[45%] bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
-        
         <span className="relative z-10 drop-shadow-sm">VIEW MORE</span>
         <span className="text-[14px] relative z-10 drop-shadow-sm transform transition-transform group-hover:translate-x-1">→</span>
       </div>
@@ -297,9 +295,9 @@ const AllNodes = () => {
   // SaaS Architecture: Real-time Telemetry Sync for ALL devices
   useEffect(() => {
     const handleUpdate = (data: any) => {
-        const id = data.device_id || data.node_id;
-        if (!id) return;
-        setRealtimeStatuses(prev => ({ ...prev, [id]: data }));
+      const id = data.device_id || data.node_id;
+      if (!id) return;
+      setRealtimeStatuses(prev => ({ ...prev, [id]: data }));
     };
     // Listen to both targeted room events AND global broadcast
     socket.on("telemetry_update", handleUpdate);
@@ -321,7 +319,7 @@ const AllNodes = () => {
   const filtered = useMemo(() => nodes.filter((n) => {
     const matchAnalytics =
       analyticsFilter === "all" || n.analytics_template === analyticsFilter;
-    
+
     // Consistent status calculation for filtering
     const snapshot = realtimeStatuses[n.id] || n || {};
     const effectiveLastSeen = snapshot.timestamp || snapshot.created_at || n.last_seen || n.last_online_at || n.updated_at || null;
@@ -528,7 +526,7 @@ const AllNodes = () => {
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full max-w-7xl">
             {filtered.map((node) => (
-               <NodeCardItem key={node.node_key || node.id} node={node} realtimeStatuses={realtimeStatuses} />
+              <NodeCardItem key={node.node_key || node.id} node={node} realtimeStatuses={realtimeStatuses} />
             ))}
           </div>
         ) : (

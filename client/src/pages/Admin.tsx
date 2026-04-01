@@ -197,14 +197,14 @@ const StatPill = ({
             fontWeight: 800,
             color:
               trend.includes("+") ||
-              trend.includes("Clear") ||
-              trend.includes("Operational")
+                trend.includes("Clear") ||
+                trend.includes("Operational")
                 ? "#10B981"
                 : "#64748B",
             background:
               trend.includes("+") ||
-              trend.includes("Clear") ||
-              trend.includes("Operational")
+                trend.includes("Clear") ||
+                trend.includes("Operational")
                 ? "#F0FDF4"
                 : "#F8FAFC",
             padding: "2px 8px",

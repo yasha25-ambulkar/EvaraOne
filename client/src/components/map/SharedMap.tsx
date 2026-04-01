@@ -20,6 +20,7 @@ import { getTankLevel } from "../../utils/telemetryPipeline";
 import { socket } from "../../services/api";
 import { getDeviceAnalyticsRoute } from "../../utils/deviceRouting";
 import { useTelemetry } from "../../hooks/useTelemetry";
+import { useFirestoreFlowData } from "../../hooks/useFirestoreFlowData";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -35,7 +36,6 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface SharedMapProps {
@@ -109,10 +109,10 @@ function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon |
   });
 }
 
-// ─── Mini Telemetry Viz ─────────────────────────────────────────────────────
-
-const MiniTelemetryViz = ({ device, snap }: { device: MapDevice; snap: any }) => {
-  const t = ((device as any).analytics_template || "").toLowerCase();
+// ─── Mini Telemetry Visualizer ────────────────────────────────────────────────
+const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; snap: any; firestoreFlow?: any }) => {
+  const t =
+    ((device as any).analytics_template || device.asset_type || "Sensor Node").toLowerCase();
 
   // If it's a tank but no telemetry, show a "Syncing" liquid bar at 0% or placeholder
   if (t === "evaratank" || t === "oht" || t === "sump" || device.asset_type === "tank" || device.asset_type === "sump") {
@@ -163,7 +163,7 @@ const MiniTelemetryViz = ({ device, snap }: { device: MapDevice; snap: any }) =>
     );
   }
 
-  if (!snap)
+  if (!snap && !firestoreFlow)
     return (
       <div
         style={{
@@ -182,7 +182,7 @@ const MiniTelemetryViz = ({ device, snap }: { device: MapDevice; snap: any }) =>
     );
 
   if (t === "evaradeep") {
-    const depth = snap.depth_value ?? 0;
+    const depth = snap?.depth_value ?? 0;
     const pct = Math.min(100, (depth / 100) * 100);
     return (
       <div style={{ marginTop: "10px" }}>
@@ -230,8 +230,8 @@ const MiniTelemetryViz = ({ device, snap }: { device: MapDevice; snap: any }) =>
   }
 
   if (t === "evaraflow") {
-    const rate = snap.flow_rate ?? 0;
-    const total = snap.total_liters ?? 0;
+    const rate = snap?.flow_rate ?? firestoreFlow?.flowRate ?? 0;
+    const total = snap?.total_liters ?? firestoreFlow?.volume ?? 0;
     return (
       <div
         style={{
@@ -321,6 +321,11 @@ const DeviceHoverPanel = ({
 
   const t =
     ((device as any).analytics_template || device.asset_type || "Sensor Node").toLowerCase();
+
+  const firestoreFlow = useFirestoreFlowData(
+    device.id,
+    t === "evaraflow" ? "flow_meter" : undefined
+  );
 
   // Real-time status detection based on active WebSocket snap or fallback to device API status
   const computedStatus = snap
@@ -466,7 +471,7 @@ const DeviceHoverPanel = ({
         }}
       />
 
-      <MiniTelemetryViz device={device} snap={snap} />
+      <MiniTelemetryViz device={device} snap={snap} firestoreFlow={firestoreFlow} />
 
       <div style={{ marginTop: "18px", pointerEvents: "auto" }}>
         <button

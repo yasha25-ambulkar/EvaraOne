@@ -28,12 +28,12 @@ const SplashScreen = ({ onDone }: SplashScreenProps) => {
                     className={`h-[140px] object-contain transition-all duration-800 will-change-[opacity,transform] ${phase === 'in' ? 'opacity-0 scale-[0.8]' : 'opacity-100 scale-100'}`}
                     style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
                 />
-                <h1 className={`m-0 text-[32px] font-bold tracking-tight transition-all duration-800 delay-100 will-change-[opacity,transform] flex items-center gap-0 font-sans ${phase === 'in' ? 'opacity-0 scale-[0.8] translate-y-5' : 'opacity-100 scale-100 translate-y-0'}`}
+                <img
+                    src="/evaratech.png"
+                    alt="EvaraTech"
+                    className={`h-[50px] w-auto object-contain transition-all duration-800 delay-100 will-change-[opacity,transform] ${phase === 'in' ? 'opacity-0 scale-[0.8] translate-y-5' : 'opacity-100 scale-100 translate-y-0'}`}
                     style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-                >
-                    <span className="text-evara-blue">Evara</span>
-                    <span className="text-evara-green">Tech</span>
-                </h1>
+                />
             </div>
         </div>
     );

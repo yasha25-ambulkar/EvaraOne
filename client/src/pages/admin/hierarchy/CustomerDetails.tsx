@@ -24,12 +24,17 @@ const CustomerDetails = () => {
   const { customerId } = useParams();
   const navigate = useNavigate();
   const [client, setClient] = useState<any | null>(null);
-  const [nodes, setNodes] = useState<any[]>([]); // Task 7: Real-time Nodes State
+  const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDevice, setEditingDevice] = useState<any | null>(null);
-  const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null); // Task 3: Deletion State
+  const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
+
+  // KEY CHANGE: deviceToggles now tracks isVisibleToCustomer from Firestore
   const [deviceToggles, setDeviceToggles] = useState<Record<string, boolean>>({});
+  // Track which toggles are currently saving to show loading state
+  const [togglingDeviceId, setTogglingDeviceId] = useState<string | null>(null);
+
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -52,24 +57,24 @@ const CustomerDetails = () => {
     fetchProfile();
   }, [customerId]);
 
-  // Task 7: Real-Time Sync for Nodes via API polling
+  // Real-Time Sync for Nodes via API polling
   useEffect(() => {
     if (!customerId) return;
 
-    // Abstracted away into deviceService which natively polls via Axios
     const unsub = deviceService.subscribeToNodeUpdates(
-      (nodesData) => setNodes([nodesData]), // Re-structured locally inside deviceService caching mechanics
+      (nodesData) => setNodes([nodesData]),
       { community_id: "ignore_we_are_fetching_all" }
     );
 
-    // To correctly capture all nodes locally:
     const fetchNodes = async () => {
       const allNodes = await deviceService.getMapNodes(undefined, customerId);
       setNodes(allNodes);
-      // Initialise toggle state from device status
+
+      // KEY CHANGE: Initialize toggle state from isVisibleToCustomer field
+      // Falls back to true if field doesn't exist yet (safe default)
       const toggleMap: Record<string, boolean> = {};
       allNodes.forEach((n: any) => {
-        toggleMap[n.id] = n.status === 'active' || n.status === 'Online';
+        toggleMap[n.id] = n.isVisibleToCustomer !== false; // default true if not set
       });
       setDeviceToggles(toggleMap);
     };
@@ -78,7 +83,31 @@ const CustomerDetails = () => {
     return () => unsub();
   }, [customerId]);
 
-  // Task 4: Node Delete Logic
+  // KEY CHANGE: Device visibility toggle now calls the backend API
+  const handleDeviceToggle = async (deviceId: string) => {
+    const newValue = !deviceToggles[deviceId];
+
+    // Optimistic UI update — toggle immediately in UI
+    setDeviceToggles(prev => ({ ...prev, [deviceId]: newValue }));
+    setTogglingDeviceId(deviceId);
+
+    try {
+      await adminService.updateDeviceVisibility(deviceId, newValue);
+      showToast(
+        newValue ? "Device is now visible to customer" : "Device hidden from customer",
+        "success"
+      );
+    } catch (err: any) {
+      // Revert toggle on failure
+      setDeviceToggles(prev => ({ ...prev, [deviceId]: !newValue }));
+      console.error("Failed to update device visibility:", err);
+      showToast("Failed to update device visibility", "error");
+    } finally {
+      setTogglingDeviceId(null);
+    }
+  };
+
+  // Node Delete Logic
   const handleDeleteDevice = async () => {
     if (!deletingDeviceId) return;
 
@@ -209,86 +238,71 @@ const CustomerDetails = () => {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-bold uppercase">
-                    Assigned Zone
+                    Location
                   </p>
                   <p className="text-slate-800 font-medium">
-                    {zone?.name || zone?.zoneName || "N/A"}
+                    {client?.address || zone?.name || "N/A"}
                   </p>
-                  <p className="text-xs text-slate-400">{zone?.state || ""}</p>
                 </div>
               </div>
-
-              {client?.address && (
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-orange-50 text-orange-600 mt-1">
-                    <MapPin size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 font-bold uppercase">
-                      Address
-                    </p>
-                    <p className="text-slate-800 font-medium">
-                      {client.address}
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Devices List */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Assigned Devices */}
+        <div className="lg:col-span-2">
           <div className="apple-glass-card p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
                 Assigned Devices
               </h3>
-              {user?.role === "superadmin" && (
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  <Plus size={14} /> Add Device
-                </button>
-              )}
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={13} /> Add Device
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {nodes.map((device: any) => (
-                <div
-                  key={device.id}
-                  onClick={() => navigate(`/node/${device.id}`)}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all apple-glass-inner cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-lg ${device.analytics_template === "EvaraTank"
-                            ? "bg-indigo-100 text-indigo-600"
-                            : device.analytics_template === "EvaraFlow"
-                              ? "bg-cyan-100 text-cyan-600"
-                              : "bg-sky-100 text-sky-600"
-                          }`}
-                      >
-                        <Box size={20} />
+            {nodes.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <Box size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="font-medium">No devices assigned yet</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {nodes.map((device: any) => (
+                  <div
+                    key={device.id}
+                    onClick={() => navigate(`/node/${device.id}`)}
+                    className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all apple-glass-inner cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-lg ${device.analytics_template === "EvaraTank"
+                              ? "bg-indigo-100 text-indigo-600"
+                              : device.analytics_template === "EvaraFlow"
+                                ? "bg-cyan-100 text-cyan-600"
+                                : "bg-sky-100 text-sky-600"
+                            }`}
+                        >
+                          <Box size={20} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800">
+                            {device.displayName ||
+                              device.label ||
+                              device.node_key ||
+                              device.name}
+                          </h4>
+                          <p className="text-xs text-slate-400">
+                            {device.assetType || device.analytics_template}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-800">
-                          {device.displayName ||
-                            device.label ||
-                            device.node_key ||
-                            device.name}
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                          {device.assetType || device.analytics_template}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <div
-                        className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${device.status === "active" ||
-                            device.status === "Online"
+                        className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${device.status === "active" || device.status === "Online"
                             ? "bg-green-100 text-green-700 border-green-200"
                             : "bg-slate-200 text-slate-600 border-slate-300"
                           }`}
@@ -296,72 +310,72 @@ const CustomerDetails = () => {
                         {device.status || "Offline"}
                       </div>
                     </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200/60">
+                      <span className="flex items-center gap-1">
+                        <Activity size={12} /> Last Seen
+                      </span>
+                      <span className="font-medium text-slate-700">Recently</span>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 w-full">
+                      {/* Configure Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isFlow =
+                            (device.analytics_template || '').toLowerCase().includes('flow') ||
+                            (device.device_type || '').toLowerCase().includes('flow') ||
+                            (device.assetType || '').toLowerCase().includes('flow');
+                          navigate(isFlow ? `/configure-flow/${device.id}` : `/configure/${device.id}`);
+                        }}
+                        className="px-4 py-2.5 rounded-xl apple-glass-card border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Settings size={14} /> Configure
+                      </button>
+
+                      {/* KEY CHANGE: Toggle Switch now calls handleDeviceToggle → backend API */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!deviceToggles[device.id]}
+                        disabled={togglingDeviceId === device.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeviceToggle(device.id);
+                        }}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none
+                          ${deviceToggles[device.id] ? 'bg-[#0077ff]' : 'bg-[#e2e8f0]'}
+                          ${togglingDeviceId === device.id ? 'opacity-50 cursor-not-allowed' : ''}
+                        `}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+                            ${deviceToggles[device.id] ? 'translate-x-5' : 'translate-x-0'}
+                          `}
+                        />
+                      </button>
+
+                      {/* Delete Icon */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingDeviceId(device.id);
+                        }}
+                        className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-500 mt-4 pt-4 border-t border-slate-200/60">
-                    <span className="flex items-center gap-1">
-                      <Activity size={12} /> Last Seen
-                    </span>
-                    <span className="font-medium text-slate-700">Recently</span>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-3 w-full">
-                    {/* Configure Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const isFlow =
-                          (device.analytics_template || '').toLowerCase().includes('flow') ||
-                          (device.device_type || '').toLowerCase().includes('flow') ||
-                          (device.assetType || '').toLowerCase().includes('flow');
-                        navigate(isFlow ? `/configure-flow/${device.id}` : `/configure/${device.id}`);
-                      }}
-                      className="px-4 py-2.5 rounded-xl apple-glass-card border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Settings size={14} /> Configure
-                    </button>
-
-                    {/* Toggle Switch (standalone) */}
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!deviceToggles[device.id]}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeviceToggles(prev => ({ ...prev, [device.id]: !prev[device.id] }));
-                      }}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${deviceToggles[device.id]
-                          ? 'bg-[#0077ff]'
-                          : 'bg-[#e2e8f0]'
-                        }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${deviceToggles[device.id]
-                            ? 'translate-x-5'
-                            : 'translate-x-0'
-                          }`}
-                      />
-                    </button>
-
-                    {/* Delete Icon (standalone) */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingDeviceId(device.id);
-                      }}
-                      className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Task 3 & 4: Deletion Confirmation Modal */}
+      {/* Deletion Confirmation Modal */}
       <Modal
         isOpen={!!deletingDeviceId}
         onClose={() => setDeletingDeviceId(null)}
@@ -377,8 +391,7 @@ const CustomerDetails = () => {
                 Permanent Destructive Action
               </h4>
               <p className="text-xs text-red-700">
-                This will permanently remove the asset from Evara
-                infrastructure.
+                This will permanently remove the asset from Evara infrastructure.
               </p>
             </div>
           </div>

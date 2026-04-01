@@ -242,11 +242,24 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 8000;
 
-server.listen(PORT, () => {
-    console.log(`[Server] Running on port ${PORT}`);
-    // Initialize our background worker
-    startWorker();
-});
+try {
+    server.on("error", (err) => {
+        console.error("[Server] Fatal error event:", err);
+        if (err.code === "EADDRINUSE") {
+            console.error(`[Server] Port ${PORT} is already in use.`);
+        }
+        process.exit(1);
+    });
+
+    server.listen(PORT, () => {
+        console.log(`[Server] ✅ Backend running on port ${PORT}`);
+        // Initialize our background worker
+        startWorker();
+    });
+} catch (error) {
+    console.error("[Server] Error during startup:", error);
+    process.exit(1);
+}
 
 // Robust error guards for unexpected crashes
 process.on("unhandledRejection", (reason, promise) => {

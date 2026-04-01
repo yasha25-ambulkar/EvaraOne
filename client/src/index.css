@@ -114,7 +114,7 @@
   backdrop-filter: blur(12px) saturate(180%);
   -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .premium-gradient {
@@ -444,7 +444,7 @@ body {
   /* Clean white rim */
   border-radius: 20px;
   /* More premium curvature - reduced for sleek look */
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   /* Top rim glow */
   overflow: hidden;
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -488,7 +488,7 @@ body {
   background: rgba(255, 255, 255, 0.35);
   /* Brighten on hover */
   border-color: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 /* Inner Translucent Element (for nested cards or stat boxes) */
@@ -499,7 +499,7 @@ body {
   border-radius: 12px;
   backdrop-filter: saturate(150%) blur(24px);
   -webkit-backdrop-filter: saturate(150%) blur(24px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 /* Typography Utilities for Glass */
@@ -617,7 +617,9 @@ body {
 }
 
 /* Re-enable text selection and cursor for actual inputs and text areas */
-input, textarea, [contenteditable="true"] {
+input,
+textarea,
+[contenteditable="true"] {
   cursor: text !important;
   user-select: text !important;
 }
