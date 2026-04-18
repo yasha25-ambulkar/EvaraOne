@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Settings, Loader2 } from 'lucide-react';
 import tankIcon from '../../public/tank.png';
+import tdsIcon from '../../public/tds.png';
 import { adminService } from '../services/admin';
 import { deviceService } from '../services/DeviceService';
 import { useToast } from '../components/ToastProvider';
@@ -170,7 +171,7 @@ const ConfigureNode = () => {
     }
 
     return (
-        <div className="min-h-screen font-sans relative overflow-x-hidden bg-transparent" style={{ color: '#1C1C1E' }}>
+        <div className="min-h-screen font-sans relative overflow-x-hidden bg-transparent">
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
 
                 <div className="max-w-[1000px] mx-auto flex flex-col gap-4">
@@ -187,11 +188,11 @@ const ConfigureNode = () => {
                             <div>
                                 <div className="flex items-center gap-3">
                                     <Settings size={22} style={{ color: '#64748b' }} />
-                                    <h2 className="text-[28px] font-bold m-0" style={{ color: '#1c2b4f', letterSpacing: '-0.5px' }}>
+                                    <h2 className="text-[28px] font-bold m-0" style={{ letterSpacing: '-0.5px', color: 'var(--configure-heading-color)' }}>
                                         Configuration
                                     </h2>
                                 </div>
-                                <p className="text-[15px] font-medium m-0 mt-0.5" style={{ color: '#64748b' }}>
+                                <p className="text-[15px] font-medium m-0 mt-0.5" style={{ color: 'var(--configure-subtext-color)' }}>
                                     Manage system parameters and controls
                                 </p>
                             </div>
@@ -204,16 +205,16 @@ const ConfigureNode = () => {
 
                     {/* Main Content Card */}
                     <div className="apple-glass-card rounded-[2rem] p-8 md:p-10" style={{
-                        background: 'rgba(255, 255, 255, 0.18)',
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(255,255,255,0.35)',
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)'
+                        background: 'var(--configure-card-bg)',
+                        backdropFilter: 'blur(24px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        border: '1px solid var(--configure-card-border)',
+                        boxShadow: 'var(--configure-card-shadow)'
                     }}>
                         <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/50">
                             <div className="flex items-center gap-3">
-                                <img src={tankIcon} alt="Tank" className="w-8 h-8 object-contain" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }} />
-                                <h3 className="text-xl font-bold m-0" style={{ color: '#1c2b4f' }}>{deviceName ? `${deviceName} Parameters` : 'EvaraTank Parameters'}</h3>
+                                <img src={deviceName?.toLowerCase().includes('tds') ? tdsIcon : tankIcon} alt="Icon" className="w-8 h-8 object-contain" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }} />
+                                <h3 className="text-xl font-bold m-0" style={{ color: 'var(--configure-heading-color)' }}>{deviceName ? `${deviceName} Parameters` : 'EvaraTank Parameters'}</h3>
                             </div>
                             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[#34C759]/10 text-[#28a745] border border-[#34C759]/20 shadow-sm">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse"></span>
@@ -226,8 +227,8 @@ const ConfigureNode = () => {
                             {PARAM_CONFIG.map((param, index) => (
                                 <div key={param.key} className={`flex justify-between items-center group ${index === PARAM_CONFIG.length - 1 ? 'pb-2' : ''}`}>
                                     <div className="flex flex-col">
-                                        <h4 className="text-[15px] font-bold m-0" style={{ color: '#1c2b4f' }}>{param.label}</h4>
-                                        <p className="text-[13px] font-medium m-0 mt-1.5" style={{ color: '#64748b' }}>{param.description}</p>
+                                        <h4 className="text-[15px] font-bold m-0" style={{ color: 'var(--configure-heading-color)' }}>{param.label}</h4>
+                                        <p className="text-[13px] font-medium m-0 mt-1.5" style={{ color: 'var(--configure-subtext-color)' }}>{param.description}</p>
                                     </div>
                                     <ToggleSwitch
                                         checked={config[param.key] ?? true}

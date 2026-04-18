@@ -1,0 +1,34 @@
+# ─── .dockerignore ────────────────────────────────────────────────────────────
+# Without this file, `COPY . .` in a Dockerfile copies everything:
+#   • node_modules  → huge layer, wrong OS/arch binaries
+#   • .env files    → secrets baked into image layers
+#   • logs/         → stale log files bloating the image
+#   • test files    → not needed at runtime
+#   • .git/         → full git history in every image
+
+node_modules
+npm-debug.log
+yarn-error.log
+
+.env
+.env.*
+!.env.example
+
+logs
+*.log
+
+.git
+.gitignore
+.dockerignore
+
+# Test files
+**/*.test.js
+**/*.spec.js
+__tests__
+coverage
+
+# IDE / OS noise
+.DS_Store
+Thumbs.db
+.vscode
+.idea

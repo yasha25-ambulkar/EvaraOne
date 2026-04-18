@@ -6,8 +6,9 @@ const {
   distanceToVolume,
   distanceToPercentage,
 } = require("./waterAnalyticsEngine.js");
+const { DEVICE_STATUS, STATUS_THRESHOLD_MS } = require("../utils/deviceConstants.js");
 
-const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const OFFLINE_THRESHOLD_MS = STATUS_THRESHOLD_MS; // Use centralized threshold
 
 /**
  * Calculate device status based on STRICT date + time validation
@@ -25,7 +26,7 @@ const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
  * - OFFLINE_STOPPED: different day (last data not from today)
  */
 const calculateDeviceStatus = (lastUpdatedAt) => {
-  if (!lastUpdatedAt) return "OFFLINE_STOPPED";
+  if (!lastUpdatedAt) return DEVICE_STATUS.OFFLINE;
   
   try {
     const now = new Date();
@@ -48,16 +49,16 @@ const calculateDeviceStatus = (lastUpdatedAt) => {
     
     if (isSameDay) {
       if (timeDiffMinutes <= 20) {
-        return "ONLINE";
+        return DEVICE_STATUS.ONLINE;
       } else {
-        return "OFFLINE_RECENT";
+        return DEVICE_STATUS.OFFLINE_RECENT;
       }
     } else {
-      return "OFFLINE_STOPPED";
+      return DEVICE_STATUS.OFFLINE;
     }
   } catch (err) {
     console.error("[DeviceStatus] Status calculation error:", err.message);
-    return "OFFLINE_STOPPED";
+    return DEVICE_STATUS.OFFLINE;
   }
 };
 
@@ -117,28 +118,41 @@ const processThingSpeakData = async (device, feeds) => {
   const lastUpdatedAt = latestFeed.created_at;
   const status = calculateDeviceStatus(lastUpdatedAt);
 
-  // ── FLOW METER path (unchanged) ──────────────────────────────────────
+  // ── FLOW METER path ───────────────────────────────────────
+  // ✅ FIX #9: USE DEVICE-SPECIFIC FIELD MAPPING (NOT HARDCODED field3/field1 fallbacks)
   const typeNormalized = (device.type || device.device_type || "").toLowerCase();
   const isFlowMeter = ["evaraflow", "flow", "flow_meter"].includes(typeNormalized);
   if (isFlowMeter) {
-    const mapping = device.mapping || {};
-    const flowKeys = ['flowField', 'flow_rate', 'flow_rate_field'];
-    const totalKeys = ['volumeField', 'current_reading', 'total_reading', 'meter_reading_field'];
+    let flowField = null;
+    let totalField = null;
 
-    const fieldFlow =
-      device.flow_rate_field || device.flowField ||
-      mapping.flowField || mapping.flow_rate_field ||
-      Object.keys(mapping).find(k => flowKeys.includes(mapping[k])) ||
-      (latestFeed.field4 !== undefined ? "field4" : "field3");
+    // Priority 1: New schema device.fields
+    if (device.fields?.flow_rate && device.fields?.total_liters) {
+      flowField = device.fields.flow_rate;
+      totalField = device.fields.total_liters;
+      console.log(`[DeviceState] Using device.fields for flow: flow=${flowField}, total=${totalField}`);
+    }
+    // Priority 2: Sensor field mapping
+    else if (device.sensor_field_mapping) {
+      flowField = Object.keys(device.sensor_field_mapping).find(k => 
+        device.sensor_field_mapping[k] === "flow_rate"
+      );
+      totalField = Object.keys(device.sensor_field_mapping).find(k => 
+        device.sensor_field_mapping[k] === "current_reading"
+      );
+      if (flowField && totalField) {
+        console.log(`[DeviceState] Using sensor_field_mapping for flow: flow=${flowField}, total=${totalField}`);
+      }
+    }
+    // Priority 3: Fallback to device properties
+    if (!flowField || !totalField) {
+      flowField = flowField || device.flow_rate_field || "field3";
+      totalField = totalField || device.meter_reading_field || "field1";
+      console.log(`[DeviceState] Using fallback for flow: flow=${flowField}, total=${totalField}`);
+    }
 
-    const fieldTotal =
-      device.meter_reading_field || device.volumeField ||
-      mapping.volumeField || mapping.meter_reading_field ||
-      Object.keys(mapping).find(k => totalKeys.includes(mapping[k])) ||
-      (latestFeed.field5 !== undefined ? "field5" : "field1");
-
-    const flow_rate = parseFloat(latestFeed[fieldFlow]) || 0;
-    const total_liters = parseFloat(latestFeed[fieldTotal]) || 0;
+    const flow_rate = parseFloat(latestFeed[flowField] || 0) || 0;
+    const total_liters = parseFloat(latestFeed[totalField] || 0) || 0;
 
     return {
       deviceId: device.id,
@@ -150,16 +164,50 @@ const processThingSpeakData = async (device, feeds) => {
     };
   }
 
-  // ── TANK path — NEW: use analytics engine ──────────────────────────────
+  // ──TANK path — NEW: use analytics engine ──────────────────────────────
   const mapping = device.mapping || {};
-  const definedField =
-    device.secondary_field || device.water_level_field ||
-    device.fieldKey || device.configuration?.water_level_field ||
-    device.configuration?.fieldKey;
-  const fieldKey =
-    mapping.levelField || definedField ||
-    Object.keys(mapping).find(k => mapping[k] && mapping[k].includes("water_level")) ||
-    (latestFeed.field1 !== undefined ? "field1" : "field2");
+  
+  // ✅ FIX #9: USE DEVICE-SPECIFIC FIELD MAPPING (NOT HARDCODED field1/field2)
+  // BEFORE: Falls back to field1/field2 if no mapping (wrong data)
+  // AFTER: Uses device.fields.water_level OR device.configuration settings
+  let fieldKey = null;
+  
+  // Try mapping paths in priority order:
+  // 1. New schema: device.fields.water_level (recommended)
+  if (device.fields && device.fields.water_level) {
+    fieldKey = device.fields.water_level;
+    console.log(`[DeviceState] ✓ Using device.fields.water_level: ${fieldKey}`);
+  }
+  // 2. Old schema: mapping object
+  else if (mapping.levelField) {
+    fieldKey = mapping.levelField;
+    console.log(`[DeviceState] ✓ Using mapping.levelField: ${fieldKey}`);
+  }
+  // 3. Configuration stored field
+  else if (device.configuration?.fieldKey && latestFeed[device.configuration.fieldKey] !== undefined) {
+    fieldKey = device.configuration.fieldKey;
+    console.log(`[DeviceState] ✓ Using configuration.fieldKey: ${fieldKey}`);
+  }
+  // 4. LAST RESORT: Scan mapping for "water_level" semantic name
+  else {
+    const mappedField = Object.keys(mapping).find(k => 
+      mapping[k] && (mapping[k].includes("water_level") || mapping[k].includes("level"))
+    );
+    if (mappedField) {
+      fieldKey = mappedField;
+      console.log(`[DeviceState] ✓ Found level field in mapping: ${fieldKey}`);
+    }
+  }
+  
+  // ✅ CRITICAL: NO IMPLICIT FALLBACK TO field1/field2
+  // If we still don't have a field, FAIL explicitly (don't silently use wrong data)
+  if (!fieldKey) {
+    console.error(`[DeviceState] ❌ NO FIELD MAPPING for device ${device.id}: no water_level field found`);
+    console.error(`[DeviceState] Device mapping:`, mapping);
+    console.error(`[DeviceState] Device fields:`, device.fields);
+    console.error(`[DeviceState] Available data keys:`, Object.keys(latestFeed));
+    return null;  // Return null = no data instead of using wrong field
+  }
 
   // Build readings array for engine
   const readings = feeds
@@ -217,10 +265,16 @@ const processThingSpeakData = async (device, feeds) => {
  */
 const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, feeds) => {
   try {
+    const now = new Date().toISOString();
+    
     const updatePayload = {
+      // ✅ CRITICAL: Update last_seen when data comes in
+      // This is what frontend uses to determine Online/Offline status
+      last_seen: now,
+      last_updated_at: telemetryData.lastUpdatedAt,
       lastUpdatedAt: telemetryData.lastUpdatedAt,
       status: telemetryData.status,
-      lastTelemetryFetch: new Date().toISOString(),
+      lastTelemetryFetch: now,
       raw_data: telemetryData.raw_data,
     };
 
@@ -239,7 +293,7 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
       total_liters: telemetryData.total_liters || 0,
       percentage: telemetryData.percentage || 0,
       level_percentage: telemetryData.percentage || 0,
-      timestamp: telemetryData.lastUpdatedAt,
+      timestamp: now,  // Use current time when data arrives
       status: telemetryData.status,
       waterState: telemetryData.waterState || 'STABLE',
       rateLitresPerMin: telemetryData.rateLitresPerMin || 0,
@@ -257,6 +311,7 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
     }
 
     await db.collection(deviceType.toLowerCase()).doc(deviceId).update(updatePayload);
+    console.log(`[DeviceState] ✅ Updated telemetry for ${deviceId}: status=${telemetryData.status}, last_seen=${now}`);
   } catch (err) {
     console.error(`[DeviceState] Firestore update failed for ${deviceId}:`, err.message);
     throw err;

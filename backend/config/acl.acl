@@ -1,0 +1,79 @@
+# ============================================================================
+# MQTT Access Control List (ACL)
+# Controls which devices can publish/subscribe to which topics
+# ============================================================================
+# 
+# FORMAT:
+#   user <username>
+#   topic [read|write] <topic_pattern>
+#   pattern [read|write] <topic_pattern>
+#
+# SECURITY PRINCIPLE: Zero-trust — only explicit permissions
+# ============================================================================
+
+# ─── DEFAULT POLICY ───────────────────────────────────────────────────────
+# By default, deny all access (explicit whitelist only)
+# Set in mosquitto.conf: acl_default deny
+
+# ─── SUPERADMIN USER ──────────────────────────────────────────────────────
+# Backend service can publish/subscribe to all device topics (administrative)
+user backend_service
+  # Backend can publish telemetry updates to any device
+  topic write devices/+/telemetry
+  topic write devices/+/status
+  # Backend can send commands to any device
+  topic write devices/+/commands
+  # Backend can subscribe to all device events
+  topic read devices/+/telemetry
+  topic read devices/+/events
+  topic read devices/+/status
+
+# ─── DEVICE TEMPLATE ──────────────────────────────────────────────────────
+# Each physical device gets ONE device_user with restricted permissions
+# Device can ONLY publish to its own telemetry topic
+# Device can ONLY subscribe to its own command topic
+#
+# EXAMPLE DEVICES (configure in environment):
+# For device with hardware ID "tank_001":
+#   user device_tank_001
+#   topic write devices/tank_001/telemetry
+#   topic read devices/tank_001/commands
+#
+# For device with hardware ID "flow_meter_042":
+#   user device_flow_meter_042
+#   topic write devices/flow_meter_042/telemetry
+#   topic read devices/flow_meter_042/commands
+#
+# Pattern-based alternative (if device count is huge):
+#   pattern write devices/$I/telemetry
+#   pattern read devices/$I/commands
+#   subs_pattern_priority true
+
+# ─── MONITORING USER ──────────────────────────────────────────────────────
+# Optional: Monitoring service can read all topics without writing
+user monitoring_service
+  topic read devices/+/telemetry
+  topic read devices/+/status
+  topic read devices/+/events
+
+# ============================================================================
+# IMPORTANT: Load this file into the container
+# See docker-compose.yml volume mount
+# ============================================================================
+
+# ============================================================================
+# TO GENERATE DEVICE PASSWORDS:
+# ============================================================================
+# 1. Inside container:
+#    docker exec mosquitto_container mosquitto_passwd -c /mosquitto/config/passwd device_tank_001
+#    (Enter password when prompted)
+#
+# 2. Output will add to passwd file:
+#    device_tank_001:$7$hashed_password_here
+#
+# 3. Store passwords in Railway environment variables (MQTT_DEVICE_PASSWORDS_JSON):
+#    {
+#      "device_tank_001": "password123",
+#      "device_flow_meter_042": "password456"
+#    }
+# ============================================================================

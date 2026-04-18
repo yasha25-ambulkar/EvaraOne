@@ -8,10 +8,10 @@ import { motion } from "framer-motion";
 import {
   MapPin,
   Globe,
-  Hash,
   FileText,
   Loader2,
   CheckCircle,
+  Box,
 } from "lucide-react";
 
 import { adminService } from "../../../services/admin";
@@ -95,21 +95,20 @@ export const AddZoneForm = ({ onSubmit, onCancel, initialData }: Props) => {
   };
 
   const inputClass = (error?: any) => `
-        w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm
-        ${
-          error
-            ? "border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-            : "border-slate-200 apple-glass-inner focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:apple-glass-card"
+        w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)]
+        ${error
+            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:bg-red-900/20 dark:border-red-500/50'
+            : 'bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:apple-glass-card'
         }
     `;
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-8 p-1">
       <div className="space-y-6">
-        {/* Zone Identity */}
-        <div className="bg-indigo-50/30 p-6 rounded-3xl border border-indigo-100 space-y-4">
-          <div className="flex items-center gap-3 text-sm font-bold text-indigo-800 uppercase tracking-tight">
-            <MapPin size={18} /> Zone Identity
+        {/* Basic Info Section */}
+        <div className="modal-card-glass p-6 rounded-3xl space-y-4">
+          <div className="flex items-center gap-3 text-sm font-bold text-indigo-800 dark:text-indigo-400 uppercase tracking-tight">
+            <MapPin className="text-indigo-500" size={18} /> Zone Identity
           </div>
           <div className="space-y-4">
             <FormField
@@ -159,15 +158,15 @@ export const AddZoneForm = ({ onSubmit, onCancel, initialData }: Props) => {
           </div>
         </div>
 
-        {/* Technical Details */}
-        <div className="apple-glass-inner p-6 rounded-3xl border border-slate-100 space-y-4">
-          <div className="flex items-center gap-3 text-sm font-bold text-slate-800 uppercase tracking-tight">
-            <Hash size={18} /> Infrastructure Details
+        {/* Limits Section */}
+        <div className="modal-card-glass p-6 rounded-3xl space-y-4">
+          <div className="flex items-center gap-3 text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+            <Box className="text-slate-400" size={18} />
+            Infrastructure Details
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               label="Zone Code"
-              icon={Hash}
               error={errors.zone_code?.message}
             >
               <input
@@ -210,7 +209,7 @@ export const AddZoneForm = ({ onSubmit, onCancel, initialData }: Props) => {
           whileTap={{ scale: 0.98 }}
           type="submit"
           disabled={isSubmitting}
-          className="flex items-center gap-2 px-10 py-3 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white text-sm font-black rounded-2xl hover:shadow-xl hover:shadow-indigo-500/30 transition-all shadow-lg shadow-indigo-200"
+          className="flex items-center gap-2 px-8 py-3 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50 shadow-md" style={{ background: '#7C3AED' }}
         >
           {isSubmitting ? (
             <Loader2 className="animate-spin" size={18} />

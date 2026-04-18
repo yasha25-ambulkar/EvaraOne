@@ -101,8 +101,7 @@ exports.getUserProfile = async (req, res) => {
     
     return res.status(500).json({
       success: false,
-      error: "Failed to get user profile",
-      details: error.message
+      error: "Failed to get user profile"
     });
   }
 };
@@ -218,8 +217,7 @@ exports.verifyToken = async (req, res) => {
     
     return res.status(401).json({
       success: false,
-      error: "Token verification failed",
-      details: error.message
+      error: "Token verification failed"
     });
   }
 };

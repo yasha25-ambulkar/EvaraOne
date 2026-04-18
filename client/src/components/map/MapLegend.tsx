@@ -35,6 +35,13 @@ const ASSET_FILTERS: FilterItem[] = [
     activeBg: "bg-cyan-100",
     activeRing: "ring-cyan-400",
   },
+  {
+    key: "EvaraTDS",
+    label: "EvaraTDS",
+    iconUrl: "/tds.png",
+    activeBg: "bg-blue-100 dark:bg-blue-900/30",
+    activeRing: "ring-blue-400 text-blue-600 dark:text-blue-400",
+  },
 ];
 
 
@@ -99,27 +106,20 @@ export const MapLegend = ({
     {/* Index Card */}
     <div
       className={clsx(
-        "rounded-[32px] w-[360px] flex flex-col transition-all duration-300 origin-bottom-left overflow-hidden pointer-events-auto border",
-        "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
-        "p-1",
+        "rounded-[32px] w-[360px] flex flex-col transition-all duration-300 origin-bottom-left overflow-hidden pointer-events-auto",
+        "map-legend-panel",
         showIndex
           ? "opacity-100 scale-100 max-h-[500px]"
           : "opacity-0 scale-95 max-h-0",
       )}
-      style={{
-        background: 'var(--map-index-bg)',
-        borderColor: 'var(--map-index-border)',
-        backdropFilter: 'blur(40px)'
-      }}
     >
       <div className="p-8">
         <h2
-          className="text-[13px] font-black uppercase tracking-tight mb-6 cursor-pointer flex items-center gap-1.5"
-          style={{ color: 'var(--map-index-text)' }}
+          className="text-[13px] uppercase tracking-tight mb-6 cursor-pointer flex items-center gap-1.5 legend-heading"
           onClick={() => onFilterClick("")}
         >
           ASSETS{" "}
-          <span className="font-semibold normal-case" style={{ color: 'var(--map-index-text-muted)' }}>
+          <span className="font-semibold normal-case legend-text">
             — Tanks &amp; Borewells &amp; Flow Meters
           </span>
         </h2>
@@ -137,8 +137,7 @@ export const MapLegend = ({
             >
               <div
                 className={clsx(
-                  "w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.08)] shrink-0 transition-transform",
-                  "bg-white dark:bg-white",
+                  "w-12 h-12 shrink-0 transition-transform legend-icon-bg",
                   activeFilter === f.key && "scale-105",
                 )}
               >
@@ -148,16 +147,16 @@ export const MapLegend = ({
                   className="w-7 h-7 object-contain transition-all brightness-[0.6] saturate-[1.8] contrast-[1.2] dark:brightness-100 dark:saturate-100 dark:contrast-100 dark:opacity-95" 
                 />
               </div>
-              <span className="text-[15px] font-bold leading-tight" style={{ color: 'var(--map-index-text)' }}>
+              <span className="text-[15px] font-bold leading-tight legend-text">
                 {f.label}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="my-8 border-t" style={{ borderColor: 'var(--map-index-border)' }} />
+        <div className="my-8 border-t legend-divider" />
 
-        <h2 className="text-[13px] font-black uppercase tracking-tight mb-6" style={{ color: 'var(--map-index-text)' }}>
+        <h2 className="text-[13px] uppercase tracking-tight mb-6 legend-heading">
           PIPELINES
         </h2>
 
@@ -173,14 +172,13 @@ export const MapLegend = ({
           >
             <div
               className={clsx(
-                "w-12 h-12 flex items-center justify-center rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.08)] shrink-0 transition-transform",
-                "bg-white dark:bg-white",
+                "w-12 h-12 shrink-0 transition-transform legend-icon-bg",
                 activePipeline === "watersupply" && "scale-105",
               )}
             >
               <div className="w-7 h-[6px] bg-[#00b4d8] rounded-full" />
             </div>
-            <span className="text-[15px] font-bold leading-tight" style={{ color: 'var(--map-index-text)' }}>
+            <span className="text-[15px] font-bold leading-tight legend-text">
               Water Supply
             </span>
           </div>
@@ -196,14 +194,13 @@ export const MapLegend = ({
           >
             <div
               className={clsx(
-                "w-12 h-12 flex items-center justify-center rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.08)] shrink-0 transition-transform",
-                "bg-white dark:bg-white",
+                "w-12 h-12 shrink-0 transition-transform legend-icon-bg",
                 activePipeline === "borewellwater" && "scale-105",
               )}
             >
               <div className="w-7 h-[6px] bg-[#000080] rounded-full" />
             </div>
-            <span className="text-[15px] font-bold leading-tight" style={{ color: 'var(--map-index-text)' }}>
+            <span className="text-[15px] font-bold leading-tight legend-text">
               Borewell Water
             </span>
           </div>

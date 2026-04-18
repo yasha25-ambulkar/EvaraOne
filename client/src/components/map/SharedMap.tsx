@@ -77,6 +77,8 @@ function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon |
     iconUrl = "/borewell.png";
   } else if (t.includes("flow") || t.includes("meter") || t.includes("pump") || t === "evaraflow") {
     iconUrl = "/meter.png";
+  } else if (t.includes("tds") || t === "evaratds") {
+    iconUrl = "/tds.png";
   }
 
   if (!iconUrl) return FALLBACK_ICON;
@@ -417,7 +419,7 @@ const DeviceHoverPanel = ({
             style={{
               margin: "4px 0 0",
               fontSize: "11px",
-               color: "var(--text-muted)",
+              color: "var(--text-muted)",
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -451,7 +453,7 @@ const DeviceHoverPanel = ({
           />
           <span
             style={{
-               fontSize: "9px",
+              fontSize: "9px",
               fontWeight: 900,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
@@ -519,16 +521,21 @@ const SharedMap = ({
   );
   const [hoverPanel, setHoverPanel] = useState<HoverPanel | null>(null);
   const [realtimeStatuses, setRealtimeStatuses] = useState<Record<string, "Online" | "Offline">>({});
-  const [theme, setTheme] = useState(document.documentElement.getAttribute('data-theme') || 'light');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
-  // Watch for theme changes
+  // SaaS Architecture: Persistent Theme Observer
   useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setTheme(document.documentElement.getAttribute('data-theme') || 'light');
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark') || 
+                    document.documentElement.getAttribute('data-theme') === 'dark';
+      setTheme(isDark ? 'dark' : 'light');
+    };
+
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
     return () => observer.disconnect();
   }, []);
 
@@ -574,12 +581,12 @@ const SharedMap = ({
     const m = new Map<string, L.Icon | L.DivIcon>();
     for (const d of filteredDevices) {
       const t = (d as any).analytics_template || d.asset_type || "";
-      
+
       // FIX: Use computeDeviceStatus on the latest available timestamp to ensure the marker dot
       // matches the real-time status seen in the hover panel.
       const latestTs = realtimeStatuses[d.id] || d.last_telemetry?.timestamp || d.last_seen || d.status;
       const s = computeDeviceStatus(latestTs);
-      
+
       const key = `${t}_${s}`;
       if (!m.has(key)) m.set(key, getDeviceIcon(t, s));
     }
@@ -624,26 +631,21 @@ const SharedMap = ({
           scrollWheelZoom={true}
         >
           <TileLayer
-            attribution={theme === 'dark' ? '&copy; <a href="https://carto.com/attributions">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+            key={theme}
+            attribution={theme === 'dark' ? '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
             url={theme === 'dark' 
-              ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+              ? 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'
               : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             }
           />
 
-          <style>{`
-            ${theme === 'dark' ? `
-              .leaflet-tile-pane {
-                filter: brightness(1.3) contrast(0.9) saturate(0.8);
-              }
-            ` : ''}
-          `}</style>
+          {/* Map theme filters now handled in global index.css for better control */}
 
           {filteredDevices.map((device) => {
             if (!device.latitude || !device.longitude) return null;
             const t =
               (device as any).analytics_template || device.asset_type || "";
-            
+
             // FIX: Ensure marker status is computed correctly here too
             const latestTs = realtimeStatuses[device.id] || device.last_telemetry?.timestamp || device.last_seen || device.status;
             const s = computeDeviceStatus(latestTs);
@@ -673,7 +675,7 @@ const SharedMap = ({
                     });
                     closeTimer.current = setTimeout(
                       () => setHoverPanel(null),
-                      3000,
+                      1500,
                     );
                   },
                   mouseout: () => {

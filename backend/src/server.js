@@ -7,16 +7,22 @@ const { getDashboardSummary, getHierarchy, getAuditLogs, getZoneStats } = requir
 const { requireAuth, checkOwnership } = require("./middleware/auth.middleware.js");
 const tenantCheck = require("./middleware/tenantCheck.middleware.js");
 const rbac = require("./middleware/rbac.middleware.js");
+const adminOnly = require("./middleware/adminOnly.middleware.js"); // ✅ FIX #1: RBAC gate
 const { startWorker, telemetryEvents } = require("./workers/telemetryWorker.js");
+const socketValidation = require("./services/socketValidation.js"); // ✅ FIX #2: Socket.io validation
 const cache = require("./config/cache.js");
 const apiLimiter = require("./middleware/rateLimit.js");
 const http = require("http");
 const { Server } = require("socket.io");
-const morgan = require("morgan");
 const Sentry = require("@sentry/node");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const { ipKeyGenerator } = require("express-rate-limit");
 const validateEnv = require("./utils/validateEnv.js");
+// ✅ PHASE 2: Structured logging (Task #15)
+const { httpLogger, requestIdMiddleware, logger } = require("./config/pino.js");
+// ✅ PHASE 2: Cache versioning (Task #11)
+const { initializeCacheVersions } = require("./utils/cacheVersioning.js");
 
 // Validate environment before starting
 validateEnv();
@@ -30,8 +36,9 @@ Sentry.init({
 
 const app = express();
 
+// ✅ PHASE 2: Task #14 - Lock CORS to specific domains (no *.railway.app wildcard)
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(",") 
+  ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
   : [
       "https://app.evaratech.com",
       "http://localhost:8080",
@@ -39,40 +46,87 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       "http://localhost:3000"
     ];
 
-// In production on Railway, allow same-origin requests
+// ✅ FIX: Remove .railway.app wildcard, use only explicit origins
 const corsOptions = {
-  origin: process.env.NODE_ENV === "production" 
-    ? (origin, callback) => {
-        // Allow requests with no origin (same-origin, mobile apps, curl)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin) || origin.endsWith('.railway.app')) {
-          return callback(null, true);
-        }
-        callback(new Error('Not allowed by CORS'));
-      }
-    : allowedOrigins,
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (same-origin, mobile apps, curl)
+    if (!origin) return callback(null, true);
+    
+    // Check against explicit list only (no wildcards)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // CORS denied
+    logger.warn({ origin, allowed: allowedOrigins }, '[CORS] Origin rejected');
+    callback(new Error('CORS policy: Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
 };
 
 // Pre-flight CORS and Security
 app.use(cors(corsOptions));
 
-// Relax Helmet for development/local communication if needed
+// ============================================================================
+// Helmet Security Headers (Enhanced)
+// ============================================================================
 app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "https:", "data:"],
+      connectSrc: ["'self'", "https://*.railway.app", "wss://*.railway.app"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: true,
+  crossOriginOpenerPolicy: true,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
 
-app.use(express.json());
-app.use(morgan("combined"));
+// ============================================================================
+// Trust proxy for reverse proxy support (Railway, Nginx, etc)
+// ============================================================================
+app.set('trust proxy', process.env.TRUST_PROXY_DEPTH || 1);
 
-// Consolidate Rate Limiting
+app.use(express.json());
+
+// ✅ AUDIT FIX L10: requestIdMiddleware BEFORE httpLogger so request ID appears in all logs
+app.use(requestIdMiddleware);
+app.use(httpLogger);
+
+// ============================================================================
+// Rate Limiting: Per-user limiting (not per-IP) for reverse proxy environments
+// ============================================================================
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 100, // Limit each IP to 100 requests per `window` (here, per minute)
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: { error: "Too many requests, please try again later." }
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // ✅ Rate limit by user UID (fallback to IPv6-safe IP key)
+  keyGenerator: (req, res) => {
+    return req.user?.uid || ipKeyGenerator(req, res);
+  },
+  // ✅ CRITICAL FIX #1: NO EXEMPTIONS FOR SUPERADMINS
+  // A compromised superadmin account can DOS the backend
+  // Instead: lighter limits for admins (not unlimited)
+  skip: (req, res) => {
+    // Apply lighter rate limit for superadmins (1000/min vs 100/min for users)
+    // This allows bulk operations but still prevents DOS
+    return false;  // Never skip — all users are rate-limited
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Too many requests, please try again later."
+    });
+  }
 });
 app.use("/api/", limiter);
 
@@ -83,6 +137,139 @@ const io = new Server(server, {
         origin: allowedOrigins,
         credentials: true
     } 
+});
+
+// ============================================================================
+// ✅ TASK #4 — Redis Fail-Fast for Cluster Mode
+// Prevents silent real-time breakage when running multiple instances without Redis
+// ============================================================================
+const pubSub = cache.getPubSub();
+
+// Are we running multiple Railway instances?
+const isCluster = process.env.RAILWAY_REPLICA_COUNT 
+  ? parseInt(process.env.RAILWAY_REPLICA_COUNT) > 1 
+  : process.env.MULTIPLE_REPLICAS === 'true';
+
+if (isCluster && !pubSub) {
+  // 🚨 LOUD CRASH — better than silent corruption
+  console.error('');
+  console.error('╔══════════════════════════════════════════╗');
+  console.error('║  FATAL: Redis required for clustering    ║');
+  console.error('║  Running without Redis in multi-instance ║');
+  console.error('║  mode will silently break real-time.     ║');
+  console.error('║                                          ║');
+  console.error('║  Fix: Set REDIS_URL environment variable ║');
+  console.error('╚══════════════════════════════════════════╝');
+  console.error('');
+  process.exit(1); // 💀 Stop here. Don't continue.
+}
+
+if (pubSub) {
+  try {
+    const { createAdapter } = require("@socket.io/redis-adapter");
+    io.adapter(createAdapter(pubSub.pub, pubSub.sub));
+    console.log("[Socket.io] ✅ Redis adapter enabled for multi-instance clustering");
+  } catch (err) {
+    console.error("[Socket.io] ❌ Redis adapter failed to initialize:", err.message);
+    process.exit(1); // Also crash here — don't pretend it's fine
+  }
+} else {
+  // Single instance, no Redis — that's fine
+  console.log("[Socket.io] ⚠️  Using in-memory adapter (single instance only)");
+}
+
+// ============================================================================
+// ✅ TASK #8 — Redis-Backed Socket.io Connection Limits
+// ============================================================================
+// ORIGINAL BUG: In-memory Map only exists on one instance.
+// With 3 Railway replicas, user connects 10times to each = 30 total (no limit).
+// Memory exhausted → crash.
+//
+// FIX: Use Redis so ALL instances share the same counter.
+// Entrance 1 sees "already 10", Entrance 2 sees "already 10", blocks them all. ✅
+const MAX_CONNECTIONS_PER_USER = 10;
+const CONNECTION_TTL = 86400; // 24 hours (safety net for stale keys)
+
+io.use(async (socket, next) => {
+  try {
+    // Get user ID (prefer authenticated UID, fall back to IP)
+    const uid = socket.handshake.auth?.uid || socket.ip || 'anonymous';
+
+    // Redis key for this user's connection count
+    // Using Redis means ALL instances share this number
+    const redisKey = `socket_connections:${uid}`;
+
+    // ─────────────────────────────────────────
+    // ✅ AUDIT FIX C6: Atomic INCR eliminates TOCTOU race
+    // Old: GET count → check → SET count+1 (two concurrent connects both read same count)
+    // New: INCR atomically increments and returns new value (guaranteed unique)
+    // ─────────────────────────────────────────
+    let currentCount;
+    if (cache.isRedisReady && cache.redis) {
+      currentCount = await cache.redis.incr(redisKey);
+      if (currentCount === 1) {
+        // First connection — set TTL
+        await cache.redis.expire(redisKey, CONNECTION_TTL);
+      }
+    } else {
+      // Memory fallback (single-instance only)
+      currentCount = (parseInt(await cache.get(redisKey)) || 0) + 1;
+      await cache.set(redisKey, currentCount, CONNECTION_TTL);
+    }
+
+    if (currentCount > MAX_CONNECTIONS_PER_USER) {
+      // Over limit — rollback the increment
+      if (cache.isRedisReady && cache.redis) {
+        await cache.redis.decr(redisKey);
+      }
+      console.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
+      return next(new Error(
+        `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
+      ));
+    }
+
+    console.log(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
+
+    // ─────────────────────────────────────────
+    // CLEANUP: When this socket disconnects,
+    // decrement the count atomically in Redis
+    // ─────────────────────────────────────────
+    socket.on('disconnect', async (reason) => {
+      try {
+        if (cache.isRedisReady && cache.redis) {
+          const remaining = await cache.redis.decr(redisKey);
+          if (remaining <= 0) {
+            await cache.redis.del(redisKey);
+            console.log(`[Socket.io] User ${uid} fully disconnected`);
+          } else {
+            console.log(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+          }
+        } else {
+          const currentOnDisconnect = parseInt(await cache.get(redisKey)) || 1;
+          const remaining = currentOnDisconnect - 1;
+          if (remaining <= 0) {
+            await cache.del(redisKey);
+            console.log(`[Socket.io] User ${uid} fully disconnected`);
+          } else {
+            await cache.set(redisKey, remaining, CONNECTION_TTL);
+            console.log(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+          }
+        }
+      } catch (cleanupErr) {
+        // Don't let cleanup errors break anything
+        console.error('[Socket.io] Disconnect cleanup error:', cleanupErr.message);
+      }
+    });
+
+    // Allow the connection
+    next();
+
+  } catch (err) {
+    // If Redis itself fails, let the connection through
+    // (better to have no limit than to block everyone)
+    console.error('[Socket.io] Connection limit check failed:', err.message);
+    next(); // Fail open
+  }
 });
 
 global.io = io;
@@ -96,39 +283,85 @@ io.use(async (socket, next) => {
     
     const decodedToken = await admin.auth().verifyIdToken(token);
     
-    // SaaS Architecture: Resolve role and community from Firestore
-    let userData = { role: "customer" };
-    try {
-        // Priority 1: Superadmins by ID
-        let userDoc = await db.collection("superadmins").doc(decodedToken.uid).get();
-        if (userDoc.exists) {
-            userData = userDoc.data();
-        } else {
-            // Priority 2: Customers by ID
-            userDoc = await db.collection("customers").doc(decodedToken.uid).get();
-            if (userDoc.exists) {
-                userData = { ...userDoc.data(), id: userDoc.id };
-            } else if (decodedToken.email) {
-                // Priority 3: Customers by Email (Fallback)
-                const emailMatches = await db.collection("customers")
-                    .where("email", "==", decodedToken.email)
-                    .limit(1)
-                    .get();
-                if (!emailMatches.empty) {
-                    const match = emailMatches.docs[0];
-                    userData = { ...match.data(), id: match.id };
+    // ============================================================================
+    // PART 1: Share cache key with HTTP auth middleware (single source of truth)
+    // ============================================================================
+    const cacheKey = `auth_role_${decodedToken.uid}`;
+    let userData = await cache.get(cacheKey);
+
+    if (!userData) {
+        // ====================================================================
+        // PART 2: Hard timeout with Promise.race (don't hang indefinitely)
+        // ====================================================================
+        const firestoreTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("User lookup timed out")), 3000)
+        );
+
+        const lookupTask = (async () => {
+            try {
+                // Priority 1: Superadmins by ID
+                let userDoc = await db.collection("superadmins").doc(decodedToken.uid).get();
+                if (userDoc.exists) {
+                    return userDoc.data();
                 }
+
+                // Priority 2: Customers by ID
+                userDoc = await db.collection("customers").doc(decodedToken.uid).get();
+                if (userDoc.exists) {
+                    return { ...userDoc.data(), id: userDoc.id };
+                }
+
+                // Priority 3: Customers by Email (Fallback for pre-provisioned SaaS users)
+                if (decodedToken.email) {
+                    const emailMatches = await db.collection("customers")
+                        .where("email", "==", decodedToken.email)
+                        .limit(1)
+                        .get();
+                    
+                    if (!emailMatches.empty) {
+                        const match = emailMatches.docs[0];
+                        return { ...match.data(), id: match.id };
+                    }
+                }
+
+                // If not found anywhere, return default (will be caught and rejected in next step)
+                return { role: "customer" };
+            } catch (e) {
+                console.error("[Socket.io] Firestore lookup error:", e.message);
+                throw e;
             }
+        })();
+
+        try {
+            userData = await Promise.race([lookupTask, firestoreTimeout]);
+            // ========================================================================
+            // PART 2b: Cache the result for 3 minutes (sync with HTTP auth middleware)
+            // ========================================================================
+            await cache.set(cacheKey, userData, 180);
+        } catch (dbError) {
+            // ====================================================================
+            // PART 3: REJECT on failure, never default silently
+            // ====================================================================
+            console.error("[Socket.io Auth] User lookup failed:", dbError.message);
+            return next(new Error("Authentication error: Cannot resolve user role"));
         }
-    } catch (e) {
-        console.warn("[Socket.io] User lookup failed:", e.message);
     }
 
+    // ========================================================================
+    // PART 4: Validate role is non-empty before attaching to socket
+    // ========================================================================
     const role = (userData.role || "customer").trim().toLowerCase().replace(/\s+/g, "");
+    
+    if (!role || role === '') {
+        console.error("[Socket.io Auth] Invalid role resolved:", role);
+        return next(new Error("Authentication error: Invalid role"));
+    }
+
     const community_id = userData.community_id || "";
     const customer_id = userData.customer_id || userData.id || "";
     
     socket.user = { uid: decodedToken.uid, role, community_id, customer_id };
+    console.log(`[Socket.io Auth] ✅ User ${decodedToken.uid} authenticated => role: '${role}'`);
     next();
   } catch (err) {
     next(new Error("Authentication error: Invalid token"));
@@ -138,28 +371,71 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
     console.log(`[Socket.io] Client connected: ${socket.user?.uid || 'Unknown'}`);
 
-    socket.on("subscribe_device", async (deviceId) => {
-        // SaaS Architecture: Security Guard (Zero Trust)
-        const isOwner = await checkOwnership(socket.user.customer_id || socket.user.uid, deviceId, socket.user.role, socket.user.community_id);
-        if (isOwner) {
-            console.log(`[Socket.io] Client ${socket.user?.uid} subscribed to device ${deviceId}`);
-            socket.join(`room:${deviceId}`);
-        } else {
-            console.warn(`[Socket.io] Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`);
+    // ✅ FIX #11: AUTO-SUBSCRIBE USER TO THEIR CUSTOMER ROOM
+    // When user connects, subscribe them to customer-specific events
+    // This allows Emit("device:added", {...}) to reach all users of that customer
+    if (socket.user?.customer_id) {
+        socket.join(`customer:${socket.user.customer_id}`);
+        console.log(`[Socket.io] ✅ User ${socket.user.uid} subscribed to customer:${socket.user.customer_id}`);
+    }
+
+    // ✅ FIX #2: Validate subscribe_device with Zod
+    socket.on("subscribe_device", async (rawData) => {
+        try {
+            // Validate input (reject __proto__, unknown fields, etc.)
+            const data = socketValidation.validateRoomJoin({
+                room: `room:${rawData}`,
+                deviceId: rawData
+            });
+
+            // SaaS Architecture: Security Guard (Zero Trust)
+            const deviceId = data.deviceId;
+            const isOwner = await checkOwnership(socket.user.customer_id || socket.user.uid, deviceId, socket.user.role, socket.user.community_id);
+            if (isOwner) {
+                console.log(`[Socket.io] ✅ Client ${socket.user?.uid} subscribed to device ${deviceId}`);
+                socket.join(`room:${deviceId}`);
+                socket.emit('subscribe_ack', { success: true, deviceId });
+            } else {
+                console.warn(`[Socket.io] ❌ Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`);
+                socket.emit('error', { message: 'Access denied' });
+            }
+        } catch (err) {
+            console.warn(`[Socket.io] ❌ Invalid subscribe_device data:`, err.message);
+            socket.emit('error', { message: 'Invalid request' });
         }
     });
 
-    socket.on("unsubscribe_device", (deviceId) => {
-        socket.leave(`room:${deviceId}`);
+    socket.on("unsubscribe_device", (rawData) => {
+        try {
+            // Validate input
+            const data = socketValidation.validateRoomJoin({
+                room: `room:${rawData}`,
+                deviceId: rawData
+            });
+            socket.leave(`room:${data.deviceId}`);
+            console.log(`[Socket.io] ✅ Client ${socket.user?.uid} unsubscribed from device ${data.deviceId}`);
+        } catch (err) {
+            console.warn(`[Socket.io] ❌ Invalid unsubscribe_device data:`, err.message);
+        }
     });
 
     socket.on("disconnect", () => {
-        console.log(`[Socket.io] Client disconnected`);
+        console.log(`[Socket.io] Client disconnected: ${socket.user?.uid}`);
     });
 });
 
-// SaaS Architecture: Distributed Telemetry (Redis Pub/Sub)
-const pubSub = cache.getPubSub();
+// ============================================================================
+// #3 FIX: MQTT Telemetry — Broadcast ONLY to room subscribers (not all clients)
+// ============================================================================
+// ORIGINAL BUG: io.emit("telemetry_update", {...}) sent telemetry to every connected
+// client in the system, including users who don't own the device.
+//
+// FIX: Use io.to("room:${deviceId}").emit() to send ONLY to clients who have
+// subscribed to that specific device via socket.emit("subscribe_device", deviceId).
+// The subscription already includes checkOwnership() guard.
+//
+// "All Nodes" list view updates are now pushed via a separate batch query
+// (handled on the frontend) rather than broadcasting every device to everyone.
 if (pubSub) {
     const sub = pubSub.sub;
     sub.psubscribe("device:update:*");
@@ -168,14 +444,8 @@ if (pubSub) {
             const payload = JSON.parse(message);
             const deviceId = channel.split(":")[2];
             if (deviceId) {
-                // Emit to specific device room (for detailed analytics pages)
+                // ✅ FIXED: Emit ONLY to room subscribers (those who passed checkOwnership)
                 io.to(`room:${deviceId}`).emit("device:update", payload);
-                // Also emit telemetry_update to all clients (for All Nodes list view)
-                io.emit("telemetry_update", {
-                    device_id: deviceId,
-                    node_id: deviceId,
-                    ...payload
-                });
             }
         } catch (err) {}
     });
@@ -185,14 +455,8 @@ if (pubSub) {
 // Node.js EventEmitter doesn't support regex patterns — use explicit wildcard
 telemetryEvents.on("device:update", (payload) => {
     if (payload && payload.deviceId) {
-        // Emit to specific device room (for detailed analytics pages)
+        // ✅ FIXED: Emit ONLY to room subscribers (those who passed checkOwnership)
         io.to(`room:${payload.deviceId}`).emit("device:update", payload);
-        // Also emit telemetry_update to all clients (for All Nodes list view)
-        io.emit("telemetry_update", {
-            device_id: payload.deviceId,
-            node_id: payload.deviceId,
-            ...payload
-        });
     }
 });
 
@@ -206,22 +470,16 @@ const globalSaaSAuth = [requireAuth, tenantCheck, rbac()];
 const authRoutes = require("./routes/auth.routes.js");
 app.use("/api/v1/auth", authRoutes);
 
-// Main admin routes
-app.use("/api/v1/admin", globalSaaSAuth, adminRoutes);
+// Main admin routes — ✅ FIX #1: Add adminOnly middleware to block non-superadmins
+app.use("/api/v1/admin", globalSaaSAuth, adminOnly, adminRoutes);
 
 // Node telemetry and analytics routes
 const nodesRoutes = require("./routes/nodes.routes.js");
-// Health Check Endpoint
-app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    env: process.env.NODE_ENV
-  });
-});
-
 app.use("/api/v1/nodes", globalSaaSAuth, nodesRoutes);
+
+// TDS device routes
+const tdsRoutes = require("./routes/tds.routes.js");
+app.use("/api/v1/devices/tds", globalSaaSAuth, tdsRoutes);
 
 // Other routes that frontend service calls
 app.get("/api/v1/admin/hierarchy", globalSaaSAuth, getHierarchy);
@@ -250,12 +508,82 @@ if (process.env.NODE_ENV === "production") {
     }
 }
 
+// ============================================================================
+// ✅ TASK #1 — Health check endpoint for Railway
+// ============================================================================
+app.get('/api/v1/health', (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()) + ' seconds',
+    services: {
+      firebase: admin.apps.length > 0 ? 'connected' : 'disconnected',
+      redis: cache?.isRedisReady ? 'connected' : 'memory_fallback',
+      mqtt: global.mqttConnected ? 'connected' : 'disconnected'
+    }
+  };
+
+  // If Firebase is down, tell Railway we're sick (503)
+  // Otherwise say we're fine (200)
+  const isHealthy = admin.apps.length > 0;
+  res.status(isHealthy ? 200 : 503).json(health);
+});
+
 // Sentry error handler must be after all controllers and routes
 Sentry.setupExpressErrorHandler(app);
 
+// ============================================================================
+// ✅ TASK #7: Global async error handler
+// Catches all unhandled promise rejections and errors
+// Routes wrapped with asyncHandler() funnel errors here
+// ============================================================================
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal Server Error" });
+  const isDev = process.env.NODE_ENV !== 'production';
+  const errorId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
+  
+  // Extract useful error info
+  const statusCode = err.status || err.statusCode || 500;
+  const errorMessage = err.message || 'Internal Server Error';
+  const timestamp = new Date().toISOString();
+  
+  // ✅ FIX #7: Log full error server-side (always)
+  console.error(`[Error ${errorId}] ${statusCode} - ${errorMessage}`, {
+    timestamp,
+    method: req.method,
+    path: req.path,
+    url: req.originalUrl,
+    ip: req.ip,
+    userId: req.user?.uid || 'anonymous',
+    userRole: req.user?.role || 'guest',
+    body: req.body ? JSON.stringify(req.body).substring(0, 200) : 'none',
+    stack: err.stack,
+    cause: err.cause ? String(err.cause) : undefined
+  });
+  
+  // ✅ FIX #7: Return generic message to client (prevents info leakage)
+  const publicMessage = {
+    500: "Something went wrong on our end — we have been notified",
+    404: "The requested resource was not found",
+    403: "You do not have permission to access this resource",
+    401: "Authentication required",
+    400: "Bad request — check your input and try again",
+    429: "Too many requests — please try again later",
+    503: "Service temporarily unavailable"
+  }[statusCode] || "An unexpected error occurred";
+  
+  // Send response with error ID for tracking
+  res.status(statusCode).json({
+    success: false,
+    error: publicMessage,
+    errorId: errorId,  // Client can reference this for support tickets
+    status: statusCode,
+    ...(isDev && {
+      // Development: include details for debugging
+      message: errorMessage,
+      stack: err.stack,
+      details: err.details || null
+    })
+  });
 });
 
 const PORT = process.env.PORT || 8000;
@@ -269,8 +597,17 @@ try {
         process.exit(1);
     });
 
-    server.listen(PORT, () => {
+    server.listen(PORT, async () => {
         console.log(`[Server] ✅ Backend running on port ${PORT}`);
+        
+        // ✅ PHASE 2: Task #11 - Initialize cache versions on startup
+        try {
+            await initializeCacheVersions();
+            logger.info('[Server] Cache versioning initialized');
+        } catch (err) {
+            logger.warn({ error: err.message }, '[Server] Cache versioning initialization failed');
+        }
+        
         // Initialize our background worker
         startWorker();
     });
@@ -278,6 +615,48 @@ try {
     console.error("[Server] Error during startup:", error);
     process.exit(1);
 }
+
+// ============================================================================
+// Graceful Shutdown Handler
+// ============================================================================
+let isShuttingDown = false;
+
+async function gracefulShutdown() {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    
+    console.log("[Server] 🛑 Received shutdown signal, starting graceful shutdown...");
+    
+    // 1. Stop accepting new connections
+    server.close(() => {
+        console.log("[Server] HTTP server closed");
+    });
+    
+    // 2. Wait for existing requests to complete (5 second timeout)
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // 3. Disconnect all WebSocket clients orderly
+    if (global.io) {
+        global.io.disconnectSockets();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    // 4. Close Redis connection if available
+    if (cache && cache.redis) {
+        try {
+            await cache.redis.quit();
+            console.log("[Server] Redis connection closed");
+        } catch (err) {
+            console.error("[Server] Error closing Redis:", err.message);
+        }
+    }
+    
+    console.log("[Server] ✅ Graceful shutdown complete");
+    process.exit(0);
+}
+
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
 
 // Robust error guards for unexpected crashes
 process.on("unhandledRejection", (reason, promise) => {

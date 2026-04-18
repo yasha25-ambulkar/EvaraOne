@@ -672,7 +672,7 @@ const EvaraDeepAnalytics = () => {
                                                 <stop offset="95%" stopColor="#3A7AFE" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" vertical={false} opacity={0.3} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-color)" vertical={false} opacity={0.3} />
                                         <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 600 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                                         <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} unit="m" width={45} />
                                         <RechartsTooltip

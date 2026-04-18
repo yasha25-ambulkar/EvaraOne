@@ -1,17 +1,38 @@
 const logger = require('../utils/logger');
+const { sanitizeRequest, sanitizeError } = require('../utils/requestSanitizer');
 
-// Standardized error response format
+// ─── #8 FIX: Never expose stack traces or internal details in production ──────
+const isDev = () => process.env.NODE_ENV !== 'production';
+
+// ─── Safe response builder ────────────────────────────────────────────────────
+const getPublicMessage = (statusCode) => {
+  const messages = {
+    400: "Bad request — check your input and try again",
+    401: "Authentication required",
+    403: "You do not have permission to perform this action",
+    404: "The requested resource was not found",
+    409: "A conflict occurred — the resource may already exist",
+    422: "Validation failed — check your request body",
+    429: "Too many requests — please slow down",
+    500: "Something went wrong on our end — we have been notified",
+    502: "Upstream service unavailable",
+    503: "Service temporarily unavailable",
+  };
+  return messages[statusCode] || "An unexpected error occurred";
+};
+
 const createErrorResponse = (error, statusCode = 500) => {
-  // Don't expose internal errors in production
-  const isDevelopment = process.env.NODE_ENV !== 'production';
-  
   return {
     success: false,
     error: {
-      message: error.message || 'Internal Server Error',
-      ...(isDevelopment && { stack: error.stack }),
+      // Production: generic message — NEVER the real error.message
+      message: isDev()
+        ? (error.message || 'Internal Server Error')
+        : getPublicMessage(statusCode),
       code: error.code || 'INTERNAL_ERROR',
-      statusCode
+      statusCode,
+      // Stack ONLY in development — stripped in production
+      ...(isDev() && error.stack ? { stack: error.stack } : {}),
     },
     timestamp: new Date().toISOString()
   };
@@ -19,34 +40,40 @@ const createErrorResponse = (error, statusCode = 500) => {
 
 // Main error handling middleware
 const errorHandler = (err, req, res, next) => {
-  // Log the error
-  logger.error('Request error', err, {
-    method: req.method,
-    url: req.url,
-    headers: req.headers,
-    body: req.body,
-    user: req.user?.uid
-  });
+  // ✅ CRITICAL FIX #5: Sanitize request before logging
+  const sanitizedReq = sanitizeRequest(req);
+  const sanitizedErr = sanitizeError(err);
+
+  // ── Internal logging — always log everything in dev, minimal in prod ──
+  if (isDev()) {
+    logger.error('Request error', err, {
+      ...sanitizedReq,
+      error: sanitizedErr,
+      stack: err.stack
+    });
+  } else {
+    // Production: don't log headers or body (may contain tokens)
+    logger.error('Request error', err, {
+      method: req.method,
+      url: req.url,
+      userId: req.user?.uid ? req.user.uid.substring(0, 4) + '***' : 'anonymous',
+      error: sanitizedErr
+    });
+  }
 
   // Handle specific error types
   let statusCode = 500;
-  let message = 'Internal Server Error';
 
-  if (err.name === 'ValidationError') {
+  if (err.name === 'ValidationError' || err.name === 'ZodError') {
     statusCode = 400;
-    message = 'Validation Error';
   } else if (err.name === 'UnauthorizedError') {
     statusCode = 401;
-    message = 'Unauthorized';
   } else if (err.name === 'ForbiddenError') {
     statusCode = 403;
-    message = 'Forbidden';
   } else if (err.name === 'NotFoundError') {
     statusCode = 404;
-    message = 'Resource Not Found';
   } else if (err.name === 'ConflictError') {
     statusCode = 409;
-    message = 'Conflict';
   }
 
   res.status(statusCode).json(createErrorResponse(err, statusCode));

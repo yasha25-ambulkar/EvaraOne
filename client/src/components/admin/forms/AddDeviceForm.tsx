@@ -77,13 +77,13 @@ const DEVICE_TYPES = [
     bg: "bg-cyan-50",
   },
   {
-    value: "custom",
-    label: "Custom Sensor",
-    icon: Gauge,
-    template: "EvaraTank",
-    desc: "Custom IoT sensors",
-    color: "text-purple-600",
-    bg: "bg-purple-50",
+    value: "tds",
+    label: "EvaraTDS",
+    icon: FlaskConical,
+    template: "EvaraTDS",
+    desc: "Water quality and TDS sensors",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
   },
 ];
 
@@ -202,6 +202,11 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const onFormSubmit = async (data: DeviceInput) => {
     try {
+      console.log('[AddDeviceForm] ─────────────────────────────────────────────');
+      console.log('[AddDeviceForm] 📝 FORM SUBMITTED');
+      console.log('[AddDeviceForm] Device Type:', data.device_type);
+      console.log('[AddDeviceForm] Full form data:', data);
+
       // Step 5: Flat nodeData schema matching user's requested Firestore structure
       const nodeData: any = {
         hardwareId: data.node_key,
@@ -213,15 +218,19 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
               ? "EvaraDeep"
               : data.device_type === "flow"
                 ? "EvaraFlow"
-                : "Custom",
+                : data.device_type === "tds"
+                  ? "EvaraTDS"
+                  : "EvaraTank",
         subType:
           data.device_type === "deep"
             ? "Borewell"
             : data.device_type === "flow"
               ? "Pump"
-              : assetSubType === "sump"
-                ? "UndergroundSump"
-                : "OverheadTank",
+              : data.device_type === "tds"
+                ? "TDSSensor"
+                : assetSubType === "sump"
+                  ? "UndergroundSump"
+                  : "OverheadTank",
 
         zoneId: watchZoneId || "",
         customerId: data.customer_id,
@@ -235,6 +244,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         borewellDepthField: data.depth_field,
         meterReadingField: data.meter_reading_field,
         flowRateField: data.flow_rate_field,
+        tdsField: data.tds_field,
+        temperatureField: data.temperature_field,
 
         capacity: data.capacity ? Number(data.capacity) : 0,
         depth: data.max_depth ? Number(data.max_depth) : 0,
@@ -251,12 +262,17 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         status: "online",
       };
 
+      console.log('[AddDeviceForm] 📤 Sending to API:', nodeData);
+      console.log('[AddDeviceForm] ─────────────────────────────────────────────');
+
       let result;
       if (isEdit) {
         result = await adminService.updateNode(initialData.id, nodeData);
+        console.log('[AddDeviceForm] ✅ Node updated successfully');
         showToast("Node updated successfully", "success");
       } else {
         result = await adminService.createNode(nodeData);
+        console.log('[AddDeviceForm] ✅ Node created successfully, ID:', result?.id);
         showToast("Node commissioned successfully! 🎉", "success");
       }
 
@@ -267,6 +283,11 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
       onSubmit(result);
     } catch (err: any) {
+      console.error('[AddDeviceForm] ❌ SUBMISSION FAILED');
+      console.error('[AddDeviceForm] Error:', err.message);
+      if (err.response?.data) {
+        console.error('[AddDeviceForm] Response:', err.response.data);
+      }
       showToast(
         err.message || `Failed to ${isEdit ? "update" : "commission"} node`,
         "error",
@@ -275,7 +296,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
   };
 
   const inp = (error?: any) =>
-    `w-full px-3.5 py-2.5 h-10 min-h-[40px] rounded-xl border text-sm outline-none transition-all duration-150 ${error ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100" : "border-slate-200 bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"}`;
+    `w-full px-3.5 py-2.5 h-10 min-h-[40px] rounded-xl border text-sm outline-none transition-all duration-150 text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)] ${error ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:bg-red-900/20 dark:border-red-500/50" : "bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20"}`;
 
 
   return (
@@ -372,10 +393,10 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                 })}
               </div>
 
-              {/* Sub-type selector — only for EvaraTank / Custom */}
-              {(watchType === "tank" || watchType === "custom") && (
-                <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
-                  <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-600 uppercase tracking-wider">
+              {/* Sub-type selector — only for EvaraTank */}
+              {watchType === "tank" && (
+                <div className="modal-card-glass p-3.5 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                     <Droplets size={12} /> Asset Sub-Type
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -427,7 +448,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                 </div>
               )}
 
-              <div className="p-4 rounded-2xl bg-white/50 border border-slate-200 space-y-3 shadow-sm">
+              <div className="modal-card-glass p-4 rounded-2xl space-y-3 shadow-sm">
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
                     label="Display Name"
@@ -502,8 +523,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
               className="space-y-4"
             >
               {/* ThingSpeak — dynamic field selector */}
-              <div className="p-4 rounded-2xl bg-cyan-50/40 border border-cyan-100 space-y-3">
-                <div className="flex items-center gap-2 text-[11px] font-[800] text-cyan-700 uppercase tracking-wider">
+              <div className="modal-card-glass p-4 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-[11px] font-[800] text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">
                   <Wifi size={13} /> ThingSpeak Configuration
                 </div>
 
@@ -528,13 +549,16 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     } else if (watchTemplate === 'EvaraFlow') {
                       setValue('meter_reading_field', first, { shouldValidate: true });
                       setValue('flow_rate_field', second, { shouldValidate: true });
+                    } else if (watchTemplate === 'EvaraTDS') {
+                      setValue('tds_field', first, { shouldValidate: true });
+                      setValue('temperature_field', second, { shouldValidate: true });
                     }
                   }}
                 />
 
-                <div className="flex gap-2 items-start p-2.5 bg-cyan-50 rounded-xl border border-cyan-100">
+                <div className="flex gap-2 items-start p-2.5 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border border-cyan-100 dark:border-cyan-800">
                   <Info className="text-cyan-500 mt-0.5 shrink-0" size={12} />
-                  <p className="text-[10px] text-cyan-700 leading-relaxed">
+                  <p className="text-[10px] text-cyan-700 dark:text-cyan-200 leading-relaxed">
                     Ensure the channel is <strong>Public</strong> or the{" "}
                     <strong>Read Key</strong> is correct. Select the fields that
                     match your sensor outputs.
@@ -558,8 +582,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
               {/* EvaraDeep dimensions */}
               {watchTemplate === "EvaraDeep" && (
-                <div className="p-4 rounded-2xl bg-slate-50/60 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2 text-[11px] font-[800] text-slate-600 uppercase tracking-wider">
+                <div className="modal-card-glass p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 text-[11px] font-[800] text-slate-600 dark:text-slate-200 uppercase tracking-wider">
                     <FlaskConical size={13} /> Borewell Specifications
                   </div>
                   <div className="grid grid-cols-3 gap-3">
@@ -602,9 +626,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
               {/* EvaraFlow info */}
               {watchTemplate === "EvaraFlow" && (
-                <div className="flex gap-2 items-start p-3 bg-cyan-50 rounded-xl border border-cyan-100">
+                <div className="flex gap-2 items-start p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border border-cyan-100 dark:border-cyan-800">
                   <Info className="text-cyan-500 mt-0.5 shrink-0" size={13} />
-                  <p className="text-[10px] text-cyan-700 leading-relaxed">
+                  <p className="text-[10px] text-cyan-700 dark:text-cyan-200 leading-relaxed">
                     <strong>EvaraFlow</strong> derives meter readings and flow
                     rates directly from live sensor data — no physical
                     dimensions needed.
@@ -613,9 +637,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
               )}
 
               {/* Geospatial */}
-              <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-3">
+              <div className="modal-card-glass p-4 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[11px] font-[800] text-emerald-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-[11px] font-[800] text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
                     <MapPin size={13} /> Device Location
                   </div>
                   {watchLat && watchLng && (
@@ -641,7 +665,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                         (e.preventDefault(), handleGoToCoords())
                       }
                       placeholder="e.g. 17.385044"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[var(--modal-input-border)] bg-[var(--modal-input-bg)] text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)] text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all"
                     />
                   </div>
                   <div className="flex-1">
@@ -657,7 +681,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                         (e.preventDefault(), handleGoToCoords())
                       }
                       placeholder="e.g. 78.486671"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[var(--modal-input-border)] bg-[var(--modal-input-bg)] text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)] text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all"
                     />
                   </div>
                   <button
@@ -676,7 +700,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
                 {/* Coordinate status badge */}
                 {watchLat && watchLng ? (
-                  <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-white border border-emerald-200 shadow-sm">
+                  <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl modal-card-glass shadow-sm">
                     <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                       <MapPin size={15} className="text-emerald-600" />
                     </div>
@@ -684,7 +708,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                       <p className="text-[10px] font-[700] text-emerald-700 uppercase tracking-wider">
                         Position confirmed
                       </p>
-                      <p className="text-[12px] font-mono font-[600] text-slate-700 truncate">
+                      <p className="text-[12px] font-mono font-[600] text-slate-700 dark:text-slate-300 truncate">
                         {Number(watchLat).toFixed(6)},{" "}
                         {Number(watchLng).toFixed(6)}
                       </p>
@@ -698,9 +722,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30">
-                    <MapPin size={14} className="text-emerald-300 shrink-0" />
-                    <p className="text-[11px] text-emerald-500">
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/20">
+                    <MapPin size={14} className="text-emerald-300 dark:text-emerald-500 shrink-0" />
+                    <p className="text-[11px] text-emerald-500 dark:text-emerald-400">
                       Enter coordinates above or use the map picker below
                     </p>
                   </div>

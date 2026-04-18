@@ -807,8 +807,8 @@ const EvaraTankAnalytics = () => {
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
                             {/* Status Button (Pill Style) */}
-                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isOffline ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#34C759]/30 text-[#1e7e34] border border-[#34C759]/60 shadow-md transition-all duration-300'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-[#34C759] animate-pulse shadow-[0_0_8px_rgba(52,199,89,0.6)]'}`} />
+                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm border-none transition-all duration-300 text-white ${isOffline ? 'bg-[#FF3B30]' : 'bg-[#34C759]'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
                                 {isOffline ? 'Offline' : 'Online'}
                             </div>
 
@@ -816,7 +816,7 @@ const EvaraTankAnalytics = () => {
                             <button
                                 onClick={() => refetch()}
                                 disabled={analyticsFetching}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95 ${analyticsFetching ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff]/10 hover:bg-[#0077ff]/20 text-[#0077ff] border border-[#0077ff]/30'}`}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 border-none ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff] hover:bg-[#0062d6] text-white'}`}
                             >
                                 <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
                                     {analyticsFetching ? 'sync' : 'refresh'}
@@ -826,7 +826,7 @@ const EvaraTankAnalytics = () => {
 
                             <button
                                 onClick={() => setShowNodeInfo(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[#AF52DE]/30 hover:bg-[#AF52DE]/40 text-[#6f2da8] border border-[#AF52DE]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#AF52DE] hover:bg-[#9d44ce] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Info size={12} className="stroke-[2.5px]" />
                                 Node Info
@@ -835,7 +835,7 @@ const EvaraTankAnalytics = () => {
                             {/* Parameters Button */}
                             <button
                                 onClick={() => setShowParams(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[#FF9500]/30 hover:bg-[#FF9500]/40 text-[#d35400] border border-[#FF9500]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#FFB340] hover:bg-[#f5a623] text-amber-900 border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Settings size={12} className="stroke-[2.5px]" />
                                 Parameters
@@ -845,7 +845,7 @@ const EvaraTankAnalytics = () => {
                             {user?.role === 'superadmin' && (
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-600 border border-red-500/40 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#FF3B30] hover:bg-[#e0352b] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
                                     Delete Node
@@ -1860,7 +1860,7 @@ const EvaraTankAnalytics = () => {
 
                                                 </defs>
 
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--card-border)" />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
 
                                                 <XAxis 
                                                     dataKey="timestamp" 

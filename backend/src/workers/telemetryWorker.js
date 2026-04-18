@@ -1,9 +1,19 @@
 const { db } = require("../config/firebase.js");
+const logger = require("../utils/logger.js"); // ✅ AUDIT FIX M10
 const cacheService = require("../services/cacheService.js");
 const cache = require("../config/cache.js");
 const { fetchSixHourData } = require("../services/thingspeakService.js");
 const deviceState = require("../services/deviceStateService.js");
 const { startStatusCron } = require("./deviceStatusCron.js");
+
+// ─── #17 FIX: MQTT Message Deduplication ──────────────────────────────────
+// ORIGINAL BUG: If an MQTT message arrived twice (network retry), Firestore
+// was updated twice with the same data. No cache key = no deduplication.
+// Also created duplicate entries in audit logs and inflated analytics counts.
+//
+// FIX: Store a "seen message ID" cache with 5-minute TTL. Skip processing
+// if we've already handled this message recently.
+const MQTT_DEDUP_TTL = 300; // 5 minutes
 
 // SaaS Architecture: Redis Pub/Sub Support
 const pubSub = cache.getPubSub();
@@ -25,9 +35,13 @@ async function getActiveDevices() {
         const cachedList = await cache.get("nodes:polling:list");
         if (cachedList) return cachedList;
 
-        console.log("[TelemetryWorker] Cache miss: Loading active device list from Firestore...");
+        logger.info("Cache miss: Loading active device list from Firestore...", { category: "telemetry" });
         
-        const snapshot = await db.collection("devices").get();
+        // ✅ AUDIT FIX M2: Only poll devices that might have fresh data
+        // OFFLINE_STOPPED / DECOMMISSIONED devices have no ThingSpeak data to fetch
+        const snapshot = await db.collection("devices")
+            .where("status", "not-in", ["OFFLINE_STOPPED", "DECOMMISSIONED"])
+            .get();
         const typedGroups = {};
         const registryDataMap = {};
 
@@ -76,15 +90,28 @@ async function getActiveDevices() {
         await cache.set("nodes:polling:list", devices, 3600);
         return devices;
     } catch (err) {
-        console.error("[TelemetryWorker] Error fetching devices:", err.message);
+        logger.error("Error fetching devices", err, { category: "telemetry" });
         return [];
     }
 }
 
 async function processDevice(device) {
     try {
+        // ─── Deduplication: Skip if we recently processed this exact device ────
+        const dedupKey = `mqtt_dedup_${device.id}`;
+        const lastProcessed = await cache.get(dedupKey);
+        
         const feeds = await fetchSixHourData(device.channel, device.key);
         if (!feeds.length) return;
+
+        // Create a fingerprint of this data update to detect duplicates
+        const feedFingerprint = JSON.stringify(feeds.map(f => f.created_at));
+        
+        // If we processed the exact same timestamp sequence recently, skip it
+        if (lastProcessed === feedFingerprint) {
+            logger.info(`Skipping duplicate update for ${device.id}`, { category: "telemetry", deviceId: device.id });
+            return;
+        }
 
         // CRITICAL FIX: Use centralized processing logic
         const telemetryData = await deviceState.processThingSpeakData(device, feeds);
@@ -92,6 +119,24 @@ async function processDevice(device) {
 
         // CRITICAL FIX: Update Firestore with standardized payload
         await deviceState.updateFirestoreTelemetry(device.type, device.id, telemetryData, feeds);
+
+        // ✅ CRITICAL: Also update registry with latest last_seen so status is consistent everywhere
+        const now = new Date().toISOString();
+        await db.collection("devices").doc(device.id).update({
+            last_seen: now,
+            last_updated_at: now,
+            status: telemetryData.status,
+            updated_at: now
+        }).catch(err => {
+            if (err.code === 'not-found') {
+                console.warn(`[TelemetryWorker] Registry doc not found for ${device.id}, skipping registry update`);
+            } else {
+                throw err;
+            }
+        });
+
+        // Record that we processed this device's data with this fingerprint
+        await cache.set(dedupKey, feedFingerprint, MQTT_DEDUP_TTL);
 
         // CRITICAL FIX: Emit real-time update via Socket.IO
         const payload = {
@@ -112,9 +157,9 @@ async function processDevice(device) {
             telemetryEvents.emit("device:update", payload);
         }
         
-        console.log(`[TelemetryWorker] Updated ${device.id}: ${telemetryData.percentage !== undefined ? telemetryData.percentage.toFixed(1) + '%' : 'N/A'} (${telemetryData.status})`);
+        logger.telemetry(device.id, "updated", { percentage: telemetryData.percentage, status: telemetryData.status });
     } catch (err) {
-        console.error(`[TelemetryWorker] Error processing ${device.id}:`, err.message);
+        logger.error(`Error processing device ${device.id}`, err, { category: "telemetry", deviceId: device.id });
     }
 }
 
@@ -122,7 +167,7 @@ async function runPoll() {
     const devices = await getActiveDevices();
     if (devices.length === 0) return;
 
-    console.log(`[TelemetryWorker] Processing ${devices.length} devices...`);
+    logger.info(`Processing ${devices.length} devices`, { category: "telemetry", count: devices.length });
 
     // Process in batches so we don't accidentally Ddos Thingspeak
     for (let i = 0; i < devices.length; i += BATCH_SIZE) {
@@ -132,12 +177,12 @@ async function runPoll() {
         await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    console.log(`[TelemetryWorker] Poll complete`);
+    logger.info("Poll complete", { category: "telemetry" });
 }
 
 // Start the worker
 function startWorker() {
-    console.log(`[TelemetryWorker] Initialized polling every ${POLL_INTERVAL}ms...`);
+    logger.info(`TelemetryWorker initialized, polling every ${POLL_INTERVAL}ms`, { category: "telemetry", interval: POLL_INTERVAL });
     
     // Run immediately once
     runPoll();

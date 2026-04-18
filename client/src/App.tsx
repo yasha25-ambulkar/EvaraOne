@@ -14,12 +14,15 @@ import SplashScreen from './components/ui/SplashScreen';
 const Login = React.lazy(() => import('./pages/Login'));
 const Home = React.lazy(() => import('./pages/Home'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const SuperAdminDashboard = React.lazy(() => import('./pages/SuperAdminDashboard'));
+const CustomerDashboard = React.lazy(() => import('./pages/CustomerDashboard'));
 const AllNodes = React.lazy(() => import('./pages/AllNodes'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const NodeDetails = React.lazy(() => import('./pages/NodeDetails'));
 const EvaraTankAnalytics = React.lazy(() => import('./pages/EvaraTankAnalytics'));
 const EvaraDeepAnalytics = React.lazy(() => import('./pages/EvaraDeepAnalytics'));
 const EvaraFlowAnalytics = React.lazy(() => import('./pages/EvaraFlowAnalytics'));
+const EvaraTDSAnalytics = React.lazy(() => import('./pages/EvaraTDSAnalytics'));
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminCustomers = React.lazy(() => import('./pages/admin/AdminCustomers'));
 const ConfigureNode = React.lazy(() => import('./pages/ConfigureNode'));
@@ -99,6 +102,7 @@ function App() {
                                                     <Route path="/evaradeep/:hardwareId" element={<EvaraDeepAnalytics />} />
                                                     <Route path="/evaraflow" element={<EvaraFlowAnalytics />} />
                                                     <Route path="/evaraflow/:hardwareId" element={<EvaraFlowAnalytics />} />
+                                                    <Route path="/evaratds/:id" element={<EvaraTDSAnalytics />} />
                                                     <Route path="/admin" element={<Admin />} />
                                                 </Route>
 

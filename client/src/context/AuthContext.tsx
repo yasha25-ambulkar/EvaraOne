@@ -5,6 +5,31 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+
+// ─── Retry helper ────────────────────────────────────────────────────────────
+// Retries an async fn up to `maxAttempts` times with exponential backoff.
+// Only retries on network / 5xx errors; stops immediately on 4xx auth errors.
+async function retryWithBackoff<T>(
+  fn: () => Promise<{ response: Response; data: T }>,
+  maxAttempts = 3,
+  baseDelayMs = 600,
+): Promise<{ response: Response; data: T }> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await fn();
+      // Don't retry on genuine 4xx auth errors — only on 5xx / network issues
+      if (result.response.status < 500) return result;
+      lastError = new Error(`Server error ${result.response.status}`);
+    } catch (err) {
+      lastError = err; // network failure
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
+    }
+  }
+  throw lastError;
+}
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -13,7 +38,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import type { User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 
 export type UserRole = "superadmin" | "community_admin" | "customer";
@@ -152,26 +177,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           return { success: false, error: "Login failed" };
         }
 
-        // Step 2: Get ID token
-        const idToken = await credential.user.getIdToken();
+        // Step 2: Get a FRESH ID token (forceRefresh=true avoids sending a
+        //         cached token that the backend might not have indexed yet)
+        const idToken = await credential.user.getIdToken(true);
 
-        // Step 3: Verify token with backend and get profile
+        // Step 3: Verify token with backend and get profile.
+        // Retried up to 3 times with backoff to handle transient network hiccups.
         console.log("[AuthContext] Verifying token with backend...");
-        const response = await fetch("/api/v1/auth/verify-token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ idToken }),
-        });
-
-        if (!response.ok) {
-          console.error("[AuthContext] Token verification failed:", response.status);
+        let response: Response;
+        let data: any;
+        try {
+          const result = await retryWithBackoff(async () => {
+            const res = await fetch("/api/v1/auth/verify-token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken }),
+            });
+            const json = await res.json();
+            return { response: res, data: json };
+          });
+          response = result.response;
+          data = result.data;
+        } catch (fetchErr: any) {
+          console.error("[AuthContext] Backend unreachable after retries:", fetchErr);
           setLoading(false);
-          return { success: false, error: "Token verification failed" };
+          return { success: false, error: "Cannot reach server. Please check your connection." };
         }
 
-        const data = await response.json();
+        if (!response.ok) {
+          console.error("[AuthContext] Token verification failed:", response.status, data);
+          setLoading(false);
+          return { success: false, error: data?.error ?? "Token verification failed" };
+        }
 
         if (data.success && data.user) {
           const finalUser = extractUser(data.user);

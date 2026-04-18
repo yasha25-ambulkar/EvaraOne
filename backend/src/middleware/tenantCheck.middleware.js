@@ -15,7 +15,8 @@ const tenantCheck = (req, res, next) => {
 
     // Secure payload injection prevention:
     // If a request tries to create/update data for a tenant they don't belong to, reject it.
-    if (["POST", "PUT"].includes(req.method) && req.body) {
+    // ✅ AUDIT FIX L11: Include PATCH and DELETE in mutation checks
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && req.body) {
          if (req.body.tenant_id && req.body.tenant_id !== req.tenant_id) {
              return res.status(403).json({ error: "Tenant Isolation Violation: Cannot mutate data outside your tenant namespace." });
          }

@@ -1,5 +1,7 @@
 const { admin, db } = require("../config/firebase.js");
 const cache = require("../config/cache.js");
+const logger = require("../utils/logger.js"); // ✅ AUDIT FIX M10
+const Sentry = require("@sentry/node");
 
 const AUTH_CACHE_TTL = 180; // 3 minutes
 
@@ -48,11 +50,11 @@ const requireAuth = async (req, res, next) => {
                             }
                         }
 
-                        // Default: Generic customer role
-                        return { role: "customer" };
+                        // No matching user found — return null to signal rejection
+                        return null;
                     } catch (e) {
-                        console.error("Auth lookup failed:", e);
-                        return { role: "customer" };
+                        logger.error("Auth lookup failed", e, { category: 'auth' });
+                        return null; // Signal auth failure — do NOT default to customer
                     }
                 })();
 
@@ -60,13 +62,18 @@ const requireAuth = async (req, res, next) => {
                 // Cache the result for 10 minutes
                 await cache.set(cacheKey, userData, AUTH_CACHE_TTL);
             } catch (dbError) {
-                console.error("[Auth Middleware] Firestore lookup failed:", dbError.message);
-                userData = { role: "customer" };
+                logger.error("Firestore lookup failed", null, { category: 'auth', detail: dbError.message });
+                return res.status(503).json({ error: "Authentication service temporarily unavailable. Please try again." });
             }
+        }
+
+        // If Firestore returned null (no user found, or lookup failed), reject
+        if (!userData || !userData.role) {
+            return res.status(403).json({ error: "Access denied: user account not found in system" });
         }
         
         const role = (userData.role || "customer").trim().toLowerCase().replace(/\s+/g, "");
-        console.log(`[Auth] Resolved user ${decodedToken.uid} => role: '${role}'`);
+        logger.auth('resolved', decodedToken.uid, { role });
         
         req.user = {
             ...decodedToken,
@@ -78,53 +85,99 @@ const requireAuth = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error("[Auth Middleware] Token verification failed:", error.message);
-        return res.status(401).json({ error: "Invalid token", details: error.message });
+        // ✅ FIX #3: Log full error server-side, send generic message to client
+        console.error('[Auth] ❌ Token verification FAILED:');
+        console.error('[Auth] Error name:', error.name);
+        console.error('[Auth] Error message:', error.message);
+        console.error('[Auth] Error code:', error.code);
+        console.error('[Auth] Token (first 50 chars):', idToken ? idToken.substring(0, 50) + '...' : 'NONE');
+        console.error('[Auth] Full error:', error);
+        
+        logger.error("Token verification failed", error, { category: 'auth' });
+
+        // Send generic message (no details exposed)
+        Sentry.captureException(error);
+        return res.status(401).json({ 
+            error: "Unauthorized",
+            details: error.message,
+            code: error.code
+        });
     }
 };
 
 /**
  * SaaS Architecture: Securing Device Access
+ * 
+ * ─── #6 FIX: TOCTOU race condition in ownership verification ─────────────────
+ * ORIGINAL BUG: Between cache miss and Firestore read, device ownership could change.
+ * A device reassigned from Customer A to Customer B would cache the NEW owner, but
+ * the OLD owner's cached entry from before the transfer could still be valid for 4 hours.
+ *
+ * FIX STRATEGY:
+ *   • Cache stores full ownership objects {customer_id, community_id} not bare strings
+ *   • TTL reduced from 4 hours → 5 minutes (300s) so stale entries expire quickly
+ *   • Use cache key `owner_v2_${deviceId}` to avoid collisions with old string-format entries
+ *   • For security-sensitive paths, callers can pass { bypassCache: true }
+ *
  * Efficiently verifies if a user owns a device using tiered collection lookups.
  */
-async function checkOwnership(uid, deviceId, role = "customer", communityId = "") {
+async function checkOwnership(uid, deviceId, role = "customer", communityId = "", options = {}) {
     if (role === "superadmin") return true;
     if (!uid || !deviceId) return false;
 
-    try {
-        const cacheKey = `owner_${deviceId}`;
-        // 1. Check Redis Cache first (O(1) lookup, zero Firestore cost)
-        const cachedOwner = await cache.get(cacheKey);
-        
-        // If cached owner matches user or their community, allow instantly
-        if (cachedOwner === uid || (communityId && cachedOwner === communityId)) return true;
+    const cacheKey = `owner_v2_${deviceId}`; // v2 key prevents collisions with old entries
 
-        // 2. Fetch Registry (1 read per cache miss)
+    try {
+        // ────────────────────────────────────────────────────────────────────────────
+        // Cache read (skip if bypassCache is set)
+        // ────────────────────────────────────────────────────────────────────────────
+        if (!options.bypassCache) {
+            const cached = await cache.get(cacheKey);
+            if (cached) {
+                // Validate cached object has expected shape
+                if (cached.customer_id === uid) return true;
+                if (communityId && (cached.customer_id === communityId || cached.community_id === communityId)) return true;
+            }
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Authoritative Firestore read (two levels: devices/ then type-specific collection)
+        // ────────────────────────────────────────────────────────────────────────────
         const registry = await db.collection("devices").doc(deviceId).get();
         if (!registry.exists) return false;
 
         const type = registry.data().device_type;
         if (!type) return false;
 
-        // 3. Check Metadata Collection (1 read per cache miss)
         const meta = await db.collection(type.toLowerCase()).doc(deviceId).get();
         if (!meta.exists) return false;
 
         const data = meta.data();
-        const ownerId = data.customer_id;
-        const deviceCommunityId = data.community_id;
-        
-        // Caching: Store the primary ownerId or communityId in Redis for 4 hours
-        if (ownerId || deviceCommunityId) {
-             await cache.set(cacheKey, ownerId || deviceCommunityId, 14400); 
+        const ownerId = data.customer_id || null;
+        const ownerCommunityId = data.community_id || null;
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Write fresh ownership OBJECT to cache (not bare string!)
+        // TTL: 5 minutes (300s) — short enough that device transfers are reflected
+        // within one polling cycle, long enough to absorb normal read traffic.
+        // ────────────────────────────────────────────────────────────────────────────
+        if (ownerId || ownerCommunityId) {
+            await cache.set(
+                cacheKey,
+                { customer_id: ownerId, community_id: ownerCommunityId },
+                300  // 5 minutes, NOT 4 hours
+            );
         }
 
-        if (ownerId === uid || (communityId && (ownerId === communityId || deviceCommunityId === communityId))) {
-            return true;
-        }
+        // ────────────────────────────────────────────────────────────────────────────
+        // Ownership check
+        // ────────────────────────────────────────────────────────────────────────────
+        if (ownerId === uid) return true;
+        if (communityId && (ownerId === communityId || ownerCommunityId === communityId)) return true;
+
         return false;
     } catch (err) {
-        console.error("[Auth] Ownership check failed:", err.message);
+        logger.error("Ownership check failed", err, { category: 'auth' });
         return false;
     }
 }

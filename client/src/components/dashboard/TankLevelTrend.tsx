@@ -15,7 +15,7 @@ const TankLevelTrend = ({ data }: Props) => {
                             <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
                     <XAxis dataKey="time" />
                     <YAxis domain={[0, 100]} />
                     <RechartsTooltip />

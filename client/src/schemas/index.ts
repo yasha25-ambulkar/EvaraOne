@@ -84,6 +84,8 @@ export const deviceSchema = z.object({
   depth_field: z.string().optional(),
   meter_reading_field: z.string().optional(),
   flow_rate_field: z.string().optional(),
+  tds_field: z.string().optional(),
+  temperature_field: z.string().optional(),
   // Technical metadata fields
   max_depth: z.string().optional(),
   static_depth: z.string().optional(),

@@ -59,6 +59,20 @@ export const MapPicker = ({ initialLat = 17.385, initialLng = 78.487, onConfirm,
     const [manualLng, setManualLng] = useState('');
     const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
     const [coordError, setCoordError] = useState('');
+    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+    useEffect(() => {
+        const checkTheme = () => {
+            const isDark = document.documentElement.classList.contains('dark') || 
+                        document.documentElement.getAttribute('data-theme') === 'dark';
+            setTheme(isDark ? 'dark' : 'light');
+        };
+
+        checkTheme();
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+        return () => observer.disconnect();
+    }, []);
 
     const handleDragEnd = useCallback((e: L.DragEndEvent) => {
         const loc = (e.target as L.Marker).getLatLng();
@@ -135,8 +149,12 @@ export const MapPicker = ({ initialLat = 17.385, initialLng = 78.487, onConfirm,
                     scrollWheelZoom={true}
                 >
                     <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        key={theme}
+                        attribution={theme === 'dark' ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+                        url={theme === 'dark' 
+                          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        }
                     />
                     <FlyToView target={flyTarget} />
                     <ClickHandler onMapClick={handleMapClick} />
