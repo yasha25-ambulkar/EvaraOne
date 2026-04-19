@@ -573,27 +573,8 @@ const EvaraFlowAnalytics = () => {
             if (deviceConfig.meter_reading_field) setFieldTotal(deviceConfig.meter_reading_field);
             if (deviceConfig.flow_rate_field) setFieldFlow(deviceConfig.flow_rate_field);
         }
-        console.log('[Flow] activeFields:', activeFields, 'deviceConfig:', { meter: deviceConfig?.meter_reading_field, flow: deviceConfig?.flow_rate_field });
     }, [deviceConfig, unifiedData]);
 
-    // Debug: Log data source info
-    useEffect(() => {
-        if (historyFeeds.length > 0) {
-            const lastEntry = historyFeeds[historyFeeds.length - 1];
-            const firstEntry = historyFeeds[0];
-            console.log('[Flow-DEBUG] historyFeeds Analysis:', {
-                length: historyFeeds.length,
-                firstEntry: { keys: Object.keys(firstEntry), total_liters: firstEntry.total_liters, flow_rate: firstEntry.flow_rate, raw_keys: Object.keys(firstEntry.raw || {}) },
-                lastEntry: { total_liters: lastEntry.total_liters, flow_rate: lastEntry.flow_rate },
-                fieldFlow: fieldFlow,
-                fieldTotal: fieldTotal,
-                extracted_flow: lastEntry.flow_rate ?? parseFloat(lastEntry.raw?.[fieldFlow] as string),
-                extracted_total: lastEntry.total_liters ?? parseFloat(lastEntry.raw?.[fieldTotal] as string)
-            });
-        } else {
-            console.log('[Flow-DEBUG] historyFeeds is EMPTY');
-        }
-    }, [historyFeeds, fieldFlow, fieldTotal]);
 
     const isConfigMissing = !deviceConfig?.thingspeak_channel_id;
     const isDataMissing = !telemetryData;
@@ -700,10 +681,8 @@ const EvaraFlowAnalytics = () => {
         if (historyFeeds && historyFeeds.length > 0) {
             const lastEntry = historyFeeds[historyFeeds.length - 1];
             const val = lastEntry.total_liters ?? parseFloat(lastEntry.raw?.[fieldTotal] as string);
-            console.log('[TotalRaw] From historyFeeds:', { val, has_total_liters: lastEntry.total_liters != null, fieldTotal, raw_field_value: lastEntry.raw?.[fieldTotal], isValid: !isNaN(val) });
             if (!isNaN(val)) return val;
         }
-        console.log('[TotalRaw] Fallback to 0 - historyFeeds:', historyFeeds?.length);
         return 0;
     }, [telemetryData, fieldTotal, effectiveIsOffline, tsMeterReading, historyFeeds]);
 

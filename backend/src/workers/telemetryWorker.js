@@ -24,8 +24,6 @@ async function getActiveDevices() {
         // 1. Check Cache first (invalidated automatically on admin updates via prefix 'nodes_')
         const cachedList = await cache.get("nodes:polling:list");
         if (cachedList) return cachedList;
-
-        console.log("[TelemetryWorker] Cache miss: Loading active device list from Firestore...");
         
         const snapshot = await db.collection("devices").get();
         const typedGroups = {};
@@ -169,8 +167,6 @@ async function runPoll() {
     const devices = await getActiveDevices();
     if (devices.length === 0) return;
 
-    console.log(`[TelemetryWorker] Processing ${devices.length} devices...`);
-
     // Process in batches so we don't accidentally Ddos Thingspeak
     for (let i = 0; i < devices.length; i += BATCH_SIZE) {
         const batch = devices.slice(i, i + BATCH_SIZE);
@@ -178,14 +174,10 @@ async function runPoll() {
         // Tiny 50ms sleep between batches
         await new Promise(resolve => setTimeout(resolve, 50));
     }
-
-    console.log(`[TelemetryWorker] Poll complete`);
 }
 
 // Start the worker
 function startWorker() {
-    console.log(`[TelemetryWorker] Initialized polling every ${POLL_INTERVAL}ms...`);
-    
     // Run immediately once
     runPoll();
     

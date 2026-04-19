@@ -6,8 +6,8 @@ import axios, {
 import { io } from 'socket.io-client';
 import { auth } from "../lib/firebase";
 
-const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
-const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:8000');
+const VITE_API_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : '');
 
 export const socket = io(SOCKET_URL, {
   auth: async (cb) => {
