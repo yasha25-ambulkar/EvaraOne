@@ -537,6 +537,97 @@ exports.getNodeTelemetry = async (req, res) => {
             }
         }
 
+        // ── TDS DEVICE PATH ─────────────────────────────────────────────────────
+        if (["evaratds", "tds"].includes(type)) {
+            // Get TDS and Temperature field mappings from metadata
+            const fields = metadata.fields || {};
+            const tdsField = fields.tds || fieldMapping.tds || metadata.tds_field || "field1";
+            const temperatureField = fields.temperature || fieldMapping.temperature || metadata.temperature_field || "field2";
+
+            console.log(`[TDS] Device ${deviceDoc.id}:`);
+            console.log(`[TDS]   Stored last_tds_value: ${metadata.last_tds_value}`);
+            console.log(`[TDS]   Stored last_temperature: ${metadata.last_temperature}`);
+            console.log(`[TDS]   Field mapping: tds=${tdsField}, temp=${temperatureField}`);
+            console.log(`[TDS]   Channel ID: ${channelId}`);
+            console.log(`[TDS]   API Key: ${apiKey ? '***' : 'MISSING'}`);
+
+            if (!channelId || !apiKey) {
+                console.log(`[TDS] Missing credentials, returning stored values`);
+                return res.status(200).json({
+                    deviceId: deviceDoc.id,
+                    status: storedStatus,
+                    timestamp: storedLastSeen,
+                    tds_value: metadata.last_tds_value || null,
+                    temperature: metadata.last_temperature || null,
+                    field_mapping: { tds_field: tdsField, temperature_field: temperatureField }
+                });
+            }
+
+            const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
+            console.log(`[TDS] Fetching: ${url}`);
+
+            try {
+                const response = await axios.get(url, { timeout: 8000 });
+                const feeds = response.data?.feeds || [];
+                console.log(`[TDS] Response status 200, feeds: ${feeds.length}`);
+
+                if (!feeds || feeds.length === 0) {
+                    console.log(`[TDS] No feeds returned`);
+                    return res.status(200).json({
+                        deviceId: deviceDoc.id,
+                        status: DEVICE_STATUS.UNKNOWN,
+                        timestamp: storedLastSeen,
+                        tds_value: metadata.last_tds_value || null,
+                        temperature: metadata.last_temperature || null,
+                        field_mapping: { tds_field: tdsField, temperature_field: temperatureField }
+                    });
+                }
+
+                const latestFeed = feeds[feeds.length - 1];
+                const rawTdsValue = parseFloat(latestFeed[tdsField]);
+                const rawTemperature = parseFloat(latestFeed[temperatureField]);
+                const tdsValue = isNaN(rawTdsValue) ? null : rawTdsValue;
+                const temperature = isNaN(rawTemperature) ? null : rawTemperature;
+
+                console.log(`[TDS] Latest feed data:`, latestFeed);
+                console.log(`[TDS] Extracted values: tdsValue=${tdsValue} temperature=${temperature}`);
+                console.log(`[TDS] Extracted from fields: tds_field=${tdsField} (value in feed=${latestFeed[tdsField]}), temp_field=${temperatureField} (value in feed=${latestFeed[temperatureField]})`);
+
+                const feedTimestamp = latestFeed.created_at;
+                const status = deviceState.calculateDeviceStatus(feedTimestamp);
+
+                // Persist to DB async (non-blocking)
+                db.collection(type).doc(deviceDoc.id).update({
+                    last_updated_at: feedTimestamp,
+                    status,
+                    last_telemetry_fetch: new Date().toISOString(),
+                    last_tds_value: tdsValue,
+                    last_temperature: temperature
+                }).catch(() => null);
+
+                return res.status(200).json({
+                    deviceId: deviceDoc.id,
+                    status,
+                    timestamp: normalizeThingSpeakTimestamp(feedTimestamp),
+                    last_updated_at: normalizeThingSpeakTimestamp(feedTimestamp),
+                    tds_value: tdsValue,
+                    temperature: temperature,
+                    field_mapping: { tds_field: tdsField, temperature_field: temperatureField },
+                    raw_data: latestFeed
+                });
+            } catch (err) {
+                console.error(`[TDS] Fetch error for device ${deviceDoc.id}:`, err.message);
+                return res.status(200).json({
+                    deviceId: deviceDoc.id,
+                    status: DEVICE_STATUS.UNKNOWN,
+                    timestamp: storedLastSeen,
+                    tds_value: metadata.last_tds_value || null,
+                    temperature: metadata.last_temperature || null,
+                    error: "ThingSpeak fetch failed"
+                });
+            }
+        }
+
         // ── TANK / DEEP WELL DEVICE PATH ───────────────────────────────────────
         const computeTelemetry = (distance, seenAt, status) => {
             const validDistance = Math.min(distance / 100, depth);
@@ -895,6 +986,45 @@ exports.getNodeAnalytics = async (req, res) => {
       return res.status(200).json({ node_id: req.params.id, status: DEVICE_STATUS.OFFLINE, history: [] });
     }
 
+    // ── TDS path — Extract TDS and temperature values ──────────────────────────────
+    if (["evaratds", "tds"].includes(type)) {
+      const fields = metadata.fields || {};
+      const tdsField = fields.tds || fieldMapping.tds || metadata.tds_field || "field1";
+      const temperatureField = fields.temperature || fieldMapping.temperature || metadata.temperature_field || "field2";
+
+      console.log(`[TDS-Analytics] Device ${req.params.id}:`);
+      console.log(`[TDS-Analytics]   tdsField: ${tdsField}, temperatureField: ${temperatureField}`);
+      console.log(`[TDS-Analytics]   Total feeds: ${feeds.length}`);
+
+      const latestFeed = getLatestFeed(feeds);
+      const lastUpdatedAt = latestFeed?.created_at;
+      const status = lastUpdatedAt ? deviceState.calculateDeviceStatus(lastUpdatedAt) : DEVICE_STATUS.OFFLINE;
+
+      const tdsResult = {
+        node_id: req.params.id,
+        status,
+        lastUpdatedAt,
+        active_fields: { tds_field: tdsField, temperature_field: temperatureField },
+        tds_value: latestFeed ? parseFloat(latestFeed[tdsField]) || null : null,
+        temperature: latestFeed ? parseFloat(latestFeed[temperatureField]) || null : null,
+        history: feeds.map(f => ({
+          timestamp: normalizeThingSpeakTimestamp(f.created_at),
+          tds_value: parseFloat(f[tdsField]) || null,
+          temperature: parseFloat(f[temperatureField]) || null
+        }))
+      };
+
+      console.log(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}`);
+
+      syncNodeStatus(deviceDoc.id, type, lastUpdatedAt, {
+        tds_value: tdsResult.tds_value,
+        temperature: tdsResult.temperature,
+        status
+      }).catch(err => console.error("Sync error:", err));
+
+      await cache.set(analyticsCacheKey, tdsResult, 300);
+      return res.status(200).json(tdsResult);
+    }
 
     // ── TANK path — NEW: use analytics engine ──────────────────────────────
 

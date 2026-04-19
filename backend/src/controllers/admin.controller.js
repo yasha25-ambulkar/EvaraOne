@@ -419,6 +419,8 @@ exports.createNode = async (req, res) => {
             borewellDepthField,
             meterReadingField,
             flowRateField,
+            tdsField,
+            temperatureField,
             capacity,
             depth,
             tankLength,
@@ -612,20 +614,25 @@ exports.createNode = async (req, res) => {
                 min_threshold: 0,
                 max_threshold: 2000
             };
-            // NEW: Allow custom TDS/Temperature field mapping
+            // NEW: Use user-provided TDS/Temperature field mapping from frontend
+            const userTdsField = tdsField || "field1";
+            const userTempField = temperatureField || "field2";
             metadata.fields = {
-                tds: "field1",
-                temperature: "field2"
+                tds: userTdsField,
+                temperature: userTempField
             };
             metadata.sensor_field_mapping = {
-                "field1": "tds_value",
-                "field2": "temperature"
+                [userTdsField]: "tds_value",
+                [userTempField]: "temperature"
             };
             console.log(`[createNode-TDS] 📝 Storing TDS metadata:`);
             console.log(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
             console.log(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
+            console.log(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
+            console.log(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
             console.log(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
             console.log(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
+            console.log(`[createNode-TDS]   Fields mapping:`, metadata.fields);
         }
 
         // Critical Fix: Use SAME document ID for metadata as registry
