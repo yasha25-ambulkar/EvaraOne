@@ -21,6 +21,7 @@ exports.createNodeSchema = z.object({
     assetSubType: z.string().optional(),
     zoneId: z.string().optional(),
     customerId: z.string().optional(),
+<<<<<<< HEAD
     latitude: z.union([z.number(), z.string()]).optional(),
     longitude: z.union([z.number(), z.string()]).optional(),
     // ThingSpeak credentials — MUST match frontend field names
@@ -42,6 +43,19 @@ exports.createNodeSchema = z.object({
     // Location
     hardwareId: z.string().optional(),
     status: z.string().optional()
+=======
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    channelId: z.string().optional(),
+    readApiKey: z.string().optional(),
+    capacity: z.number().optional(),
+    status: z.string().optional(),
+    // TDS specific
+    tdsValue: z.number().optional(),
+    temperature: z.number().optional(),
+    waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
+    location: z.string().optional()
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
   })
 });
 
@@ -110,8 +124,19 @@ exports.updateNodeSchema = z.object({
     status: z.string().optional(),
     tank_shape: z.string().optional(),
     temperature_field: z.string().optional(),
+<<<<<<< HEAD
   })
   // ✅ NO passthrough() — Zod strips unknown keys by default
+=======
+    // TDS specific
+    tdsValue: z.number().optional(),
+    temperature: z.number().optional(),
+    waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
+    location: z.string().optional(),
+    tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
+    tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
+  }).passthrough()
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 });
 
 exports.createZoneSchema = z.object({

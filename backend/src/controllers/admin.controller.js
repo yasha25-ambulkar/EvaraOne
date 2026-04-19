@@ -604,6 +604,7 @@ exports.createNode = async (req, res) => {
                 [rateField]: "flow_rate",
                 [readingField]: "current_reading"
             };
+<<<<<<< HEAD
             console.log(`[createNode-FLOW] 📝 Storing Flow metadata:`);
             console.log(`[createNode-FLOW]   Channel ID: "${metadata.thingspeak_channel_id}"`);
             console.log(`[createNode-FLOW]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'EMPTY'}"`);
@@ -633,6 +634,25 @@ exports.createNode = async (req, res) => {
             console.log(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
             console.log(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
             console.log(`[createNode-TDS]   Fields mapping:`, metadata.fields);
+=======
+        } else if (typeNormalized === "evaratds" || typeNormalized === "tds" || assetType === "EvaraTDS") {
+            targetCol = "evaratds";
+            metadata.tdsValue = req.body.tdsValue || 0;
+            metadata.temperature = req.body.temperature || 0;
+            metadata.waterQualityRating = req.body.waterQualityRating || "Good";
+            metadata.location = req.body.location || "";
+            metadata.status = req.body.status || "online";
+            metadata.lastUpdated = timestamp;
+            metadata.tdsHistory = [];
+            metadata.tempHistory = [];
+            metadata.configuration = {}; // For consistency
+            const tdsField = req.body.tdsField || req.body.tds_field || "field2";
+            const tempField = req.body.temperatureField || req.body.temperature_field || "field3";
+            metadata.sensor_field_mapping = {
+                [tdsField]: "tdsValue",
+                [tempField]: "temperature"
+            };
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
         }
 
         // Critical Fix: Use SAME document ID for metadata as registry
@@ -1047,6 +1067,7 @@ exports.updateNode = async (req, res) => {
                     [trimmed(readingField)]: "current_reading"
                 };
             }
+<<<<<<< HEAD
         } else if (type === "evaratds") {
             // TDS device configuration updates
             const config = {};
@@ -1055,6 +1076,29 @@ exports.updateNode = async (req, res) => {
                 if (body.configuration.max_threshold !== undefined) config.max_threshold = parseFloat(body.configuration.max_threshold) || 2000;
             }
             if (Object.keys(config).length > 0) metaUpdate.configuration = config;
+=======
+        } else if (type === "evaratds" || type === "tds") {
+            if (body.tdsValue !== undefined) metaUpdate.tdsValue = parseFloat(body.tdsValue) || 0;
+            if (body.temperature !== undefined) metaUpdate.temperature = parseFloat(body.temperature) || 0;
+            if (body.waterQualityRating) metaUpdate.waterQualityRating = trimmed(body.waterQualityRating);
+            if (body.location) metaUpdate.location = trimmed(body.location);
+            if (body.status) metaUpdate.status = trimmed(body.status);
+            metaUpdate.lastUpdated = new Date();
+            
+            // Handle history updates if provided
+            if (body.tdsValue !== undefined) {
+                metaUpdate.tdsHistory = admin.firestore.FieldValue.arrayUnion({
+                    value: parseFloat(body.tdsValue) || 0,
+                    timestamp: new Date()
+                });
+            }
+            if (body.temperature !== undefined) {
+                metaUpdate.tempHistory = admin.firestore.FieldValue.arrayUnion({
+                    value: parseFloat(body.temperature) || 0,
+                    timestamp: new Date()
+                });
+            }
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
         }
 
         await metaRef.set(metaUpdate, { merge: true });
@@ -1366,6 +1410,55 @@ exports.getDashboardInit = async (req, res) => {
     } catch (error) {
         console.error("[Init] Aggregate failure:", error.message);
         res.status(500).json({ error: "Aggregate fetch failed" });
+    }
+};
+
+/**
+ * SYSTEM CONFIGURATION (Superadmin only)
+ * Stores global settings like sampling intervals and firmware policies.
+ */
+exports.getSystemConfig = async (req, res) => {
+    try {
+        const doc = await db.collection("settings").doc("system_config").get();
+        if (!doc.exists) {
+            // Default settings if not initialized
+            return res.status(200).json({
+                samplingIntervals: {
+                    evaraTank: 60,
+                    evaraDeep: 300,
+                    evaraFlow: 30,
+                    evaraTDS: 120
+                },
+                batterySaverMode: false,
+                firmwarePolicies: {
+                    autoUpdate: false,
+                    updateWindow: { start: "02:00", end: "04:00" }
+                }
+            });
+        }
+        res.status(200).json(doc.data());
+    } catch (error) {
+        console.error("[AdminController] getSystemConfig error:", error);
+        res.status(500).json({ error: "Failed to get system configuration" });
+    }
+};
+
+exports.updateSystemConfig = async (req, res) => {
+    try {
+        const config = req.body;
+        await db.collection("settings").doc("system_config").set({
+            ...config,
+            updatedAt: new Date(),
+            updatedBy: req.user.uid
+        }, { merge: true });
+
+        // Flush relevant caches if necessary (e.g., if polling workers use this)
+        await cache.del("system_config");
+        
+        res.status(200).json({ success: true, message: "System configuration updated" });
+    } catch (error) {
+        console.error("[AdminController] updateSystemConfig error:", error);
+        res.status(500).json({ error: "Failed to update system configuration" });
     }
 };
 

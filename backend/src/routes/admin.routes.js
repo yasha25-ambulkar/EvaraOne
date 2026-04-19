@@ -5,7 +5,9 @@ const {
   createNode, getNodes, updateNode, deleteNode,
   getDashboardSummary, getHierarchy, getAuditLogs, getDashboardInit,
   updateDeviceVisibility,   // ← NEW: Image 1 - main device toggle
-  updateDeviceParameters    // ← NEW: Image 2 - parameter toggles
+  updateDeviceParameters,    // ← NEW: Image 2 - parameter toggles
+  getSystemConfig,
+  updateSystemConfig
 } = require("../controllers/admin.controller.js");
 
 const validateRequest = require("../middleware/validateRequest.js");
@@ -56,5 +58,9 @@ router.patch("/devices/:id/parameters", validateRequest(updateDeviceParametersSc
 
 // Aggregate
 router.get("/dashboard/init", auditLog("ADMIN_DASHBOARD_INIT"), getDashboardInit);
+
+// System Configuration
+router.get("/config/system", getSystemConfig);
+router.put("/config/system", auditLog("UPDATE_SYSTEM_CONFIG"), updateSystemConfig);
 
 module.exports = router;

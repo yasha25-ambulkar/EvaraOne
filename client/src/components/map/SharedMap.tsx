@@ -231,6 +231,24 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
     );
   }
 
+  if (t === "evaratds") {
+    const tds = snap?.tdsValue ?? device.last_telemetry?.tdsValue ?? 0;
+    const temp = snap?.temperature ?? device.last_telemetry?.temperature ?? 0;
+    return (
+      <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+        <div style={{ background: "rgba(16,185,129,0.08)", borderRadius: "10px", padding: "7px 9px", border: "1px solid rgba(16,185,129,0.1)" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#065f46", textTransform: "uppercase", marginBottom: "3px" }}>TDS</div>
+          <div style={{ fontSize: "15px", fontWeight: 800, color: "#10b981" }}>{tds}</div>
+          <div style={{ fontSize: "9px", color: "#6b7280", fontWeight: 600 }}>ppm</div>
+        </div>
+        <div style={{ background: "rgba(249,115,22,0.08)", borderRadius: "10px", padding: "7px 9px", border: "1px solid rgba(249,115,22,0.1)" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#9a3412", textTransform: "uppercase", marginBottom: "3px" }}>Temp</div>
+          <div style={{ fontSize: "15px", fontWeight: 800, color: "#f97316" }}>{temp}°C</div>
+        </div>
+      </div>
+    );
+  }
+
   if (t === "evaraflow") {
     const rate = snap?.flow_rate ?? firestoreFlow?.flowRate ?? 0;
     const total = snap?.total_liters ?? firestoreFlow?.volume ?? 0;
@@ -347,7 +365,9 @@ const DeviceHoverPanel = ({
       ? "#4f46e5"
       : t === "evaradeep"
         ? "#0ea5e9"
-        : "#06b6d4";
+        : t === "evaratds"
+          ? "#10b981"
+          : "#06b6d4";
 
   const panelW = 240;
   const panelH = 180;
@@ -596,7 +616,7 @@ const SharedMap = ({
   useEffect(() => {
     const points = filteredDevices
       .filter((d) => d.latitude && d.longitude)
-      .map((d) => [d.latitude!, d.longitude!] as L.LatLngExpression);
+      .map((d) => [Number(d.latitude), Number(d.longitude)] as L.LatLngExpression);
     if (points.length > 0) setMapBounds(L.latLngBounds(points).pad(0.05));
   }, [devices.length, filteredDevices]);
 
@@ -657,7 +677,7 @@ const SharedMap = ({
             return (
               <Marker
                 key={device.id}
-                position={[device.latitude, device.longitude]}
+                position={[Number(device.latitude), Number(device.longitude)]}
                 icon={icon}
                 eventHandlers={{
                   mouseover: (e) => {

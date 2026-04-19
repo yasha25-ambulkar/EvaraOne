@@ -475,7 +475,22 @@ app.use("/api/v1/admin", globalSaaSAuth, adminOnly, adminRoutes);
 
 // Node telemetry and analytics routes
 const nodesRoutes = require("./routes/nodes.routes.js");
+<<<<<<< HEAD
+=======
+const evaratdsRoutes = require("./routes/evaratds.routes.js");
+// Health Check Endpoint
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV
+  });
+});
+
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 app.use("/api/v1/nodes", globalSaaSAuth, nodesRoutes);
+app.use("/api/v1/evaratds", globalSaaSAuth, evaratdsRoutes);
 
 // TDS device routes
 const tdsRoutes = require("./routes/tds.routes.js");

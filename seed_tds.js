@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+require("dotenv").config({ path: "./backend/.env" });
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 const { db, admin } = require("./backend/src/config/firebase.js");
 
 async function seedTDS() {
