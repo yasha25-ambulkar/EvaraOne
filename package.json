@@ -10,7 +10,7 @@
     "install:client": "cd client && npm install",
     "build:client": "cd client && npm run build",
     "build": "npm run install:backend && npm run install:client && npm run build:client",
-    "start": "cd backend && node src/server.js",
+    "start": "cd backend && node --openssl-legacy-provider src/server.js",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd client && npm run dev\""
   },
   "devDependencies": {
