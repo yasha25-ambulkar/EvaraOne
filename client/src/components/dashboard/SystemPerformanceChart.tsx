@@ -23,7 +23,7 @@ const SystemPerformanceChart: React.FC<Props> = ({ nodeId, title = "System Perfo
             <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
                         <XAxis dataKey="time" />
                         <YAxis />
                         <RechartsTooltip />

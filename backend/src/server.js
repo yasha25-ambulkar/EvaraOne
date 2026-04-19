@@ -211,6 +211,7 @@ app.use("/api/v1/admin", globalSaaSAuth, adminRoutes);
 
 // Node telemetry and analytics routes
 const nodesRoutes = require("./routes/nodes.routes.js");
+const evaratdsRoutes = require("./routes/evaratds.routes.js");
 // Health Check Endpoint
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
@@ -222,6 +223,7 @@ app.get("/api/v1/health", (req, res) => {
 });
 
 app.use("/api/v1/nodes", globalSaaSAuth, nodesRoutes);
+app.use("/api/v1/evaratds", globalSaaSAuth, evaratdsRoutes);
 
 // Other routes that frontend service calls
 app.get("/api/v1/admin/hierarchy", globalSaaSAuth, getHierarchy);

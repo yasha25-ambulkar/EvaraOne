@@ -158,29 +158,30 @@ const CustomerDetails = () => {
   return (
     <div className="space-y-6">
       {/* Breadcrumb - COUPLING FIX: Customers are now top-level entities */}
-      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4 overflow-hidden">
+      <div className="flex items-center gap-2 text-sm mb-4 overflow-hidden" style={{ color: 'var(--text-muted)' }}>
         <span
           onClick={() => navigate("/superadmin/customers")}
-          className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer shrink-0"
+          className="hover:text-blue-600 cursor-pointer shrink-0"
         >
           Customers
         </span>
         <ChevronRight size={14} className="shrink-0" />
-        <span className="font-bold text-slate-800 dark:text-white truncate">
+        <span className="font-bold truncate" style={{ color: 'var(--text-primary)' }}>
           {client?.display_name || client?.full_name || "..."}
         </span>
       </div>
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
             {client?.display_name || client?.full_name || "..."}
           </h2>
-          <p className="text-slate-500 dark:text-slate-400">Customer Profile & Device Management</p>
+          <p style={{ color: 'var(--text-muted)' }}>Customer Profile & Device Management</p>
         </div>
         <button
           onClick={() => navigate("/superadmin/customers")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white/30 dark:hover:bg-slate-700/30 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium border"
+          style={{ color: 'var(--text-secondary)', borderColor: 'var(--card-border)' }}
         >
           <ArrowLeft size={16} /> Back to Customers
         </button>
@@ -190,7 +191,7 @@ const CustomerDetails = () => {
         {/* Profile Card */}
         <div className="lg:col-span-1 space-y-6">
           <div className="apple-glass-card p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>
               Contact Details
             </h3>
 
@@ -200,10 +201,10 @@ const CustomerDetails = () => {
                   <Mail size={16} />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase">
+                  <p className="text-xs font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
                     Email Address
                   </p>
-                  <p className="text-slate-800 dark:text-white font-medium">
+                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
                     {client?.email || "N/A"}
                   </p>
                 </div>
@@ -214,10 +215,10 @@ const CustomerDetails = () => {
                   <Phone size={16} />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase">
+                  <p className="text-xs font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
                     Phone Number
                   </p>
-                  <p className="text-slate-800 dark:text-white font-medium">
+                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
                     {client?.phone || "N/A"}
                   </p>
                 </div>
@@ -228,10 +229,10 @@ const CustomerDetails = () => {
                   <MapPin size={16} />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase">
+                  <p className="text-xs font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
                     Location
                   </p>
-                  <p className="text-slate-800 dark:text-white font-medium">
+                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
                     {client?.address || zone?.name || "N/A"}
                   </p>
                 </div>
@@ -244,7 +245,7 @@ const CustomerDetails = () => {
         <div className="lg:col-span-2">
           <div className="apple-glass-card p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 Assigned Devices
               </h3>
               <button
@@ -266,7 +267,7 @@ const CustomerDetails = () => {
                   <div
                     key={device.id}
                     onClick={() => navigate(`/node/${device.id}`)}
-                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md dark:hover:shadow-blue-500/20 transition-all apple-glass-inner cursor-pointer"
+                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md dark:hover:shadow-blue-500/20 transition-all apple-glass-card shadow-sm cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
@@ -281,13 +282,13 @@ const CustomerDetails = () => {
                           <Box size={20} />
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-800 dark:text-white">
+                          <h4 className="font-bold" style={{ color: 'var(--text-primary)' }}>
                             {device.displayName ||
                               device.label ||
                               device.node_key ||
                               device.name}
                           </h4>
-                          <p className="text-xs text-slate-400 dark:text-slate-400">
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                             {device.assetType || device.analytics_template}
                           </p>
                         </div>
@@ -302,11 +303,11 @@ const CustomerDetails = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-700/40">
+                    <div className="flex items-center justify-between text-xs mt-4 pt-4 border-t" style={{ color: 'var(--text-muted)', borderColor: 'var(--card-border)' }}>
                       <span className="flex items-center gap-1">
                         <Activity size={12} /> Last Seen
                       </span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Recently</span>
+                      <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>Recently</span>
                     </div>
 
                     <div className="flex items-center justify-between mt-3 w-full">
@@ -320,7 +321,8 @@ const CustomerDetails = () => {
                             (device.assetType || '').toLowerCase().includes('flow');
                           navigate(isFlow ? `/configure-flow/${device.id}` : `/configure/${device.id}`);
                         }}
-                        className="px-4 py-2.5 rounded-xl apple-glass-card border border-slate-200 dark:border-slate-600 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center justify-center gap-2"
+                        className="px-4 py-2.5 rounded-xl border border-slate-300 text-[11px] font-bold text-gray-800 dark:text-slate-300 hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                        style={{ color: 'var(--configure-btn-color)' }}
                       >
                         <Settings size={14} /> Configure
                       </button>

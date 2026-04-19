@@ -5,6 +5,7 @@ interface ProductPieChartProps {
     tank: number;
     flow: number;
     deep: number;
+    tds: number;
     className?: string;
 }
 
@@ -12,12 +13,14 @@ export const ProductPieChart = ({
     tank,
     flow,
     deep,
+    tds,
     className
 }: ProductPieChartProps) => {
     const data = [
-        { name: 'EvaraTank', value: Math.max(tank, 0.01), color: '#3A7AFE' },
+        { name: 'EvaraTank', value: Math.max(tank, 0.01), color: '#6EB5FF' },
         { name: 'EvaraFlow', value: Math.max(flow, 0.01), color: '#0891B2' },
-        { name: 'EvaraDeep', value: Math.max(deep, 0.01), color: '#7C3AED' }
+        { name: 'EvaraDeep', value: Math.max(deep, 0.01), color: '#2B5FA3' },
+        { name: 'EvaraTDS',  value: Math.max(tds,  0.01), color: '#8B72E0' }
     ];
 
     return (

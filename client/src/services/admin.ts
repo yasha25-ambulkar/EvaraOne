@@ -140,6 +140,11 @@ class AdminService {
     return response.data;
   }
 
+  async getNodes(): Promise<any[]> {
+    const response = await api.get("/admin/nodes");
+    return response.data;
+  }
+
   /**
    * Get dashboard summary metrics.
    */
@@ -260,6 +265,19 @@ class AdminService {
     const response = await api.patch(`/admin/devices/${id}/parameters`, {
       customer_config: config
     });
+    return response.data;
+  }
+
+  /**
+   * System Configuration
+   */
+  async getSystemConfig(): Promise<any> {
+    const response = await api.get("/admin/config/system");
+    return response.data;
+  }
+
+  async updateSystemConfig(config: any): Promise<any> {
+    const response = await api.put("/admin/config/system", config);
     return response.data;
   }
 }

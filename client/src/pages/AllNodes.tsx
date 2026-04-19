@@ -1,4 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+
+const generateMockHistory = (seedValue: number, length: number = 8) => {
+  return Array.from({ length }, (_, i) => ({
+    index: i,
+    value: Math.max(0, seedValue * (0.8 + Math.random() * 0.4))
+  }));
+};
 import {
   Search,
   Filter,
@@ -13,6 +21,7 @@ import { getDeviceAnalyticsRoute } from "../utils/deviceRouting";
 import { socket } from "../services/api";
 import { computeDeviceStatus } from "../services/DeviceService";
 import { getTankLevel } from "../utils/telemetryPipeline";
+import TDSCard from "../components/dashboard/TDSCard";
 
 type NodeCategory =
   | 'OHT'
@@ -24,8 +33,9 @@ type NodeCategory =
   | 'GovtBorewell'
   | 'PumpHouse'
   | 'FlowMeter'
-  | 'flow';
-type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep';
+  | 'flow'
+  | 'EvaraTDS';
+type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
 
 // ─── Category config ─────────────────────────────────────────────────────────
 
@@ -120,6 +130,14 @@ export const CATEGORY_CONFIG: Record<
     badge: "bg-cyan-100 text-cyan-700",
     dot: "bg-cyan-500",
   },
+  EvaraTDS: {
+    label: "EvaraTDS",
+    icon: <img src="/tds.png" className="w-8 h-8 object-contain drop-shadow-sm" alt="EvaraTDS" />,
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    badge: "bg-blue-100 text-blue-700",
+    dot: "bg-blue-500",
+  },
 };
 
 const ANALYTICS_CONFIG: Record<
@@ -165,6 +183,16 @@ const ANALYTICS_CONFIG: Record<
     badge: "bg-cyan-50 text-cyan-700 border border-cyan-200",
     dot: "bg-cyan-500",
   },
+  EvaraTDS: {
+    label: "EvaraTDS",
+    desc: "Water Quality",
+    icon: <img src="/tds.png" className="w-6 h-6 object-contain" alt="EvaraTDS" />,
+    activeBg: "bg-blue-600",
+    activeText: "text-white",
+    activeBorder: "border-blue-600",
+    badge: "bg-blue-50 text-blue-700 border border-blue-200",
+    dot: "bg-blue-500",
+  },
 };
 
 const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
@@ -176,16 +204,19 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
   const currentStatus = computeDeviceStatus(effectiveLastSeen);
   const isOnline = currentStatus === "Online";
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
+  const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
 
   // DRIVER FIX: Use the backend's authoritative smoothed level for absolute parity. 
-  // This eliminates divergence between Map, List, and Analytics.
   const pct = lastTel.level_percentage ?? getTankLevel(node, lastTel);
 
-  const cardDynamicClasses = isOnline
-    ? "apple-glass-card bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20"
-    : "apple-glass-card bg-slate-500/5 hover:bg-slate-500/10 border-slate-500/20";
+  if (node.analytics_template === 'EvaraTDS' || (node.category || node.asset_type || '').toString().toLowerCase().includes('tds')) {
+    return <TDSCard node={node} realtimeStatus={realtimeSnapshot} />;
+  }
+
+  // Dynamic Card Styles - Harmonized with TDSCard
+  const cardTint = "bg-[var(--card-bg)] border-[var(--card-border)]";
 
   return (
     <Link
@@ -196,7 +227,10 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         device_type: node.category || undefined,
         asset_type: node.asset_type || undefined,
       })}
-      className={`group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full border ${cardDynamicClasses}`}
+      className={clsx(
+        "group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full border apple-glass-card",
+        cardTint
+      )}
     >
       <div className="p-5 flex flex-col flex-1 relative z-10 w-full min-h-[160px] gap-[18px]">
         {/* Top: Icon + Title + Status */}
@@ -206,19 +240,19 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
               {cfg.icon}
             </div>
             <div className="flex flex-col justify-center gap-[5px] overflow-hidden pt-0.5">
-              <h3 className="font-[900] text-[17px] leading-none truncate w-full" style={{ color: 'var(--dashboard-heading)' }}>
+              <h3 className="font-[900] text-[17px] leading-none truncate w-full uppercase tracking-tight" style={{ color: 'var(--text-primary)' }}>
                 {node.label}
               </h3>
               <span className="w-fit bg-[#e2eaff] card-subheading device-type-badge text-[8.5px] font-[900] px-2.5 py-[3px] rounded-lg uppercase tracking-wider leading-none shadow-sm whitespace-nowrap">
-                {cfg.label}
+                {isFlow ? "Water Meter" : cfg.label}
               </span>
             </div>
           </div>
 
           <span
             className={clsx(
-              "flex items-center gap-1.5 text-[10px] font-[900] uppercase tracking-wider px-2.5 py-1.5 rounded-[10px] shadow-lg min-w-max shrink-0 ml-1",
-              isOnline ? "bg-green-100 text-green-600 dark:text-green-400 border border-green-300 shadow-[0_0_12px_rgba(34,197,94,0.4)]" : "bg-red-100 text-red-600 dark:text-red-400 border border-red-300 shadow-[0_0_12px_rgba(239,68,68,0.4)]",
+              "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-[10px] shadow-sm shrink-0 ml-1",
+              isOnline ? "bg-green-100 text-green-600 dark:text-green-400 border border-green-200" : "bg-red-100 text-red-600 dark:text-red-400 border border-red-200"
             )}
           >
             <span
@@ -248,23 +282,107 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
               />
             </div>
           </div>
+        ) : isFlow ? (
+          <div className="grid grid-cols-2 gap-3 flex-1 px-1 mb-2">
+            {/* Flow Rate Tile */}
+            <div className="bg-[var(--glass-accent-subtle)] backdrop-blur-md rounded-[20px] p-3.5 border border-[var(--glass-accent-subtle)] flex flex-col justify-between shadow-sm min-h-[110px] relative overflow-hidden group/tile">
+              <div className="flex flex-col gap-1 relative z-10">
+                <span className="text-[10px] font-black uppercase tracking-widest leading-none card-label" style={{ color: 'var(--text-muted)' }}>Flow Rate</span>
+              </div>
+              <div className="mt-2 flex flex-col items-start relative z-10">
+                <span className="text-[20px] font-black leading-none tracking-tight card-value" style={{ color: 'var(--text-primary)' }}>
+                  {Math.abs(lastTel.flow_rate || 0).toFixed(2)}
+                </span>
+                <div className="text-[10px] font-black uppercase mt-1 tracking-wider leading-none card-number" style={{ color: 'var(--text-muted)' }}>m³/hr</div>
+              </div>
+              {/* Sparkline Overlay */}
+              <div className="absolute inset-x-0 bottom-0 h-10 opacity-30 group-hover/tile:opacity-60 transition-opacity pointer-events-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={generateMockHistory(lastTel.flow_rate || 10)}>
+                    <defs>
+                      <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <Area 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="#06b6d4" 
+                      strokeWidth={1.5}
+                      fillOpacity={1} 
+                      fill="url(#colorFlow)" 
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Total Tile */}
+            <div className="bg-[var(--glass-accent-subtle)] backdrop-blur-md rounded-[20px] p-3.5 border border-[var(--glass-accent-subtle)] flex flex-col justify-between shadow-sm min-h-[110px] relative overflow-hidden group/tile">
+              <div className="flex flex-col gap-1 relative z-10">
+                <span className="text-[10px] font-black uppercase tracking-widest leading-none card-label" style={{ color: 'var(--text-muted)' }}>Total</span>
+              </div>
+              <div className="mt-2 flex flex-col items-start relative z-10">
+                <span className="text-[20px] font-black leading-none tracking-tight card-value" style={{ color: 'var(--text-primary)' }}>
+                  {Math.round(lastTel.total_liters || 0)}
+                </span>
+                <div className="text-[10px] font-black uppercase mt-1 tracking-wider leading-none card-number" style={{ color: 'var(--text-muted)' }}>liters</div>
+              </div>
+              {/* Sparkline Overlay */}
+              <div className="absolute inset-x-0 bottom-0 h-10 opacity-30 group-hover/tile:opacity-60 transition-opacity pointer-events-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={generateMockHistory(20, 10)}>
+                    <defs>
+                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <Area 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="#3b82f6" 
+                      strokeWidth={1.5}
+                      fillOpacity={1} 
+                      fill="url(#colorTotal)" 
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
         ) : (
-          <div className="flex-1"></div>
+          <div className="flex-1 mt-2"></div>
         )}
 
-        {/* Bottom: Location + Capacity */}
-        <div className="mt-auto flex items-center justify-between pt-3 px-1">
-          <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
-            <MapPin size={14} className="shrink-0 card-location" />
-            <span className="truncate uppercase card-location">{node.location_name || "Unknown"}</span>
+        {/* Bottom Metadata (Only for Tanks/Generic) */}
+        {!isFlow && (
+          <div className="mt-auto flex items-center justify-between pt-3 px-1">
+            <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
+              <MapPin size={14} className="shrink-0 card-location" />
+              <span className="truncate uppercase card-location">{node.location_name || "Unknown"}</span>
+            </div>
+            <span className="text-[11.5px] font-[1000] card-number bg-white/70 dark:bg-white/5 px-2.5 py-1 rounded-[8px] border border-blue-200 dark:border-white/10 shadow-sm whitespace-nowrap">
+              {node.capacity || "N/A"}
+            </span>
           </div>
-          <span className="text-[11.5px] font-[1000] card-number bg-white/70 dark:bg-white/5 px-2.5 py-1 rounded-[8px] border border-blue-200 dark:border-white/10 shadow-sm whitespace-nowrap">
-            {node.capacity || "N/A"}
-          </span>
-        </div>
+        )}
+
+        {/* Location for Flow Devices (Same as TDS) */}
+        {isFlow && (
+          <div className="mt-auto flex items-center justify-between pt-1 px-1">
+            <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
+              <MapPin size={14} className="shrink-0 card-location" />
+              <span className="truncate uppercase card-location">{node.zoneName || "IIITH"}</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Footer Nav Button - Glassmorphic */}
+      {/* Footer Nav Button - Harmonized with TDSCard */}
       <div
         className="relative overflow-hidden px-5 py-[13px] text-center text-[11.5px] font-[900] tracking-[0.15em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#002868]/70"
         style={{

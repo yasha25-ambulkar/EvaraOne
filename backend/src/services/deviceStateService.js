@@ -150,6 +150,42 @@ const processThingSpeakData = async (device, feeds) => {
     };
   }
 
+  // ── TDS path ──────────────────────────────────────────────────────────
+  const isTDS = ["evaratds", "tds"].includes(typeNormalized);
+  if (isTDS) {
+    const mapping = device.mapping || {};
+    const tdsKeys = ['tdsField', 'tds_value', 'tdsValue'];
+    const tempKeys = ['tempField', 'temperature', 'temperature_field'];
+
+    const fieldTDS =
+      device.tds_field ||
+      Object.keys(mapping).find(k => mapping[k] === "tdsValue") ||
+      "field2";
+    const fieldTemp =
+      device.temperature_field ||
+      Object.keys(mapping).find(k => mapping[k] === "temperature") ||
+      "field3";
+
+    const tdsValue = parseFloat(latestFeed[fieldTDS]) || 0;
+    const temperature = parseFloat(latestFeed[fieldTemp]) || 0;
+
+    let quality = "Good";
+    if (tdsValue > 1000) quality = "Critical";
+    else if (tdsValue > 500) quality = "Acceptable";
+
+    return {
+      deviceId: device.id,
+      tds_value: tdsValue,
+      temperature,
+      water_quality: quality,
+      lastUpdatedAt,
+      status,
+      raw_data: latestFeed,
+      fieldTDS,
+      fieldTemp,
+    };
+  }
+
   // ── TANK path — NEW: use analytics engine ──────────────────────────────
   const mapping = device.mapping || {};
   const definedField =
@@ -217,21 +253,28 @@ const processThingSpeakData = async (device, feeds) => {
  */
 const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, feeds) => {
   try {
-    const updatePayload = {
+    const cleanObject = (obj) => {
+        if (obj === null || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(cleanObject).filter(v => v !== undefined);
+        const result = {};
+        Object.keys(obj).forEach(key => {
+            const val = cleanObject(obj[key]);
+            if (val !== undefined) result[key] = val;
+        });
+        return result;
+    };
+
+    const updatePayload = cleanObject({
       lastUpdatedAt: telemetryData.lastUpdatedAt,
       status: telemetryData.status,
       lastTelemetryFetch: new Date().toISOString(),
       raw_data: telemetryData.raw_data,
-    };
-
-    if (telemetryData.rawDistance !== undefined) updatePayload.lastValue = telemetryData.rawDistance;
-    if (telemetryData.processedLevel !== undefined) updatePayload.processedLevel = telemetryData.processedLevel;
-    if (telemetryData.percentage !== undefined) {
-      updatePayload.percentage = telemetryData.percentage;
-      updatePayload.level_percentage = telemetryData.percentage;
-    }
+    });
     if (telemetryData.flow_rate !== undefined) updatePayload.flow_rate = telemetryData.flow_rate;
     if (telemetryData.total_liters !== undefined) updatePayload.total_liters = telemetryData.total_liters;
+    if (telemetryData.tds_value !== undefined) updatePayload.tdsValue = telemetryData.tds_value;
+    if (telemetryData.temperature !== undefined) updatePayload.temperature = telemetryData.temperature;
+    if (telemetryData.water_quality !== undefined) updatePayload.waterQualityRating = telemetryData.water_quality;
 
     // NEW: store analytics state in telemetry_snapshot
     updatePayload.telemetry_snapshot = {
@@ -239,6 +282,9 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
       total_liters: telemetryData.total_liters || 0,
       percentage: telemetryData.percentage || 0,
       level_percentage: telemetryData.percentage || 0,
+      tds_value: telemetryData.tds_value || 0,
+      temperature: telemetryData.temperature || 0,
+      water_quality: telemetryData.water_quality || "Good",
       timestamp: telemetryData.lastUpdatedAt,
       status: telemetryData.status,
       waterState: telemetryData.waterState || 'STABLE',
@@ -254,9 +300,54 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
         created_at: f.created_at,
         raw: f
       }));
+
+      // If it's a TDS device, also populate tdsHistory and tempHistory for the analytics page
+      if (deviceType.toLowerCase() === 'evaratds') {
+        const fieldTDS = telemetryData.fieldTDS || 'field2';
+        const fieldTemp = telemetryData.fieldTemp || 'field3';
+
+        updatePayload.tdsHistory = feeds.map(f => ({
+          value: parseFloat(f[fieldTDS]) || 0,
+          timestamp: f.created_at
+        })).reverse();
+        
+        updatePayload.tempHistory = feeds.map(f => ({
+          value: parseFloat(f[fieldTemp]) || 0,
+          timestamp: f.created_at
+        })).reverse();
+      }
     }
 
-    await db.collection(deviceType.toLowerCase()).doc(deviceId).update(updatePayload);
+    // Final metadata update
+    const updateMetadata = db.collection(deviceType.toLowerCase()).doc(deviceId).update(cleanObject(updatePayload));
+    
+    // Standardized registry update
+    const registryUpdate = cleanObject({
+        lastUpdatedAt: telemetryData.lastUpdatedAt,
+        status: telemetryData.status,
+        last_telemetry: cleanObject({
+            // Tank/Deep fields
+            percentage: telemetryData.percentage,
+            level_percentage: telemetryData.percentage,
+            volume: telemetryData.volume,
+            
+            // Flow fields
+            flow_rate: telemetryData.flow_rate,
+            total_liters: telemetryData.total_liters,
+
+            // TDS fields
+            tdsValue: telemetryData.tds_value,
+            temperature: telemetryData.temperature,
+            waterQualityRating: telemetryData.water_quality,
+            tds_history: (updatePayload.tdsHistory || []).slice(0, 10), // Sync last 10 points for sparklines
+            
+            timestamp: telemetryData.lastUpdatedAt
+        })
+    });
+
+    const updateRegistry = db.collection("devices").doc(deviceId).update(registryUpdate);
+
+    await Promise.all([updateMetadata, updateRegistry]);
   } catch (err) {
     console.error(`[DeviceState] Firestore update failed for ${deviceId}:`, err.message);
     throw err;

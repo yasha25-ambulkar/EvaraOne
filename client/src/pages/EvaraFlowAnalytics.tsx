@@ -157,7 +157,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                 {/* Left: Icon, Title, Subtitle */}
                 <div className="flex gap-4 items-center">
                     <div className="w-10 h-10 rounded-[0.8rem] bg-[#e0f2fe] dark:bg-white/10 flex items-center justify-center shrink-0 shadow-sm border border-blue-100/20">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#004F94" xmlns="http://www.w3.org/2000/svg">
+                        <svg className="fill-[#004F94] dark:fill-blue-400" width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 10h3v10H5zm5-4h3v14h-3zm5 7h3v7h-3z" />
                             <circle cx="6.5" cy="5.5" r="1.5" />
                         </svg>
@@ -233,7 +233,8 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                 </div>
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
+                        {/* Use dynamic CSS variable for grid lines to ensure visibility across themes */}
+                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="var(--chart-grid-color)" />
 
                         <YAxis
                             orientation="right"
@@ -294,7 +295,7 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
                 </div>
                 {/* Top Right Water Drop Icon */}
                 <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#004F94" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="fill-[#004F94] dark:fill-blue-400" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2C6.477 2 2 17.523 2 12c0-4.478 4.477-8 10-10 5.522 2 10 5.522 10 10 0 5.523-4.478 10-10 10zm-1.125-5.996c1.32-.4 1.838-1.536 1.838-3.085 0-.448-.363-.811-.812-.811s-.812.363-.812.81c0 .756-.168 1.53-1.076 1.805-.427.13-.672.58-.55.1 0 0 .193-.76-.023-1.312-.224-.575-.98-1.34-1.38-2.586-.135-.423-.74-.287-.698.156.096.994.499 2.146 1.344 3.256.621.815 1.373 1.48 2.169 1.667z" />
                     </svg>
                 </div>
@@ -304,7 +305,7 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
             <div className="flex items-center gap-3 w-full overflow-hidden">
                 <div className="w-8 h-8 rounded-lg bg-[#f1f5f9] flex items-center justify-center shrink-0">
                     {/* Speedometer SVG */}
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#004F94" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="fill-[#004F94] dark:fill-blue-400" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v4l3.5 3.5-1.42 1.42L11 12.5V7z" />
                     </svg>
                 </div>
@@ -899,10 +900,15 @@ const EvaraFlowAnalytics = () => {
                                 <span className="font-bold" style={{ color: "var(--text-primary)", fontWeight: '700' }}>{deviceName}</span>
                             </nav>
                             <div className="flex items-center gap-2">
+                                <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm border-none transition-all duration-300 text-white ${effectiveIsOffline ? 'bg-[#FF3B30]' : 'bg-[#34C759]'}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                    {effectiveIsOffline ? 'Offline' : 'Online'}
+                                </div>
+
                                 <button
                                     onClick={() => refetch()}
                                     disabled={analyticsFetching}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95 ${analyticsFetching ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff]/10 hover:bg-[#0077ff]/20 text-[#0077ff] border border-[#0077ff]/30'}`}
+                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 border-none ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff] hover:bg-[#0062d6] text-white'}`}
                                 >
                                     <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
                                         {analyticsFetching ? 'sync' : 'refresh'}
@@ -912,7 +918,7 @@ const EvaraFlowAnalytics = () => {
 
                                 <button
                                     onClick={() => setShowNodeInfo(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-[#AF52DE]/30 hover:bg-[#AF52DE]/40 text-[#6f2da8] border border-[#AF52DE]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#AF52DE] hover:bg-[#9d44ce] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <Info size={12} className="stroke-[2.5px]" />
                                     Node Info
@@ -920,7 +926,7 @@ const EvaraFlowAnalytics = () => {
 
                                 <button
                                     onClick={() => setShowParams(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-[#FF9500]/30 hover:bg-[#FF9500]/40 text-[#d35400] border border-[#FF9500]/60 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#FFB340] hover:bg-[#f5a623] text-amber-900 border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <Settings size={12} className="stroke-[2.5px]" />
                                     Parameters
@@ -930,17 +936,12 @@ const EvaraFlowAnalytics = () => {
                                 {user?.role === 'superadmin' && (
                                     <button
                                         onClick={() => setShowDeleteConfirm(true)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-600 border border-red-500/40 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-[#FF3B30] hover:bg-[#e0352b] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                                     >
                                         <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
                                         Delete Node
                                     </button>
                                 )}
-
-                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${effectiveIsOffline ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#34C759]/30 text-[#1e7e34] border border-[#34C759]/60 shadow-md transition-all duration-300'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${effectiveIsOffline ? 'bg-red-500' : 'bg-[#34C759] animate-pulse shadow-[0_0_8px_rgba(52,199,89,0.6)]'}`} />
-                                    {effectiveIsOffline ? 'Offline' : 'Online'}
-                                </div>
                             </div>
                         </div>
                         <div className="flex flex-col gap-1">
@@ -1240,7 +1241,7 @@ const EvaraFlowAnalytics = () => {
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-4 h-11">
                                             <div className="flex flex-col justify-center h-full">
-                                                <h2 className="text-[17px] font-black tracking-tight text-[#1C1C1E] m-0">WATER USAGE</h2>
+                                                <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">WATER USAGE</h2>
                                                 {isSuperAdmin && customerConfig.showWaterSecurity === false && (
                                                     <span className="text-[9px] font-bold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full uppercase w-fit mt-1">HIDDEN FROM CUSTOMER</span>
                                                 )}
@@ -1258,7 +1259,7 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 min-w-0">
                                                 <div className="flex items-center gap-1">
                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[#1C1C1E]">USAGE</span>
+                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">USAGE</span>
                                                 </div>
                                                 <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums truncate">
                                                     {formatMeterValue(deltaVolumeLitres > 0 ? deltaVolumeLitres : totalRaw)}
@@ -1270,7 +1271,7 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[#1C1C1E]">FLOW</span>
+                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">FLOW</span>
                                                 </div>
                                             </div>
                                         </div>

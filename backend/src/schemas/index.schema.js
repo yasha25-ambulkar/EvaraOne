@@ -13,7 +13,12 @@ exports.createNodeSchema = z.object({
     channelId: z.string().optional(),
     readApiKey: z.string().optional(),
     capacity: z.number().optional(),
-    status: z.string().optional()
+    status: z.string().optional(),
+    // TDS specific
+    tdsValue: z.number().optional(),
+    temperature: z.number().optional(),
+    waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
+    location: z.string().optional()
   })
 });
 
@@ -82,6 +87,13 @@ exports.updateNodeSchema = z.object({
     status: z.string().optional(),
     tank_shape: z.string().optional(),
     temperature_field: z.string().optional(),
+    // TDS specific
+    tdsValue: z.number().optional(),
+    temperature: z.number().optional(),
+    waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
+    location: z.string().optional(),
+    tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
+    tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
   }).passthrough()
 });
 

@@ -112,11 +112,12 @@ class NodeService {
     const categoryRaw = (data.device_type || data.assetType || data.asset_type || data.category || "tank").toLowerCase();
     
     // Map to UI-friendly categories used in AllNodes
-    let category: 'tank' | 'flow' | 'deep' | 'sump' | 'unknown' = 'unknown';
+    let category: 'tank' | 'flow' | 'deep' | 'sump' | 'tds' | 'unknown' = 'unknown';
     if (categoryRaw.includes('tank') || categoryRaw === 'oht') category = 'tank';
     else if (categoryRaw.includes('deep') || categoryRaw.includes('bore')) category = 'deep';
     else if (categoryRaw.includes('flow') || categoryRaw.includes('pump')) category = 'flow';
     else if (categoryRaw.includes('sump')) category = 'sump';
+    else if (categoryRaw.includes('tds')) category = 'tds';
     else category = 'tank'; // Default
 
     const displayName = data.displayName || data.display_name || data.label || hardwareId;
@@ -159,8 +160,8 @@ class NodeService {
       assetType: categoryRaw,
       category: category as any,
       device_type: data.device_type || categoryRaw,
-      analytics_template: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : 'EvaraDeep'),
-      analyticsTemplate: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : 'EvaraDeep'),
+      analytics_template: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : category === 'deep' ? 'EvaraDeep' : category === 'tds' ? 'EvaraTDS' : 'EvaraTank'),
+      analyticsTemplate: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : category === 'deep' ? 'EvaraDeep' : category === 'tds' ? 'EvaraTDS' : 'EvaraTank'),
       last_seen: safeIso(lastSeenTime),
       last_online_at: safeIso(lastSeenTime),
       updatedAt: safeIso(lastSeenTime) || new Date().toISOString(),

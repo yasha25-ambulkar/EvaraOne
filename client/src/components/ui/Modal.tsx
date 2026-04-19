@@ -71,21 +71,21 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', animation
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className={`absolute inset-0 bg-slate-900/20 backdrop-blur-[2px] transition-opacity ${isClosing ? 'animate-out fade-out duration-200' : 'animate-in fade-in duration-300'
+                className={`absolute inset-0 bg-slate-900/20 transition-opacity ${isClosing ? 'animate-out fade-out duration-200' : 'animate-in fade-in duration-300'
                     }`}
                 onClick={handleClose}
             />
 
             {/* Modal Dialog */}
             <div className={`relative w-full ${sizeClasses[size]} transform transition-all ${animationClasses[animation]}`}>
-                <div className="apple-glass-card m-0">
+                <div className="modal-glass rounded-[24px] m-0 overflow-hidden">
                     <div className="apple-glass-content">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.1)]">
-                            <h3 className="text-[18px] font-[600] text-[#1F2937] tracking-[-0.3px]">{title}</h3>
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
+                            <h3 className="text-[18px] font-[600] text-[var(--modal-heading-color)] tracking-[-0.3px]">{title}</h3>
                             <button
                                 onClick={handleClose}
-                                className="p-1 rounded-lg text-[#1F2937] opacity-50 hover:opacity-100 hover:bg-[rgba(255,255,255,0.2)] transition-all"
+                                className="p-1 rounded-lg text-slate-800 dark:text-white opacity-50 hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/20 transition-all"
                             >
                                 <X size={20} />
                             </button>

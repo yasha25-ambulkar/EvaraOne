@@ -122,8 +122,17 @@ exports.verifyToken = async (req, res) => {
       });
     }
 
-    // Verify the token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    // Verify the token — retry once on transient failures (e.g. Firebase Admin
+    // fetching Google public keys on cold-start, or a brief network blip).
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch (firstErr) {
+      console.warn(`[AuthController] First verifyIdToken attempt failed (${firstErr.code || firstErr.message}), retrying once…`);
+      await new Promise((r) => setTimeout(r, 800));
+      // Second attempt — if this throws it will bubble to the outer catch
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    }
     
     console.log(`[AuthController] 🔐 Token verified for user: ${decodedToken.uid}`);
     console.log(`[AuthController] Email: ${decodedToken.email}`);

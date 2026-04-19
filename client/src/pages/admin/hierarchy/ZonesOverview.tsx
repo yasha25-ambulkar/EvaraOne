@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Plus,
   Globe,
-  Hash,
   Edit2,
   Trash2,
 } from "lucide-react";
@@ -146,12 +145,12 @@ const RegionsOverview = () => {
             >
               <div className="apple-glass-content relative flex flex-col h-full p-[24px]">
                 {/* Background Icon */}
-                <div className="absolute top-0 right-0 p-4 transition-opacity pointer-events-none">
-                  <MapPin size={80} className="zone-badge-icon" style={{ opacity: 0.1 }} />
+                <div className="absolute top-0 right-0 p-4 transition-opacity pointer-events-none z-0">
+                  <MapPin size={80} className="text-[#3A7AFE] opacity-[0.08] pointer-events-none blur-[0.5px]" />
                 </div>
 
                 {/* Header */}
-                <div className="flex items-start justify-between gap-3 mb-5">
+                <div className="flex items-start justify-between gap-3 mb-5 relative z-10">
                   <div className="flex items-center gap-[12px]">
                     <div className="w-[48px] h-[48px] rounded-[16px] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center text-[var(--text-primary)] opacity-80 font-[700] text-[15px] shadow-sm group-hover:scale-105 transition-transform duration-300">
                       {(zone?.zoneName || "")
@@ -201,7 +200,7 @@ const RegionsOverview = () => {
                   </div>
                   <div className="flex items-center justify-between text-[13px]">
                     <span className="flex items-center gap-[8px] zone-stat-label font-[500]">
-                      <Hash size={14} className="opacity-50" /> Devices
+                      Devices
                     </span>
                     <span className="font-[600] zone-stat-number flex items-center gap-[6px]">
                       {rs.devices}

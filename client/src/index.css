@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+body {
+  font-family: 'Aptos', 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
 :root {
   /* ── EvaraFlow Dashboard Layout ── */
   /* Mirrors the meter reading card's min-h-[460px] Tailwind class.      */
@@ -18,6 +26,9 @@
   --color-premium-amber: #f59e0b;
 
   /* Theme Variables - Light (Default) */
+  --chart-grid-color: #f1f5f9;
+  --chart-bar-blue: #3b82f6;
+  --chart-bar-cyan: #06b6d4;
   --bg-primary: #f8fafc;
   --bg-secondary: #f1f5f9;
   --card-bg: rgba(255, 255, 255, 0.22);
@@ -41,7 +52,7 @@
 
   /* Golden Ratio Spacing (Requested Scaling) */
   --dashboard-heading: #1e3a8a;
-  --liquid-button-text: #000000;
+  --liquid-button-text: #ffffff;
   --ratio-13: 13px;
   --ratio-21: 21px;
   --ratio-34: 34px;
@@ -63,6 +74,15 @@
   --map-index-text: #0f172a;
   --map-index-text-muted: #475569;
   --map-index-border: #e2e8f0;
+
+  /* Legend Glassmorphism */
+  --legend-bg: rgba(255, 255, 255, 0.6);
+  --legend-border: rgba(255, 255, 255, 0.8);
+  --legend-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --legend-heading-color: #1e293b;
+  --legend-text-color: #334155;
+  --legend-icon-bg: rgba(255, 255, 255, 0.8);
+  --legend-divider: rgba(0, 0, 0, 0.06);
 
   /* Dashboard Icons */
   --icon-stroke: #002868;
@@ -119,9 +139,43 @@
   --zone-badge-text: #1d4ed8;
   --zone-badge-border: rgba(37, 99, 235, 0.4);
   --zone-badge-icon: #2563eb;
+
+  /* Navbar Glassmorphism */
+  --navbar-bg: rgba(240, 247, 255, 0.3);
+  --navbar-border: rgba(255, 255, 255, 0.5);
+  --navbar-shadow: 0 10px 25px rgba(37, 99, 235, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  --navbar-text: #1e3a8a;
+  --navbar-active-bg: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  --navbar-active-text: #ffffff;
+  --navbar-active-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+
+  /* Modal Vars */
+  --modal-glass-bg: rgba(255, 255, 255, 0.55);
+  --modal-glass-border: rgba(255, 255, 255, 0.6);
+  --modal-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --modal-card-glass-bg: rgba(255, 255, 255, 0.45);
+  --modal-card-glass-border: rgba(255, 255, 255, 0.5);
+  --modal-input-bg: #ffffff;
+  --modal-input-border: rgba(0, 0, 0, 0.15);
+  --modal-label-color: #1e293b;
+  --modal-heading-color: #0f172a;
+  --modal-placeholder-color: rgba(0, 0, 0, 0.35);
+  --modal-text-color: #1e293b;
+  --configure-btn-color: #1f2937;
+  --configure-card-bg: rgba(255, 255, 255, 0.35);
+  --configure-card-border: rgba(255, 255, 255, 0.6);
+  --configure-card-shadow: 0 24px 48px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(255, 255, 255, 0.7);
+  --configure-heading-color: #111827;
+  --configure-subtext-color: #4b5563;
 }
 
 .dark {
+  --configure-card-bg: rgba(255, 255, 255, 0.04);
+  --configure-card-border: rgba(255, 255, 255, 0.12);
+  --configure-card-shadow: 0 24px 48px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  --configure-heading-color: #ffffff;
+  --configure-subtext-color: #9ca3af;
+  --chart-grid-color: rgba(255, 255, 255, 0.05);
   --dashboard-heading: #ffffff;
   --liquid-button-text: #ffffff;
   --icon-stroke: #93c5fd;
@@ -129,14 +183,14 @@
   --icon-health-stroke: #93c5fd;
   --icon-product-stroke: #86efac;
   --node-label-color: #ffffff;
-  --card-label-color: rgba(255,255,255,0.7);
+  --card-label-color: rgba(255, 255, 255, 0.7);
   --card-value-color: #ffffff;
-  --card-subheading-color: rgba(255,255,255,0.5);
-  --card-location-color: rgba(255,255,255,0.6);
-  --card-number-color: rgba(255,255,255,0.8);
+  --card-subheading-color: rgba(255, 255, 255, 0.5);
+  --card-location-color: rgba(255, 255, 255, 0.6);
+  --card-number-color: rgba(255, 255, 255, 0.8);
   --overview-heading-color: #ffffff;
   --overview-subheading-color: #cbd5e1;
-  --kpi-label-color: rgba(255,255,255,0.7);
+  --kpi-label-color: rgba(255, 255, 255, 0.7);
   --kpi-value-color: #ffffff;
   --section-heading-color: #ffffff;
   --section-heading-icon-color: #93c5fd;
@@ -172,6 +226,7 @@
   --offline-border: #ef4444;
   --offline-dot: #f87171;
   --offline-bg: rgba(255, 255, 255, 0.05);
+  --configure-btn-color: #cbd5e1;
 }
 
 html.dark {
@@ -194,28 +249,155 @@ html.dark {
   --zone-badge-text: #60a5fa;
   --zone-badge-border: rgba(96, 165, 250, 0.4);
   --zone-badge-icon: #60a5fa;
+
+  /* Legend Glassmorphism */
+  --legend-bg: rgba(15, 23, 42, 0.6);
+  --legend-border: rgba(255, 255, 255, 0.08);
+  --legend-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --legend-heading-color: #f1f5f9;
+  --legend-text-color: #cbd5e1;
+  --legend-icon-bg: rgba(255, 255, 255, 0.05);
+  --legend-divider: rgba(255, 255, 255, 0.06);
+
+  /* Navbar Glassmorphism */
+  --navbar-bg: rgba(15, 23, 42, 0.35);
+  --navbar-border: rgba(255, 255, 255, 0.15);
+  --navbar-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --navbar-text: #e0f2fe;
+  --navbar-active-bg: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  --navbar-active-text: #ffffff;
+  --navbar-active-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+
+  /* Modal Vars */
+  --modal-glass-bg: rgba(13, 17, 23, 0.65);
+  --modal-glass-border: rgba(255, 255, 255, 0.08);
+  --modal-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --modal-card-glass-bg: rgba(255, 255, 255, 0.04);
+  --modal-card-glass-border: rgba(255, 255, 255, 0.08);
+  --modal-input-bg: rgba(255, 255, 255, 0.06);
+  --modal-input-border: rgba(255, 255, 255, 0.12);
+  --modal-label-color: rgba(255, 255, 255, 0.85);
+  --modal-heading-color: #ffffff;
+  --modal-placeholder-color: rgba(255, 255, 255, 0.3);
+  --modal-text-color: #ffffff;
 }
 
-.node-label { color: var(--node-label-color); }
-.card-label { color: var(--card-label-color); }
-.card-value { color: var(--card-value-color); }
-.card-subheading { color: var(--card-subheading-color); }
-.card-location { color: var(--card-location-color); }
-.card-number { color: var(--card-number-color); }
-.overview-heading { color: var(--overview-heading-color); }
-.overview-subheading { color: var(--overview-subheading-color); }
-.kpi-label { color: var(--kpi-label-color); }
-.kpi-value { color: var(--kpi-value-color); }
-.section-heading { color: var(--section-heading-color); }
-.section-heading-icon { color: var(--section-heading-icon-color); }
-.action-card-heading { color: var(--action-card-heading-color); }
-.action-card-desc { color: var(--action-card-desc-color); }
-.customer-name { color: var(--customer-name-color); }
-.customer-location { color: var(--customer-location-color); }
-.customer-email { color: var(--customer-email-color); }
-.customer-secondary { color: var(--customer-secondary-color); }
-.customer-badge { color: var(--customer-badge-color); }
-.customer-btn { color: var(--customer-btn-color); }
+.modal-glass {
+  background: var(--modal-glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--modal-glass-border);
+  box-shadow: var(--modal-glass-shadow);
+}
+
+.modal-card-glass {
+  background: var(--modal-card-glass-bg);
+  border: 1px solid var(--modal-card-glass-border);
+}
+
+/* Fix browser autofill background override in dark mode modal inputs */
+html.dark .modal-card-glass input:-webkit-autofill,
+html.dark .modal-card-glass input:-webkit-autofill:hover,
+html.dark .modal-card-glass input:-webkit-autofill:focus,
+.dark .modal-card-glass input:-webkit-autofill,
+.dark .modal-card-glass input:-webkit-autofill:hover,
+.dark .modal-card-glass input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.06) inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff;
+}
+
+/* Fix browser autofill background override in light mode modal inputs */
+html:not(.dark) .modal-card-glass input:-webkit-autofill,
+html:not(.dark) .modal-card-glass input:-webkit-autofill:hover,
+html:not(.dark) .modal-card-glass input:-webkit-autofill:focus,
+:not(.dark) .modal-card-glass input:-webkit-autofill,
+:not(.dark) .modal-card-glass input:-webkit-autofill:hover,
+:not(.dark) .modal-card-glass input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #1e293b !important;
+  caret-color: #1e293b;
+}
+
+.node-label {
+  color: var(--node-label-color);
+}
+
+.card-label {
+  color: var(--card-label-color);
+}
+
+.card-value {
+  color: var(--card-value-color);
+}
+
+.card-subheading {
+  color: var(--card-subheading-color);
+}
+
+.card-location {
+  color: var(--card-location-color);
+}
+
+.card-number {
+  color: var(--card-number-color);
+}
+
+.overview-heading {
+  color: var(--overview-heading-color);
+}
+
+.overview-subheading {
+  color: var(--overview-subheading-color);
+}
+
+.kpi-label {
+  color: var(--kpi-label-color);
+}
+
+.kpi-value {
+  color: var(--kpi-value-color);
+}
+
+.section-heading {
+  color: var(--section-heading-color);
+}
+
+.section-heading-icon {
+  color: var(--section-heading-icon-color);
+}
+
+.action-card-heading {
+  color: var(--action-card-heading-color);
+}
+
+.action-card-desc {
+  color: var(--action-card-desc-color);
+}
+
+.customer-name {
+  color: var(--customer-name-color);
+}
+
+.customer-location {
+  color: var(--customer-location-color);
+}
+
+.customer-email {
+  color: var(--customer-email-color);
+}
+
+.customer-secondary {
+  color: var(--customer-secondary-color);
+}
+
+.customer-badge {
+  color: var(--customer-badge-color);
+}
+
+.customer-btn {
+  color: var(--customer-btn-color);
+}
 
 .action-badge {
   background-color: var(--action-badge-bg);
@@ -224,18 +406,49 @@ html.dark {
   backdrop-filter: blur(8px);
 }
 
-.zone-page-heading { color: var(--zone-page-heading-color); }
-.zone-page-subheading { color: var(--zone-page-subheading-color); }
-.zone-name { color: var(--zone-name-color); }
-.zone-location { color: var(--zone-location-color); }
-.zone-desc { color: var(--zone-desc-color); }
-.zone-stat-label { color: var(--zone-stat-label-color); }
-.zone-stat-number { color: var(--zone-stat-number-color); }
-.zone-manage { color: var(--zone-manage-color); }
-.zone-icon { color: var(--zone-icon-color); }
+.zone-page-heading {
+  color: var(--zone-page-heading-color);
+}
 
-.sysconfig-heading { color: var(--sysconfig-heading-color); }
-.sysconfig-subheading { color: var(--sysconfig-subheading-color); }
+.zone-page-subheading {
+  color: var(--zone-page-subheading-color);
+}
+
+.zone-name {
+  color: var(--zone-name-color);
+}
+
+.zone-location {
+  color: var(--zone-location-color);
+}
+
+.zone-desc {
+  color: var(--zone-desc-color);
+}
+
+.zone-stat-label {
+  color: var(--zone-stat-label-color);
+}
+
+.zone-stat-number {
+  color: var(--zone-stat-number-color);
+}
+
+.zone-manage {
+  color: var(--zone-manage-color);
+}
+
+.zone-icon {
+  color: var(--zone-icon-color);
+}
+
+.sysconfig-heading {
+  color: var(--sysconfig-heading-color);
+}
+
+.sysconfig-subheading {
+  color: var(--sysconfig-subheading-color);
+}
 
 /* Status Badge Utilities */
 .badge-online {
@@ -243,14 +456,17 @@ html.dark {
   border: 2px solid var(--online-border);
   background-color: var(--online-bg);
 }
+
 .badge-online-dot {
   background-color: var(--online-dot);
 }
+
 .badge-offline {
   color: var(--offline-text);
   border: 2px solid var(--offline-border);
   background-color: var(--offline-bg);
 }
+
 .badge-offline-dot {
   background-color: var(--offline-dot);
 }
@@ -276,7 +492,81 @@ html.dark .device-type-badge {
   border: 1px solid var(--device-type-badge-border);
 }
 
-.dark, [data-theme="dark"], :root[data-theme="dark"] {
+/* Legend Utility Classes */
+.map-legend-panel {
+  background: var(--legend-bg);
+  border: 1px solid var(--legend-border) !important;
+  box-shadow: var(--legend-shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px;
+}
+
+.legend-heading {
+  color: var(--legend-heading-color) !important;
+  font-weight: 800;
+}
+
+.legend-text {
+  color: var(--legend-text-color) !important;
+}
+
+.legend-icon-bg {
+  background: var(--legend-icon-bg) !important;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legend-divider {
+  border-color: var(--legend-divider) !important;
+}
+
+/* ── Google Maps High-Fidelity Dark Theme ── */
+/* Custom tuned for CARTO Voyager Dark: Deep navy land, Teal water, Green parks, and Bright roads */
+html.dark .leaflet-tile-pane {
+  filter:
+    saturate(3) brightness(0.85) contrast(1.2) hue-rotate(10deg);
+}
+
+html.dark .leaflet-map-pane {
+  background-color: #0d1117;
+}
+
+/* Navbar Utility Classes */
+.navbar-glass {
+  background: var(--navbar-bg) !important;
+  border: 1px solid var(--navbar-border) !important;
+  box-shadow: var(--navbar-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 999px;
+  margin: 12px 24px;
+  padding: 8px 20px;
+}
+
+.navbar-text {
+  color: var(--navbar-text) !important;
+}
+
+.navbar-active {
+  background: var(--navbar-active-bg) !important;
+  color: var(--navbar-active-text) !important;
+  box-shadow: var(--navbar-active-shadow);
+  border-radius: 999px;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-1px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark,
+[data-theme="dark"],
+:root[data-theme="dark"] {
   --node-label-color: #ffffff;
   --map-control-bg: #121212;
   --map-control-border: rgba(255, 255, 255, 0.1);
@@ -298,6 +588,8 @@ html.dark .device-type-badge {
   --liquid-button-text: #ffffff;
   --bg-image: url('/Dark-BG.png');
   --bg-overlay: rgba(0, 0, 0, 0);
+  --chart-bar-blue: #60a5fa;
+  --chart-bar-cyan: #22d3ee;
   --glass-accent: rgba(255, 255, 255, 0.06);
   --glass-accent-subtle: rgba(255, 255, 255, 0.02);
 
@@ -312,13 +604,17 @@ html.dark .device-type-badge {
   --overlay-blur: 0px;
 
   /* Dashboard Icons */
-  --icon-stroke: #93c5fd; /* blue-300 */
-  --icon-alert-stroke: #fca5a5; /* red-300 */
-  --icon-health-stroke: #93c5fd; /* blue-300 */
-  --icon-product-stroke: #93c5fd; /* blue-300 */
+  --icon-stroke: #93c5fd;
+  /* blue-300 */
+  --icon-alert-stroke: #fca5a5;
+  /* red-300 */
+  --icon-health-stroke: #93c5fd;
+  /* blue-300 */
+  --icon-product-stroke: #93c5fd;
+  /* blue-300 */
   --overview-heading-color: #ffffff;
   --overview-subheading-color: #cbd5e1;
-  --kpi-label-color: rgba(255,255,255,0.7);
+  --kpi-label-color: rgba(255, 255, 255, 0.7);
   --kpi-value-color: #ffffff;
   --section-heading-color: #ffffff;
   --section-heading-icon-color: #93c5fd;
@@ -361,6 +657,8 @@ html.dark .device-type-badge {
   --liquid-button-text: #ffffff;
   --bg-image: url('/Dark-BG.png');
   --bg-overlay: rgba(0, 0, 0, 0);
+  --chart-bar-blue: #60a5fa;
+  --chart-bar-cyan: #22d3ee;
   --glass-accent: rgba(255, 255, 255, 0.06);
   --glass-accent-subtle: rgba(255, 255, 255, 0.02);
 
@@ -375,10 +673,14 @@ html.dark .device-type-badge {
   --overlay-blur: 0px;
 
   /* Dashboard Icons */
-  --icon-stroke: #93c5fd; /* blue-300 */
-  --icon-alert-stroke: #fca5a5; /* red-300 */
-  --icon-health-stroke: #93c5fd; /* blue-300 */
-  --icon-product-stroke: #93c5fd; /* blue-300 */
+  --icon-stroke: #93c5fd;
+  /* blue-300 */
+  --icon-alert-stroke: #fca5a5;
+  /* red-300 */
+  --icon-health-stroke: #93c5fd;
+  /* blue-300 */
+  --icon-product-stroke: #93c5fd;
+  /* blue-300 */
   --customer-name-color: #ffffff;
   --customer-location-color: #cbd5e1;
   --customer-email-color: #94a3b8;
@@ -412,15 +714,19 @@ html.dark .device-type-badge {
 .icon-stroke-adaptive {
   stroke: var(--icon-stroke);
 }
+
 .icon-alert-adaptive {
   stroke: var(--icon-alert-stroke);
 }
+
 .icon-health-adaptive {
   stroke: var(--icon-health-stroke);
 }
+
 .icon-product-adaptive {
   stroke: var(--icon-product-stroke);
 }
+
 .node-label {
   color: var(--node-label-color);
 }
@@ -908,17 +1214,14 @@ body {
 /* Hover Physics */
 .apple-glass-card:hover {
   transform: translateY(-2px) scale(1.005);
-  background: rgba(255, 255, 255, 0.35);
-  /* Brighten on hover */
-  border-color: rgba(255, 255, 255, 0.8);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 /* Inner Translucent Element (for nested cards or stat boxes) */
 .apple-glass-inner {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.75);
   /* More translucent inner panels */
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(200, 200, 200, 0.6);
   border-radius: 12px;
   backdrop-filter: saturate(150%) blur(24px);
   -webkit-backdrop-filter: saturate(150%) blur(24px);
@@ -1207,4 +1510,52 @@ a:active {
 .dark .leaflet-control-zoom-out,
 [data-theme="dark"] .leaflet-control-zoom-out {
   border-bottom: none !important;
-}
+}
+
+/* ── TDS Meter Water Animation Keyframes ─────────────────────────────── */
+@keyframes tdsWave {
+  0% {
+    transform: translateX(0) translateZ(0) scaleY(1);
+  }
+
+  50% {
+    transform: translateX(-25%) translateZ(0) scaleY(1.3);
+  }
+
+  100% {
+    transform: translateX(-50%) translateZ(0) scaleY(1);
+  }
+}
+
+@keyframes tdsShine {
+  0% {
+    opacity: 0.2;
+    transform: translateX(-100%) skewX(-30deg);
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0.2;
+    transform: translateX(200%) skewX(-30deg);
+  }
+}
+
+@keyframes tdsRipple {
+  0% {
+    opacity: 0.7;
+    transform: translateX(-50%) scaleX(1) scaleY(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: translateX(-50%) scaleX(1.3) scaleY(1.5);
+  }
+
+  100% {
+    opacity: 0.7;
+    transform: translateX(-50%) scaleX(1) scaleY(1);
+  }
+}

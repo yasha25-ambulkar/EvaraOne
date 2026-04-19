@@ -45,9 +45,48 @@ async function getActiveDevices() {
         const typeBatches = await Promise.all(
             Object.keys(typedGroups).map(async (type) => {
                 const ids = typedGroups[type];
-                const refs = ids.map(id => db.collection(type.toLowerCase()).doc(id));
-                const metas = await db.getAll(...refs);
-                return metas.map(m => m.exists ? { id: m.id, meta: m.data() } : null).filter(Boolean);
+                const typeLower = type.toLowerCase();
+                
+                // Strategy 1: Try direct document lookup by Registry ID (Modern/Standard)
+                const primaryRefs = ids.map(id => db.collection(typeLower).doc(id));
+                const primaryMetas = await db.getAll(...primaryRefs);
+                
+                const results = [];
+                const missingIds = [];
+                
+                primaryMetas.forEach((m, idx) => {
+                    if (m.exists) {
+                        results.push({ id: ids[idx], meta: m.data() });
+                    } else {
+                        missingIds.push(ids[idx]);
+                    }
+                });
+                
+                // Strategy 2: Fallback to Hardware/Node ID for legacy or manually provisioned devices
+                if (missingIds.length > 0) {
+                    const secondaryRefs = [];
+                    const secondaryIdMap = [];
+                    
+                    missingIds.forEach(id => {
+                        const registry = registryDataMap[id];
+                        const hId = registry.hardware_id || registry.node_id || registry.device_id;
+                        if (hId && hId !== id) {
+                            secondaryRefs.push(db.collection(typeLower).doc(hId));
+                            secondaryIdMap.push(id);
+                        }
+                    });
+                    
+                    if (secondaryRefs.length > 0) {
+                        const secondaryMetas = await db.getAll(...secondaryRefs);
+                        secondaryMetas.forEach((m, idx) => {
+                            if (m.exists) {
+                                results.push({ id: secondaryIdMap[idx], meta: m.data() });
+                            }
+                        });
+                    }
+                }
+                
+                return results;
             })
         );
 
@@ -101,7 +140,11 @@ async function processDevice(device) {
             volume: telemetryData.volume,
             flow_rate: telemetryData.flow_rate,
             total_reading: telemetryData.total_reading,
+            tds_value: telemetryData.tds_value,
+            temperature: telemetryData.temperature,
+            water_quality: telemetryData.water_quality,
             lastUpdatedAt: telemetryData.lastUpdatedAt,
+            timestamp: telemetryData.lastUpdatedAt,
             status: telemetryData.status,
             raw_data: telemetryData.raw_data
         };
@@ -112,7 +155,11 @@ async function processDevice(device) {
             telemetryEvents.emit("device:update", payload);
         }
         
-        console.log(`[TelemetryWorker] Updated ${device.id}: ${telemetryData.percentage !== undefined ? telemetryData.percentage.toFixed(1) + '%' : 'N/A'} (${telemetryData.status})`);
+        const detail = telemetryData.tds_value !== undefined 
+            ? `TDS: ${telemetryData.tds_value}ppm, Temp: ${telemetryData.temperature}°C`
+            : `${telemetryData.percentage.toFixed(1)}%`;
+            
+        console.log(`[TelemetryWorker] Updated ${device.id}: ${detail} (${telemetryData.status})`);
     } catch (err) {
         console.error(`[TelemetryWorker] Error processing ${device.id}:`, err.message);
     }

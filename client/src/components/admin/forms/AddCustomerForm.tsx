@@ -77,11 +77,11 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
   };
 
   const inputClass = (error?: any) => `
-        w-full px-4 py-3 rounded-xl border transition-all duration-200 outline-none
+        w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)]
         ${
           error
-            ? "border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-            : "border-slate-200 bg-white/30 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:bg-red-900/20 dark:border-red-500/50'
+            : 'bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
         }
     `;
 
@@ -91,9 +91,9 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
       className="space-y-6 p-1 h-[60vh] overflow-y-auto pr-2 custom-scrollbar"
     >
       {/* Identity */}
-      <div className="apple-glass-inner p-6 rounded-2xl border border-slate-100 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-tight">
-          <User size={16} className="text-blue-600" /> Account Identity
+      <div className="modal-card-glass p-6 rounded-3xl space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-indigo-800 dark:text-indigo-400 uppercase tracking-tight">
+          <User size={16} className="text-blue-500" /> Account Identity
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -147,9 +147,9 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
       </div>
 
       {/* Security */}
-      <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-tight">
-          <Lock size={16} className="text-slate-600" /> Auth & Role
+      <div className="modal-card-glass p-6 rounded-3xl space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+          <Lock size={16} className="text-slate-400" /> Auth & Role
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -209,9 +209,9 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
       </div>
 
       {/* Assignment */}
-      <div className="bg-blue-50/30 p-6 rounded-2xl border border-blue-100 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-tight">
-          <MapPin size={16} className="text-blue-600" /> Zone Assignment
+      <div className="modal-card-glass p-6 rounded-3xl space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+          <MapPin size={16} className="text-blue-500" /> Zone Assignment
         </div>
         <div className="grid grid-cols-1 gap-4">
           <FormField label="Assign Zone" required icon={MapPin}>
