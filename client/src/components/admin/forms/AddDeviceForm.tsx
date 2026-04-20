@@ -77,13 +77,13 @@ const DEVICE_TYPES = [
     bg: "bg-cyan-50",
   },
   {
-    value: "custom",
-    label: "Custom Sensor",
-    icon: Gauge,
-    template: "EvaraTank",
-    desc: "Custom IoT sensors",
-    color: "text-purple-600",
-    bg: "bg-purple-50",
+    value: "tds",
+    label: "EvaraTDS",
+    icon: FlaskConical,
+    template: "EvaraTDS",
+    desc: "Water quality and TDS sensors",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
   },
   {
     value: "tds",
@@ -211,11 +211,37 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const onFormSubmit = async (data: DeviceInput) => {
     try {
+      console.log('[AddDeviceForm] ─────────────────────────────────────────────');
+      console.log('[AddDeviceForm] 📝 FORM SUBMITTED');
+      console.log('[AddDeviceForm] Device Type:', data.device_type);
+      console.log('[AddDeviceForm] Full form data:', data);
+
       // Step 5: Flat nodeData schema matching user's requested Firestore structure
       const nodeData: any = {
         hardwareId: data.node_key,
         displayName: data.name,
         assetType:
+<<<<<<< HEAD
+          data.device_type === "tank"
+            ? "EvaraTank"
+            : data.device_type === "deep"
+              ? "EvaraDeep"
+              : data.device_type === "flow"
+                ? "EvaraFlow"
+                : data.device_type === "tds"
+                  ? "EvaraTDS"
+                  : "EvaraTank",
+        subType:
+          data.device_type === "deep"
+            ? "Borewell"
+            : data.device_type === "flow"
+              ? "Pump"
+              : data.device_type === "tds"
+                ? "TDSSensor"
+                : assetSubType === "sump"
+                  ? "UndergroundSump"
+                  : "OverheadTank",
+=======
           data.device_type === "tank" ? "EvaraTank" :
           data.device_type === "deep" ? "EvaraDeep" :
           data.device_type === "flow" ? "EvaraFlow" :
@@ -227,6 +253,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
           data.device_type === "tds" ? "TDSSensor" :
           assetSubType === "sump" ? "UndergroundSump" :
           "OverheadTank",
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 
         zoneId: watchZoneId || "",
         customerId: data.customer_id,
@@ -258,12 +285,17 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         status: "online",
       };
 
+      console.log('[AddDeviceForm] 📤 Sending to API:', nodeData);
+      console.log('[AddDeviceForm] ─────────────────────────────────────────────');
+
       let result;
       if (isEdit) {
         result = await adminService.updateNode(initialData.id, nodeData);
+        console.log('[AddDeviceForm] ✅ Node updated successfully');
         showToast("Node updated successfully", "success");
       } else {
         result = await adminService.createNode(nodeData);
+        console.log('[AddDeviceForm] ✅ Node created successfully, ID:', result?.id);
         showToast("Node commissioned successfully! 🎉", "success");
       }
 
@@ -274,6 +306,11 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
       onSubmit(result);
     } catch (err: any) {
+      console.error('[AddDeviceForm] ❌ SUBMISSION FAILED');
+      console.error('[AddDeviceForm] Error:', err.message);
+      if (err.response?.data) {
+        console.error('[AddDeviceForm] Response:', err.response.data);
+      }
       showToast(
         err.message || `Failed to ${isEdit ? "update" : "commission"} node`,
         "error",
@@ -379,8 +416,13 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                 })}
               </div>
 
+<<<<<<< HEAD
+              {/* Sub-type selector — only for EvaraTank */}
+              {watchType === "tank" && (
+=======
               {/* Sub-type selector — only for EvaraTank / Custom */}
               {(watchType === "tank" || watchType === "custom") && (
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
                 <div className="modal-card-glass p-3.5 rounded-2xl space-y-2">
                   <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                     <Droplets size={12} /> Asset Sub-Type

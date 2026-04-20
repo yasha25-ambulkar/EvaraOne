@@ -300,7 +300,7 @@ class NodeService {
   async getMapNodes(communityId?: string, customerId?: string): Promise<MapDevice[]> {
     const params: any = {};
     if (communityId) params.community_id = communityId;
-    if (customerId) params.customerId = customerId;
+    if (customerId) params.customer_id = customerId;
 
     const response = await api.get("/nodes", { params });
     const allNodes = response.data;

@@ -8,11 +8,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - MQTT_BROKER_URL=mqtt://mosquitto:1883
-      - DB_URL=postgres://postgres:password@timescaledb:5432/telemetry
     depends_on:
       - redis
       - mosquitto
-      - timescaledb
 
   redis:
     image: redis:alpine
@@ -24,27 +22,35 @@ services:
   mosquitto:
     image: eclipse-mosquitto:latest
     ports:
-      - "1883:1883"
-      - "9001:9001" # WebSockets
+      - "1883:1883"      # Authenticated MQTT (plaintext, but requires auth + ACL)
+      - "8883:8883"      # MQTTS (MQTT over TLS) — use this in production
+      - "9001:9001"      # WebSockets with TLS
     volumes:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
-      # Requires a custom mosquitto.conf to allow anonymous auth for local dev
-      # - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-
-  timescaledb:
-    image: timescale/timescaledb:latest-pg14
+      # ✅ CRITICAL FIX #1: Mount security config
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./config/acl.acl:/mosquitto/config/acl.acl
+      # Mount certificates for TLS (uses Docker secrets or mounted volume)
+      - ./config/certs:/mosquitto/certs:ro
     environment:
-      POSTGRES_PASSWORD: password
-      POSTGRES_USER: postgres
-      POSTGRES_DB: telemetry
-    ports:
-      - "5432:5432"
-    volumes:
-      - tsdb_data:/var/lib/postgresql/data
+      # MQTT credentials loaded at runtime (production: use Railway secrets)
+      MQTT_USERNAME: backend_service
+      MQTT_PASSWORD: ${MQTT_BACKEND_PASSWORD:-change_me_in_production}
+      # Device list (JSON) — populated via migration job
+      MQTT_DEVICE_PASSWORDS_JSON: ${MQTT_DEVICE_PASSWORDS_JSON:-{}}
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-p", "8883", "-u", "backend_service", "-P", "${MQTT_BACKEND_PASSWORD:-change_me_in_production}", "-t", "test", "-C", "1", "--cafile", "/mosquitto/certs/ca.crt"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ✅ AUDIT FIX M9: Removed TimescaleDB service
+  # Nothing in the codebase uses PostgreSQL/TimescaleDB.
+  # The system uses Firestore as its primary database.
+  # If needed in the future, add back with env-var-based password.
 
 volumes:
   redis_data:
   mosquitto_data:
   mosquitto_log:
-  tsdb_data:

@@ -1,13 +1,49 @@
 const { z } = require("zod");
 
+// ─── #7 FIX: Remove .passthrough() from all schemas ──────────────────────────
+// ORIGINAL BUG: updateNodeSchema had .passthrough() at the end of the body
+// object definition. With .passthrough(), ANY key not in the schema was silently
+// forwarded to the parsed output — including:
+//   { "__proto__": { "admin": true } }   ← prototype pollution
+//   { "role_override": "superadmin" }    ← field injection
+//   { "$where": "javascript expression"} ← NoSQL injection pattern
+//
+// FIX: With .passthrough() removed, Zod STRIPS unknown keys by default (.strip()
+// is Zod's default mode). The controller only receives exactly the fields listed
+// below — nothing else reaches Firestore.
+
 exports.createNodeSchema = z.object({
   body: z.object({
     id: z.string().optional(),
     displayName: z.string().min(1),
+    deviceName: z.string().optional(),
     assetType: z.string().min(1),
     assetSubType: z.string().optional(),
     zoneId: z.string().optional(),
     customerId: z.string().optional(),
+<<<<<<< HEAD
+    latitude: z.union([z.number(), z.string()]).optional(),
+    longitude: z.union([z.number(), z.string()]).optional(),
+    // ThingSpeak credentials — MUST match frontend field names
+    thingspeakChannelId: z.string().optional(),
+    thingspeakReadKey: z.string().optional(),
+    // Field mappings
+    waterLevelField: z.string().optional(),
+    borewellDepthField: z.string().optional(),
+    meterReadingField: z.string().optional(),
+    flowRateField: z.string().optional(),
+    // Physical dimensions
+    capacity: z.union([z.number(), z.string()]).optional(),
+    depth: z.union([z.number(), z.string()]).optional(),
+    tankLength: z.union([z.number(), z.string()]).optional(),
+    tankBreadth: z.union([z.number(), z.string()]).optional(),
+    staticDepth: z.union([z.number(), z.string()]).optional(),
+    dynamicDepth: z.union([z.number(), z.string()]).optional(),
+    rechargeThreshold: z.union([z.number(), z.string()]).optional(),
+    // Location
+    hardwareId: z.string().optional(),
+    status: z.string().optional()
+=======
     latitude: z.number().optional(),
     longitude: z.number().optional(),
     channelId: z.string().optional(),
@@ -19,6 +55,7 @@ exports.createNodeSchema = z.object({
     temperature: z.number().optional(),
     waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
     location: z.string().optional()
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
   })
 });
 
@@ -87,6 +124,10 @@ exports.updateNodeSchema = z.object({
     status: z.string().optional(),
     tank_shape: z.string().optional(),
     temperature_field: z.string().optional(),
+<<<<<<< HEAD
+  })
+  // ✅ NO passthrough() — Zod strips unknown keys by default
+=======
     // TDS specific
     tdsValue: z.number().optional(),
     temperature: z.number().optional(),
@@ -95,6 +136,7 @@ exports.updateNodeSchema = z.object({
     tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
     tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
   }).passthrough()
+>>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 });
 
 exports.createZoneSchema = z.object({
@@ -113,4 +155,43 @@ exports.createCustomerSchema = z.object({
         email: z.string().email().optional(),
         phone: z.string().optional()
     })
+});
+
+// ─── #10 FIX: Query parameter validation schema ────────────────────────────────
+// ORIGINAL BUG: GET /zones had no validation at all.
+// curl '…/zones?limit=999999' would hit Firestore with a 999999-document query,
+// causing memory exhaustion and a potential OOM crash.
+//
+// FIX: Every route — including GETs — runs through validateRequest().
+// This caps `limit` at 100 and validates `cursor` length.
+exports.listQuerySchema = z.object({
+  query: z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    cursor: z.string().max(256).optional(),
+    zone_id: z.string().optional(),
+    community_id: z.string().optional(),
+    customer_id: z.string().optional()
+  })
+});
+
+// ─── Device Visibility Update Schema ────────────────────────────────────────
+// Validate PATCH /admin/devices/:id/visibility payload
+exports.updateDeviceVisibilitySchema = z.object({
+  params: z.object({
+    id: z.string()
+  }),
+  body: z.object({
+    isVisibleToCustomer: z.boolean()
+  })
+});
+
+// ─── Device Parameters Update Schema ────────────────────────────────────────
+// Validate PATCH /admin/devices/:id/parameters payload
+exports.updateDeviceParametersSchema = z.object({
+  params: z.object({
+    id: z.string()
+  }),
+  body: z.object({
+    parameters: z.record(z.string(), z.boolean())
+  })
 });
