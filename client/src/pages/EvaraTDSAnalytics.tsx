@@ -49,6 +49,8 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showNodeInfo, setShowNodeInfo] = useState(false);
+    const [showParams, setShowParams] = useState(false);
 
     // Fetch EvaraTDS data dynamically
     const { data: device, isLoading, isError, refetch } = useQuery({
@@ -86,41 +88,64 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
     const qualityConfig = QUALITY_CONFIG[quality] || QUALITY_CONFIG.Good;
     const deviceName = device?.name || device?.deviceName || device?.device_name || device?.label || device?.id || 'TDS Meter';
 
-    const tdsHistory = useMemo(() => {
-        if (!device?.tdsHistory) return [];
-        return (device.tdsHistory || []).map((h: any) => {
+    const { chartData: tdsHistory, chartTicks } = useMemo(() => {
+        if (!device?.tdsHistory || device.tdsHistory.length === 0) return { chartData: [], chartTicks: [] };
+        let filtered = [...device.tdsHistory];
+
+        // Ensure data is sorted by timestamp (ascending)
+        filtered.sort((a: any, b: any) => {
+            const timeA = a.timestamp?._seconds ? a.timestamp._seconds * 1000 : new Date(a.timestamp).getTime();
+            const timeB = b.timestamp?._seconds ? b.timestamp._seconds * 1000 : new Date(b.timestamp).getTime();
+            return timeA - timeB;
+        });
+
+        if (chartRange === '24H') {
+            // Filter to strictly the last 30 readings
+            filtered = filtered.slice(-30);
+        }
+        
+        const chartData = filtered.map((h: any) => {
             const date = h.timestamp?._seconds
                 ? new Date(h.timestamp._seconds * 1000)
                 : new Date(h.timestamp);
+
             return {
+                timestampMs: date.getTime(),
                 time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 fullTime: date.toLocaleString(),
                 value: h.value
             };
         });
-    }, [device?.tdsHistory]);
+
+        // Generate ticks for every single reading
+        const chartTicks: number[] = chartData.map((d: any) => d.timestampMs);
+        return { chartData, chartTicks };
+    }, [device?.tdsHistory, chartRange]);
 
     const isOffline = !device; // simplistic — replace with real online-status logic if available
-if (!id) return <Navigate to="/nodes" replace />;
+    if (!id) return <Navigate to="/nodes" replace />;
 
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-transparent">
                 <div className="flex flex-col items-center gap-4">
-<div className="w-8 h-8 rounded-full border-4 border-solid animate-spin"
-                        style={{ borderColor: 'rgba(10,132,255,0.2)', borderTopColor: '#0A84FF' }} />
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading analytics...</p>
-</div>
+                    <div className="relative">
+                        <Activity className="text-blue-500 animate-ping absolute opacity-75" size={48} />
+                        <Activity className="text-blue-600 relative z-10" size={48} />
+                    </div>
+                    <div className="text-blue-500 font-bold tracking-widest text-sm uppercase">Loading Device Profile</div>
+                </div>
             </div>
         );
     }
 
-if (isError || !device) {
+    if (isOffline) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-transparent p-6">
-                <div className="apple-glass-card p-10 rounded-[40px] text-center max-w-md">
-                    <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                        <AlertTriangle className="text-red-500" size={32} />
+            <div className="min-h-screen flex items-center justify-center p-6 bg-transparent">
+                <div className="p-10 rounded-[2rem] w-full max-w-sm text-center shadow-2xl relative overflow-hidden"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' }}>
+                    <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Droplets className="text-red-500" size={40} />
                     </div>
                     <h2 className="text-2xl font-black mb-3" style={{ color: 'var(--text-primary)' }}>Device Offline</h2>
                     <p className="mb-8 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -192,6 +217,7 @@ if (isError || !device) {
 
                             {/* Node Info */}
                             <button
+                                onClick={() => setShowNodeInfo(true)}
                                 className="flex items-center gap-2 px-4 py-1.5 bg-[#AF52DE] hover:bg-[#9d44ce] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Info size={12} className="stroke-[2.5px]" />
@@ -200,6 +226,7 @@ if (isError || !device) {
 
                             {/* Parameters */}
                             <button
+                                onClick={() => setShowParams(true)}
                                 className="flex items-center gap-2 px-4 py-1.5 bg-[#FFB340] hover:bg-[#f5a623] text-amber-900 border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Settings size={12} className="stroke-[2.5px]" />
@@ -252,6 +279,157 @@ if (isError || !device) {
                                         className="w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
                                     >
                                         Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Node Information Modal */}
+                    {showNodeInfo && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+                            onClick={() => setShowNodeInfo(false)}>
+                            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl"
+                                style={{
+                                    background: 'var(--bg-secondary)', border: '1px solid var(--card-border)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3)'
+                                }}
+                                onClick={e => e.stopPropagation()}>
+
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-[17px] font-bold m-0" style={{ color: "var(--text-primary)" }}>Node Information</h3>
+                                    <button onClick={() => setShowNodeInfo(false)}
+                                        className="flex items-center justify-center rounded-full bg-white border-none cursor-pointer p-0 transition-all hover:scale-110"
+                                        style={{
+                                            width: 24,
+                                            height: 24,
+                                            background: "var(--bg-secondary)",
+                                            color: "var(--text-secondary)",
+                                            fontSize: '18px',
+                                            fontWeight: 'bold',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                        }}>
+                                        &times;
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Device Name</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{deviceName}</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Hardware ID</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{id}</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Device Type</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>TDS Water Quality Monitor</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Location</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{device?.location_name || 'Not specified'}</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Subscription</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>PRO</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Assigned To</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{device?.customer_name || 'Unassigned'}</p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex gap-3">
+                                    <button
+                                        className="flex-1 font-semibold py-3 rounded-2xl text-white border-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        style={{
+                                            background: '#3A7AFE',
+                                            fontSize: '14px'
+                                        }}
+                                        onClick={() => {
+                                            const info = `Device Name: ${deviceName}\nHardware ID: ${id}\nDevice Type: TDS Water Quality Monitor\nLocation: ${device?.location_name || 'Not specified'}\nSubscription: PRO\nAssigned To: ${device?.customer_name || 'Unassigned'}`;
+                                            navigator.clipboard.writeText(info);
+                                            alert('Node information copied to clipboard!');
+                                        }}
+                                    >
+                                        Copy Info
+                                    </button>
+                                    <button
+                                        onClick={() => setShowNodeInfo(false)}
+                                        className="flex-1 font-semibold py-3 rounded-2xl text-white border-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        style={{
+                                            background: '#999',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Parameters Modal */}
+                    {showParams && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+                            onClick={() => setShowParams(false)}>
+                            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl"
+                                style={{
+                                    background: 'var(--bg-secondary)', border: '1px solid var(--card-border)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3)'
+                                }}
+                                onClick={e => e.stopPropagation()}>
+
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-[17px] font-bold m-0" style={{ color: "var(--text-primary)" }}>Device Parameters</h3>
+                                    <button onClick={() => setShowParams(false)}
+                                        className="flex items-center justify-center rounded-full bg-white border-none cursor-pointer p-0 transition-all hover:scale-110"
+                                        style={{
+                                            width: 24,
+                                            height: 24,
+                                            background: "var(--bg-secondary)",
+                                            color: "var(--text-secondary)",
+                                            fontSize: '18px',
+                                            fontWeight: 'bold',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                        }}>
+                                        &times;
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 mb-6">
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>TDS Value</p>
+                                        <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{device?.tdsValue || 'N/A'} ppm</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Water Quality</p>
+                                        <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{device?.waterQualityRating || quality || 'Good'}</p>
+                                    </div>
+
+                                    <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Temperature</p>
+                                        <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{device?.temperature || 'N/A'} °C</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowParams(false)}
+                                        className="flex-1 font-semibold py-3 rounded-2xl text-white border-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        style={{
+                                            background: '#999',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        Close
                                     </button>
                                 </div>
                             </div>
@@ -369,9 +547,9 @@ quality={quality as 'Good' | 'Acceptable' | 'Critical'}
                                     </div>
                                 </div>
 
-                                <div className="flex-1 min-h-[200px]">
+                                <div className="flex-1 min-h-[400px]">
                                     {tdsHistory.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height={250}>
+                                        <ResponsiveContainer width="100%" height={450}>
                                             <AreaChart data={tdsHistory}>
                                                 <defs>
                                                     <linearGradient id="tdsGradient" x1="0" y1="0" x2="0" y2="1">
@@ -380,13 +558,24 @@ quality={quality as 'Good' | 'Acceptable' | 'Critical'}
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.04)" />
-                                                <XAxis dataKey="time" axisLine={false} tickLine={false}
-                                                    tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 700 }} dy={10} />
+                                                <XAxis 
+                                                    dataKey="timestampMs" 
+                                                    type="number"
+                                                    scale="time"
+                                                    domain={['dataMin', 'dataMax']}
+                                                    ticks={chartTicks}
+                                                    tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    interval="preserveStartEnd"
+                                                    axisLine={false} 
+                                                    tickLine={false} 
+                                                    tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 700 }} 
+                                                    dy={10} 
+                                                />
                                                 <YAxis axisLine={false} tickLine={false}
                                                     tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 700 }} />
-                                                <Tooltip content={<PremiumTooltip />} />
+                                                <Tooltip content={<PremiumTooltip />} cursor={{ fill: 'transparent', stroke: 'var(--text-muted)', strokeDasharray: '3 3' }} />
                                                 <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3}
-                                                    fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} strokeLinecap="round" />
+                                                    fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} strokeLinecap="round" activeDot={{ r: 6, fill: '#3b82f6', stroke: 'white', strokeWidth: 2 }} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     ) : (

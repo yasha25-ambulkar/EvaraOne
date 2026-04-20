@@ -22,6 +22,7 @@ export interface NodeInfoData {
   zone_name?: string;
   community_name?: string;
   customer_config?: any;
+  customer_name?: string | null;
 }
 
 export interface AnalyticsData {
@@ -211,6 +212,7 @@ export const useDeviceAnalytics = (
           zone_name: d.zone_name,
           community_name: d.community_name,
           customer_config: d.customer_config,
+          customer_name: d.customer_name || null,
         } as NodeInfoData
       },
       history: {

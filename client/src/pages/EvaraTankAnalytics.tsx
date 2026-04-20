@@ -476,7 +476,55 @@ const EvaraTankAnalytics = () => {
         if (!chartData || chartData.length === 0) return [];
 
         if (tankChartRange === '24H') {
-            return chartData.slice(-7);
+            const now = Date.now();
+            const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
+            const startBoundary = latestBoundary - (3 * 60 * 60000);
+            
+            let sorted = [...chartData].map((d: any) => ({
+                ...d,
+                timestampMs: new Date(d.timestamp || d.created_at).getTime(),
+                level: d.level || 0,
+                volume: d.volume || 0
+            })).sort((a: any, b: any) => a.timestampMs - b.timestampMs);
+
+            if (sorted.length === 0) return [];
+
+            const interpolated = [];
+            
+            for (let t = startBoundary; t <= latestBoundary; t += 60000) { 
+                 let dataIdx = 0;
+                 while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                     dataIdx++;
+                 }
+                 
+                 let point: any = { timestampMs: t, time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), fullTime: new Date(t).toLocaleString() };
+                 
+                 if (dataIdx >= sorted.length - 1) {
+                     point.level = sorted[sorted.length-1].level;
+                     point.volume = sorted[sorted.length-1].volume;
+                 } else if (sorted[dataIdx].timestampMs > t) {
+                     point.level = sorted[0].level;
+                     point.volume = sorted[0].volume;
+                 } else {
+                     const p1 = sorted[dataIdx];
+                     const p2 = sorted[dataIdx + 1];
+                     const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
+                     point.level = p1.level + (p2.level - p1.level) * ratio;
+                     point.volume = p1.volume + (p2.volume - p1.volume) * ratio;
+                 }
+                 interpolated.push(point);
+            }
+            
+            // XAxis edge padding point (null values so it doesn't draw but creates whitespace)
+            interpolated.push({
+                timestampMs: latestBoundary + (5 * 60000), 
+                time: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
+                level: null,
+                volume: null
+            });
+            
+            return interpolated;
         } else if (tankChartRange === '1W') {
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const today = new Date();
@@ -617,22 +665,10 @@ const EvaraTankAnalytics = () => {
         }
     }, [waterAnalytics.fillRateLpm, waterAnalytics.refillsToday, hardwareId, metrics.capacityLitres, logData]);
 
-    const chartDataForDisplay = useMemo(() => {
-        return filteredChartData.map(point => ({
-            time: point.time,
-            timestamp: (point as any).timestamp,   // full ISO string — used by the tooltip to display date
-            level: point.level,
-            volume: point.volume || 0,
-            is_corrected: (point as any).is_corrected || false,
-            original_value: (point as any).original_value,
-            confidence: (point as any).confidence,
-            data_label: (point as any).data_label || 'RAW',
-            prediction_mode: (point as any).prediction_mode || false,
-            consecutive_anomalies: (point as any).consecutive_anomalies || 0,
-            predictions: (point as any).predictions || null,
-            slope: (point as any).slope || 0
-        }));
-    }, [filteredChartData]);
+    const chartDataForDisplay = filteredChartData;
+
+    // Tank card uses ORIGINAL smoothed chartData (not interpolated), so it always shows the true latest point
+    const smoothedLatestPoint = chartData.length > 0 ? chartData[chartData.length - 1] : null;
 
     const latestPoint = chartDataForDisplay.length > 0 ? chartDataForDisplay[chartDataForDisplay.length - 1] : null;
 
@@ -647,7 +683,7 @@ const EvaraTankAnalytics = () => {
     };
 
     // Use the LAST chart data point for tank card display — ensures exact parity with graph
-    const pct = (latestPoint ? (latestPoint.level ?? metrics.percentage) : (metrics.percentage ?? 0)) ?? 0;
+    const pct = smoothedLatestPoint?.level ?? metrics.percentage ?? 0;
     const deviceName = deviceInfo?.name || (deviceInfo as { label?: string })?.label || 'Tank';
     const zoneName = deviceInfo?.zone_name;
 
@@ -1053,10 +1089,8 @@ const EvaraTankAnalytics = () => {
                                     </div>
 
                                     <div className="rounded-xl p-4" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</p>
-                                        <p className="text-sm font-bold mt-1" style={{ color: isOffline ? '#e74c3c' : '#27ae60' }}>
-                                            {isOffline ? 'Offline' : 'Online'}
-                                        </p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Assigned To</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{deviceInfo?.customer_name || 'Unassigned'}</p>
                                     </div>
                                 </div>
 
@@ -1078,7 +1112,7 @@ const EvaraTankAnalytics = () => {
 
                                         onClick={() => {
 
-                                            const info = `Device Name: ${deviceName}\nHardware ID: ${hardwareId}\nDevice Type: Water Tank Monitor\nLocation: Not specified\nSubscription: PRO\nStatus: ${isOffline ? 'Offline' : 'Online'}`;
+                                            const info = `Device Name: ${deviceName}\nHardware ID: ${hardwareId}\nDevice Type: Water Tank Monitor\nLocation: Not specified\nSubscription: PRO\nAssigned To: ${deviceInfo?.customer_name || 'Unassigned'}`;
 
                                             navigator.clipboard.writeText(info);
 
@@ -1540,7 +1574,7 @@ const EvaraTankAnalytics = () => {
                                                 </div>
                                                 <div className="text-left rounded-xl p-3 flex flex-col justify-center" style={{ background: 'rgba(0,122,255,0.05)', border: '1px solid rgba(0,122,255,0.1)' }}>
                                                     <p className="text-[10px] font-bold uppercase tracking-wider m-0 mb-1" style={{ color: '#007AFF' }}>Current Volume</p>
-                                                    <p className="text-lg font-black m-0 tracking-tight" style={{ color: '#004BA0' }}>{Math.round(metrics.volumeLitres).toLocaleString()} L</p>
+                                                    <p className="text-lg font-black m-0 tracking-tight" style={{ color: '#004BA0' }}>{Math.round(smoothedLatestPoint?.volume ?? metrics.volumeLitres).toLocaleString()} L</p>
                                                 </div>
                                             </div>
                                         )}
@@ -1863,25 +1897,11 @@ const EvaraTankAnalytics = () => {
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
 
                                                 <XAxis 
-                                                    dataKey="timestamp" 
-                                                    axisLine={false} 
-                                                    tickLine={false} 
+                                                    dataKey={tankChartRange === '24H' ? 'time' : 'time'}
+                                                    minTickGap={40}
+                                                    axisLine={false}
+                                                    tickLine={false}
                                                     tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
-                                                    interval="preserveStartEnd"
-                                                    minTickGap={80}
-                                                    tickFormatter={(value) => {
-                                                        const date = new Date(value);
-                                                        if (tankChartRange === '24H') {
-                                                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                                                        } else if (tankChartRange === '1W') {
-                                                            return date.toLocaleDateString([], { weekday: 'short' }); 
-                                                        } else if (tankChartRange === '1M') {
-                                                            const weekNum = Math.ceil(date.getDate() / 7);
-                                                            return `Week ${weekNum}`;
-                                                        } else {
-                                                            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                                                        }
-                                                    }}
                                                 />
 
 

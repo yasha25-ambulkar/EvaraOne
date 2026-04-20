@@ -39,7 +39,7 @@ export const useNodes = (searchQuery: string = "") => {
       const isSuperAdmin = user?.role === "superadmin";
       const mappedNodes = await deviceService.getMapNodes(
         undefined,
-        isSuperAdmin ? undefined : user?.id,
+        isSuperAdmin ? undefined : user?.customer_id,
       );
 
       if (!searchQuery) return mappedNodes;
