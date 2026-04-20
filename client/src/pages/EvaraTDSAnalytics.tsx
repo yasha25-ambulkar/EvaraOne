@@ -221,28 +221,37 @@ const EvaraTDSAnalytics = () => {
 
                     {/* Delete confirm modal */}
                     {showDeleteConfirm && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                            style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
                             onClick={() => setShowDeleteConfirm(false)}>
-                            <div className="rounded-2xl p-6 w-full max-w-sm"
-                                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--card-border)', boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}
+                            <div className="rounded-[32px] p-8 w-full max-w-sm text-center relative overflow-hidden"
+                                style={{
+                                    background: 'white',
+                                    border: '1px solid var(--card-border)',
+                                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                                }}
                                 onClick={e => e.stopPropagation()}>
-                                <h3 className="text-[17px] font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Delete Node?</h3>
-                                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-                                    This action cannot be undone. The device and all its data will be permanently removed.
+
+                                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span className="material-icons" style={{ fontSize: '32px' }}>delete_outline</span>
+                                </div>
+
+                                <h3 className="text-xl font-bold mb-2 text-gray-900">Delete this Node?</h3>
+                                <p className="text-sm text-gray-500 mb-8">
+                                    This will permanently remove <strong>{deviceName}</strong> and all its historical telemetry data. This action cannot be undone.
                                 </p>
-                                <div className="flex gap-3">
+
+                                <div className="flex flex-col gap-3">
                                     <button
                                         onClick={handleDelete}
                                         disabled={isDeleting}
-                                        className="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF3B30] text-white border-none cursor-pointer disabled:opacity-50"
+                                        className={`w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all ${isDeleting ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200 active:scale-95'}`}
                                     >
-                                        {isDeleting ? 'Deleting...' : 'Delete'}
+                                        {isDeleting ? 'Deleting...' : 'Yes, Delete Node'}
                                     </button>
                                     <button
                                         onClick={() => setShowDeleteConfirm(false)}
-                                        className="flex-1 py-3 rounded-2xl text-sm font-bold border-none cursor-pointer"
-                                        style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                        disabled={isDeleting}
+                                        className="w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
                                     >
                                         Cancel
                                     </button>
