@@ -221,27 +221,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         hardwareId: data.node_key,
         displayName: data.name,
         assetType:
-<<<<<<< HEAD
-          data.device_type === "tank"
-            ? "EvaraTank"
-            : data.device_type === "deep"
-              ? "EvaraDeep"
-              : data.device_type === "flow"
-                ? "EvaraFlow"
-                : data.device_type === "tds"
-                  ? "EvaraTDS"
-                  : "EvaraTank",
-        subType:
-          data.device_type === "deep"
-            ? "Borewell"
-            : data.device_type === "flow"
-              ? "Pump"
-              : data.device_type === "tds"
-                ? "TDSSensor"
-                : assetSubType === "sump"
-                  ? "UndergroundSump"
-                  : "OverheadTank",
-=======
+
           data.device_type === "tank" ? "EvaraTank" :
           data.device_type === "deep" ? "EvaraDeep" :
           data.device_type === "flow" ? "EvaraFlow" :
@@ -253,7 +233,6 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
           data.device_type === "tds" ? "TDSSensor" :
           assetSubType === "sump" ? "UndergroundSump" :
           "OverheadTank",
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
 
         zoneId: watchZoneId || "",
         customerId: data.customer_id,
@@ -416,13 +395,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                 })}
               </div>
 
-<<<<<<< HEAD
-              {/* Sub-type selector — only for EvaraTank */}
-              {watchType === "tank" && (
-=======
               {/* Sub-type selector — only for EvaraTank / Custom */}
               {(watchType === "tank" || watchType === "custom") && (
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
                 <div className="modal-card-glass p-3.5 rounded-2xl space-y-2">
                   <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                     <Droplets size={12} /> Asset Sub-Type

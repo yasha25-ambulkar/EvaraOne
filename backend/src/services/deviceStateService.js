@@ -164,9 +164,6 @@ const processThingSpeakData = async (device, feeds) => {
     };
   }
 
-<<<<<<< HEAD
-  // ──TANK path — NEW: use analytics engine ──────────────────────────────
-=======
   // ── TDS path ──────────────────────────────────────────────────────────
   const isTDS = ["evaratds", "tds"].includes(typeNormalized);
   if (isTDS) {
@@ -204,7 +201,6 @@ const processThingSpeakData = async (device, feeds) => {
   }
 
   // ── TANK path — NEW: use analytics engine ──────────────────────────────
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
   const mapping = device.mapping || {};
   
   // ✅ FIX #9: USE DEVICE-SPECIFIC FIELD MAPPING (NOT HARDCODED field1/field2)
@@ -305,15 +301,6 @@ const processThingSpeakData = async (device, feeds) => {
  */
 const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, feeds) => {
   try {
-<<<<<<< HEAD
-    const now = new Date().toISOString();
-    
-    const updatePayload = {
-      // ✅ CRITICAL: Update last_seen when data comes in
-      // This is what frontend uses to determine Online/Offline status
-      last_seen: now,
-      last_updated_at: telemetryData.lastUpdatedAt,
-=======
     const cleanObject = (obj) => {
         if (obj === null || typeof obj !== 'object') return obj;
         if (Array.isArray(obj)) return obj.map(cleanObject).filter(v => v !== undefined);
@@ -325,8 +312,13 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
         return result;
     };
 
+    const now = new Date().toISOString();
+    
     const updatePayload = cleanObject({
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
+      // ✅ CRITICAL: Update last_seen when data comes in
+      // This is what frontend uses to determine Online/Offline status
+      last_seen: now,
+      last_updated_at: telemetryData.lastUpdatedAt,
       lastUpdatedAt: telemetryData.lastUpdatedAt,
       status: telemetryData.status,
       lastTelemetryFetch: now,
@@ -344,14 +336,10 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
       total_liters: telemetryData.total_liters || 0,
       percentage: telemetryData.percentage || 0,
       level_percentage: telemetryData.percentage || 0,
-<<<<<<< HEAD
-      timestamp: now,  // Use current time when data arrives
-=======
       tds_value: telemetryData.tds_value || 0,
       temperature: telemetryData.temperature || 0,
       water_quality: telemetryData.water_quality || "Good",
-      timestamp: telemetryData.lastUpdatedAt,
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
+      timestamp: now,  // Use current time when data arrives
       status: telemetryData.status,
       waterState: telemetryData.waterState || 'STABLE',
       rateLitresPerMin: telemetryData.rateLitresPerMin || 0,
@@ -384,15 +372,13 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
       }
     }
 
-<<<<<<< HEAD
-    await db.collection(deviceType.toLowerCase()).doc(deviceId).update(updatePayload);
-    console.log(`[DeviceState] ✅ Updated telemetry for ${deviceId}: status=${telemetryData.status}, last_seen=${now}`);
-=======
     // Final metadata update
     const updateMetadata = db.collection(deviceType.toLowerCase()).doc(deviceId).update(cleanObject(updatePayload));
     
     // Standardized registry update
-    const registryUpdate = cleanObject({
+    const registryUpdateObj = cleanObject({
+        last_seen: now,
+        last_updated_at: telemetryData.lastUpdatedAt,
         lastUpdatedAt: telemetryData.lastUpdatedAt,
         status: telemetryData.status,
         last_telemetry: cleanObject({
@@ -411,14 +397,14 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
             waterQualityRating: telemetryData.water_quality,
             tds_history: (updatePayload.tdsHistory || []).slice(0, 10), // Sync last 10 points for sparklines
             
-            timestamp: telemetryData.lastUpdatedAt
+            timestamp: now
         })
     });
 
-    const updateRegistry = db.collection("devices").doc(deviceId).update(registryUpdate);
+    const updateRegistry = db.collection("devices").doc(deviceId).update(registryUpdateObj);
 
     await Promise.all([updateMetadata, updateRegistry]);
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
+    console.log(`[DeviceState] ✅ Updated telemetry for ${deviceId}: status=${telemetryData.status}, last_seen=${now}`);
   } catch (err) {
     console.error(`[DeviceState] Firestore update failed for ${deviceId}:`, err.message);
     throw err;

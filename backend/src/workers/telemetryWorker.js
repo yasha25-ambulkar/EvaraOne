@@ -200,15 +200,12 @@ async function processDevice(device) {
             telemetryEvents.emit("device:update", payload);
         }
         
-<<<<<<< HEAD
-        logger.telemetry(device.id, "updated", { percentage: telemetryData.percentage, status: telemetryData.status });
-=======
+        logger.telemetry(device.id, "updated", { percentage: telemetryData.percentage, status: telemetryData.status, tds_value: telemetryData.tds_value, temperature: telemetryData.temperature });
         const detail = telemetryData.tds_value !== undefined 
             ? `TDS: ${telemetryData.tds_value}ppm, Temp: ${telemetryData.temperature}°C`
             : `${telemetryData.percentage.toFixed(1)}%`;
             
         console.log(`[TelemetryWorker] Updated ${device.id}: ${detail} (${telemetryData.status})`);
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
     } catch (err) {
         logger.error(`Error processing device ${device.id}`, err, { category: "telemetry", deviceId: device.id });
     }

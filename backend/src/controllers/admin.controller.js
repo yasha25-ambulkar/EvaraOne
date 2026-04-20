@@ -604,7 +604,6 @@ exports.createNode = async (req, res) => {
                 [rateField]: "flow_rate",
                 [readingField]: "current_reading"
             };
-<<<<<<< HEAD
             console.log(`[createNode-FLOW] 📝 Storing Flow metadata:`);
             console.log(`[createNode-FLOW]   Channel ID: "${metadata.thingspeak_channel_id}"`);
             console.log(`[createNode-FLOW]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'EMPTY'}"`);
@@ -616,27 +615,16 @@ exports.createNode = async (req, res) => {
                 max_threshold: 2000
             };
             // NEW: Use user-provided TDS/Temperature field mapping from frontend
-            const userTdsField = tdsField || "field1";
-            const userTempField = temperatureField || "field2";
+            const userTdsField = req.body.tdsField || req.body.tds_field || "field2";
+            const userTempField = req.body.temperatureField || req.body.temperature_field || "field3";
             metadata.fields = {
                 tds: userTdsField,
                 temperature: userTempField
             };
             metadata.sensor_field_mapping = {
-                [userTdsField]: "tds_value",
+                [userTdsField]: "tdsValue",
                 [userTempField]: "temperature"
             };
-            console.log(`[createNode-TDS] 📝 Storing TDS metadata:`);
-            console.log(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
-            console.log(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
-            console.log(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
-            console.log(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
-            console.log(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
-            console.log(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
-            console.log(`[createNode-TDS]   Fields mapping:`, metadata.fields);
-=======
-        } else if (typeNormalized === "evaratds" || typeNormalized === "tds" || assetType === "EvaraTDS") {
-            targetCol = "evaratds";
             metadata.tdsValue = req.body.tdsValue || 0;
             metadata.temperature = req.body.temperature || 0;
             metadata.waterQualityRating = req.body.waterQualityRating || "Good";
@@ -645,14 +633,15 @@ exports.createNode = async (req, res) => {
             metadata.lastUpdated = timestamp;
             metadata.tdsHistory = [];
             metadata.tempHistory = [];
-            metadata.configuration = {}; // For consistency
-            const tdsField = req.body.tdsField || req.body.tds_field || "field2";
-            const tempField = req.body.temperatureField || req.body.temperature_field || "field3";
-            metadata.sensor_field_mapping = {
-                [tdsField]: "tdsValue",
-                [tempField]: "temperature"
-            };
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
+            
+            console.log(`[createNode-TDS] 📝 Storing TDS metadata:`);
+            console.log(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
+            console.log(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
+            console.log(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
+            console.log(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
+            console.log(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
+            console.log(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
+            console.log(`[createNode-TDS]   Fields mapping:`, metadata.fields);
         }
 
         // Critical Fix: Use SAME document ID for metadata as registry
@@ -1067,8 +1056,7 @@ exports.updateNode = async (req, res) => {
                     [trimmed(readingField)]: "current_reading"
                 };
             }
-<<<<<<< HEAD
-        } else if (type === "evaratds") {
+        } else if (type === "evaratds" || type === "tds") {
             // TDS device configuration updates
             const config = {};
             if (body.configuration) {
@@ -1076,8 +1064,6 @@ exports.updateNode = async (req, res) => {
                 if (body.configuration.max_threshold !== undefined) config.max_threshold = parseFloat(body.configuration.max_threshold) || 2000;
             }
             if (Object.keys(config).length > 0) metaUpdate.configuration = config;
-=======
-        } else if (type === "evaratds" || type === "tds") {
             if (body.tdsValue !== undefined) metaUpdate.tdsValue = parseFloat(body.tdsValue) || 0;
             if (body.temperature !== undefined) metaUpdate.temperature = parseFloat(body.temperature) || 0;
             if (body.waterQualityRating) metaUpdate.waterQualityRating = trimmed(body.waterQualityRating);
@@ -1098,7 +1084,6 @@ exports.updateNode = async (req, res) => {
                     timestamp: new Date()
                 });
             }
->>>>>>> 1fd25b56b42cbb9b72e3b965a3a1a5e5c692f020
         }
 
         await metaRef.set(metaUpdate, { merge: true });
