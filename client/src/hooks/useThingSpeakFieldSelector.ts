@@ -61,6 +61,12 @@ export interface UseThingSpeakFieldSelectorReturn {
    */
   getOptionsForRow: (rowIndex: number) => Array<ThingSpeakField & { isDisabled: boolean }>;
 
+  /**
+   * ✅ NEW: Convert selected field keys to field names
+   * Used for stable anchor architecture - returns field names for storage
+   */
+  getSelectedFieldNames: () => string[];
+
   /** True when at least one row has a non-empty selection. */
   isValid: boolean;
 }
@@ -103,6 +109,22 @@ function deriveFields(data: ThingSpeakApiResponse): ThingSpeakField[] {
     .map((key) => ({
       key,
       label: data.channel[key as FieldKey] || `Field ${key.replace('field', '')}`,
+    }));
+}
+
+/**
+ * ✅ NEW: Derive fields from channel metadata response
+ * Channel metadata has field names directly (e.g., { field1: "Meter Reading_7", field2: "Flow Rate" })
+ */
+function deriveFieldsFromMetadata(metadata: any): ThingSpeakField[] {
+  return ALL_FIELD_KEYS
+    .filter((key) => {
+      // Include a field only if it has a non-empty name in metadata
+      return metadata[key] && typeof metadata[key] === 'string' && metadata[key].trim() !== '';
+    })
+    .map((key) => ({
+      key,
+      label: metadata[key] as string, // Use the field name directly from metadata
     }));
 }
 
@@ -176,15 +198,27 @@ export function useThingSpeakFieldSelector(): UseThingSpeakFieldSelectorReturn {
     setHasFetched(false);
 
     try {
-      const { data } = await axios.get<ThingSpeakApiResponse>(
-        `https://api.thingspeak.com/channels/${id}/feeds.json`,
+      // ✅ NEW: Call backend endpoint instead of ThingSpeak directly
+      // This is a public endpoint that just fetches and returns channel metadata
+      const { data } = await axios.post<{ success: boolean; metadata: ThingSpeakChannel & { channel_id: string; fetched_at: string } }>(
+        `/api/v1/thingspeak/fetch-fields`,
         {
-          params: { api_key: key, results: 1 },
+          channelId: id,
+          apiKey: key,
+        },
+        {
           signal: abortRef.current.signal,
+          headers: {
+            'Content-Type': 'application/json',
+          }
         }
       );
 
-      const fields = deriveFields(data);
+      // Extract the metadata from the response
+      const metadata = data.metadata;
+      
+      // Derive fields from the metadata
+      const fields = deriveFieldsFromMetadata(metadata);
       setAvailableFields(fields);
       setHasFetched(true);
 
@@ -201,7 +235,7 @@ export function useThingSpeakFieldSelector(): UseThingSpeakFieldSelectorReturn {
   }, [channelId, readApiKey]);
 
   // ── Row management ───────────────────────────────────────────────────────
-
+  
   const selectField = useCallback((rowIndex: number, fieldKey: string) => {
     setSelectedFields((prev) => {
       const next = [...prev];
@@ -241,6 +275,20 @@ export function useThingSpeakFieldSelector(): UseThingSpeakFieldSelectorReturn {
 
   const isValid = selectedFields.some((f) => f !== '');
 
+  /**
+   * ✅ NEW: Convert field keys to field names for stable anchor architecture
+   * Takes the selected field keys (e.g., ["field1", "field2"]) and converts them
+   * to field names (e.g., ["Meter Reading_7", "Flow Rate"]) for storage
+   */
+  const getSelectedFieldNames = useCallback((): string[] => {
+    return selectedFields
+      .filter(fieldKey => fieldKey !== '')
+      .map(fieldKey => {
+        const field = availableFields.find(f => f.key === fieldKey);
+        return field?.label || fieldKey;
+      });
+  }, [selectedFields, availableFields]);
+
   // ── Public API ───────────────────────────────────────────────────────────
 
   return {
@@ -261,6 +309,7 @@ export function useThingSpeakFieldSelector(): UseThingSpeakFieldSelectorReturn {
     addRow,
     removeRow,
     getOptionsForRow,
+    getSelectedFieldNames, // ✅ NEW: Convert keys to names
 
     isValid,
   };

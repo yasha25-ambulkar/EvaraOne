@@ -494,6 +494,10 @@ app.use("/api/v1/evaratds", globalSaaSAuth, evaratdsRoutes);
 const tdsRoutes = require("./routes/tds.routes.js");
 app.use("/api/v1/devices/tds", globalSaaSAuth, tdsRoutes);
 
+// ThingSpeak Configuration routes (fetch fields, save metadata)
+const thingspeakConfigRoutes = require("./routes/thingspeakConfig.routes.js");
+app.use("/api/v1/thingspeak", globalSaaSAuth, thingspeakConfigRoutes);
+
 // Other routes that frontend service calls
 app.get("/api/v1/admin/hierarchy", globalSaaSAuth, getHierarchy);
 app.get("/api/v1/admin/audit-logs", globalSaaSAuth, getAuditLogs);

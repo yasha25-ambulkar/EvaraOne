@@ -797,6 +797,27 @@ exports.createNode = async (req, res) => {
         // ✅ FIX #8: EMIT REAL-TIME SOCKET EVENT (CRITICAL)
         // BEFORE: Only cache invalidated, frontend waited 12s for polling or refresh
         // AFTER: Socket event pushes new device to all connected clients immediately
+        // ✅ NEW: Fetch and save channel metadata for stable anchor architecture
+        if (thingspeakChannelId && thingspeakReadKey) {
+            console.log(`[createNode] 🔄 Fetching and saving channel metadata for device ${deviceDocId}`);
+            try {
+                const { fetchAndSaveChannelMetadata } = require("../services/channelMetadataService.js");
+                const channelMeta = await fetchAndSaveChannelMetadata(
+                    deviceDocId,
+                    thingspeakChannelId,
+                    thingspeakReadKey
+                );
+                
+                if (channelMeta) {
+                    console.log(`[createNode] ✅ Channel metadata saved successfully`);
+                } else {
+                    console.warn(`[createNode] ⚠️  Channel metadata fetch returned null (non-fatal)`);
+                }
+            } catch (metaErr) {
+                console.warn(`[createNode] ⚠️  Failed to fetch/save channel metadata (non-fatal):`, metaErr.message);
+            }
+        }
+
         try {
             if (global.io) {
                 const fullDevice = {

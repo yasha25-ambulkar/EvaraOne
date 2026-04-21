@@ -1,12 +1,68 @@
 /**
  * Field Mapping Resolver
- * Consolidates field mapping logic to resolve which field contains which data type
+ * 
+ * TWO-LEVEL RESOLUTION (Stable Anchor Architecture):
+ * - Level 1: Channel Metadata (fieldX → field_name)
+ * - Level 2: Sensor Field Mapping (field_name → internal_key)
+ * 
+ * This ensures data routes correctly even if ThingSpeak field positions change.
  */
 
 module.exports = {
   /**
+   * STABLE ANCHOR: Resolve field position using channel metadata
+   * 
+   * This is the NEW primary method for field resolution.
+   * 
+   * @param {Object} channelMetadata - Channel metadata { field1: "Meter Reading_7", field2: "Flow Rate", ... }
+   * @param {Object} fieldMapping - Sensor field mapping { flow_rate: "Flow Rate", ... }
+   * @param {string} internalKey - Internal key to resolve (e.g., "flow_rate", "tds_value")
+   * @returns {string|null} The fieldX key (e.g., "field1") or null if not found
+   */
+  resolveFieldByName(channelMetadata, fieldMapping, internalKey) {
+    if (!channelMetadata || !fieldMapping || !internalKey) {
+      console.warn(`[FieldMappingResolver] Missing params for resolveFieldByName:`, {
+        hasMetadata: !!channelMetadata,
+        hasMapping: !!fieldMapping,
+        internalKey
+      });
+      return null;
+    }
+
+    // Step 1: Get the field NAME from sensor_field_mapping
+    // e.g., internalKey="flow_rate" → fieldName="Flow Rate"
+    const fieldName = fieldMapping[internalKey];
+    if (!fieldName) {
+      console.warn(`[FieldMappingResolver] Internal key not in mapping: ${internalKey}`, { fieldMapping });
+      return null;
+    }
+
+    // Step 2: Find which fieldX contains this name in channel metadata
+    // e.g., fieldName="Flow Rate" → find field2="Flow Rate" → return "field2"
+    for (const [fieldKey, metadataName] of Object.entries(channelMetadata)) {
+      // Skip non-field entries
+      if (!fieldKey.startsWith("field") || typeof metadataName !== "string") continue;
+      
+      // Match (case-insensitive)
+      if (metadataName.trim().toLowerCase() === fieldName.trim().toLowerCase()) {
+        console.log(`[FieldMappingResolver] ✅ Resolved ${internalKey} → "${fieldName}" → ${fieldKey}`);
+        return fieldKey;
+      }
+    }
+
+    console.warn(`[FieldMappingResolver] Field name not in metadata: ${fieldName}`, { 
+      internalKey,
+      channelMetadata 
+    });
+    return null;
+  },
+
+  /**
    * Resolve a field key from fieldMapping object by searching through target names
    * Handles both direct lookups and reverse lookups
+   * 
+   * ⚠️ DEPRECATED: Use resolveFieldByName with channel metadata instead
+   * This is kept for backward compatibility only.
    * 
    * @param {Object} fieldMapping - The field mapping object (e.g., { field1: "water_level_raw_sensor_reading", ... })
    * @param {Array<string>} targetNames - Names to search for (in order of preference)
