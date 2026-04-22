@@ -115,37 +115,41 @@ const Login = () => {
 
   if (step === "role-selection") {
     return (
-      <div className="min-h-screen apple-glass-inner flex flex-col items-center justify-center p-6">
-        <div className="text-center mb-10">
+      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 bg-[#f8fafc] overflow-hidden">
+        {/* Modern Mesh Gradient Background Layer */}
+        <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+
+        <div className="text-center mb-12 relative z-10">
           <img
             src="/evara-logo.png"
             alt="EvaraTech"
-            className="w-24 h-24 mx-auto mb-4 object-contain"
+            className="w-24 h-24 mx-auto mb-6 object-contain"
           />
-          <h1 className="text-4xl font-extrabold text-[var(--text-primary)] mb-2">
+          <h1 className="text-5xl font-black text-[var(--text-primary)] mb-3 tracking-tight">
             Welcome to EvaraTech
           </h1>
-          <p className="text-[var(--text-muted)] text-lg">
+          <p className="text-[var(--text-muted)] text-xl font-medium">
             Select your portal to continue
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-center gap-8 w-full max-w-5xl">
+        <div className="flex flex-col md:flex-row justify-center gap-10 w-full max-w-6xl relative z-10">
           {/* Super Admin Card */}
           <button
             onClick={() => handleRoleSelect("superadmin")}
-            className="group apple-glass-card p-8 rounded-3xl shadow-sm border border-[var(--card-border)] hover:shadow-xl hover:border-blue-300 transition-all text-left relative overflow-hidden min-h-[320px] w-full md:w-[380px] flex flex-col justify-end"
+            className="group apple-glass-card p-10 rounded-[2.5rem] bg-white/40 dark:bg-white/5 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.06)] hover:shadow-[0_30px_60px_rgba(58,122,254,0.15)] hover:border-blue-400/50 transition-all duration-500 text-left relative overflow-hidden min-h-[360px] w-full md:w-[420px] flex flex-col justify-end"
           >
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Shield size={120} className="text-[#3A7AFE]" />
+            <div className="absolute top-4 right-4 p-4 opacity-10 group-hover:opacity-30 group-hover:scale-110 transition-all duration-500">
+              <Shield size={160} className="text-[#3A7AFE]" />
             </div>
-            <div className="w-14 h-14 bg-blue-100/10 rounded-2xl flex items-center justify-center mb-6 text-blue-950 dark:text-[#3A7AFE] group-hover:scale-110 transition-transform">
-              <Shield size={28} strokeWidth={3} className="stroke-blue-950 dark:stroke-[#3A7AFE]" />
+            <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-8 text-[#3A7AFE] group-hover:scale-110 transition-transform duration-500 border border-blue-500/20">
+              <Shield size={32} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 group-hover:text-blue-500">
+            <h3 className="text-2xl font-black text-[var(--text-primary)] mb-3 group-hover:text-[#3A7AFE] transition-colors">
               Super Admin
             </h3>
-            <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+            <p className="text-base text-[var(--text-muted)] font-medium leading-relaxed opacity-80 group-hover:opacity-100">
               Full system control, user management, and global analytics.
             </p>
           </button>
@@ -153,18 +157,18 @@ const Login = () => {
           {/* Customer Card */}
           <button
             onClick={() => handleRoleSelect("customer")}
-            className="group apple-glass-card p-8 rounded-3xl shadow-sm border border-[var(--card-border)] hover:shadow-xl hover:border-green-300 transition-all text-left relative overflow-hidden min-h-[320px] w-full md:w-[380px] flex flex-col justify-end"
+            className="group apple-glass-card p-10 rounded-[2.5rem] bg-white/40 dark:bg-white/5 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.06)] hover:shadow-[0_30px_60px_rgba(34,197,94,0.15)] hover:border-green-400/50 transition-all duration-500 text-left relative overflow-hidden min-h-[360px] w-full md:w-[420px] flex flex-col justify-end"
           >
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Users size={120} className="text-green-500" />
+            <div className="absolute top-4 right-4 p-4 opacity-10 group-hover:opacity-30 group-hover:scale-110 transition-all duration-500">
+              <Users size={160} className="text-green-500" />
             </div>
-            <div className="w-14 h-14 bg-green-100/10 rounded-2xl flex items-center justify-center mb-6 text-green-950 dark:text-green-500 group-hover:scale-110 transition-transform">
-              <Users size={28} strokeWidth={3} className="stroke-green-950 dark:stroke-green-500" />
+            <div className="w-16 h-16 bg-green-500/10 rounded-2xl flex items-center justify-center mb-8 text-green-500 group-hover:scale-110 transition-transform duration-500 border border-green-500/20">
+              <Users size={32} strokeWidth={2.5} />
             </div>
-            <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 group-hover:text-green-500">
+            <h3 className="text-2xl font-black text-[var(--text-primary)] mb-3 group-hover:text-green-500 transition-colors">
               Customer
             </h3>
-            <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+            <p className="text-base text-[var(--text-muted)] font-medium leading-relaxed opacity-80 group-hover:opacity-100">
               Monitor your water usage, view status, and receive alerts.
             </p>
           </button>
@@ -178,8 +182,12 @@ const Login = () => {
   const isSuperAdmin = selectedRole === "superadmin";
 
   return (
-    <div className="min-h-screen apple-glass-inner flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f8fafc] overflow-hidden">
+      {/* Modern Mesh Gradient Background Layer */}
+      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+
+      <div className="w-full max-w-lg relative z-10">
         <button
           onClick={handleBack}
           className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-6 font-medium transition-colors"
@@ -210,7 +218,7 @@ const Login = () => {
           </p>
         </div>
 
-        <div className="apple-glass-card rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+        <div className="apple-glass-card rounded-[2rem] bg-white/40 dark:bg-white/5 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-white/60 overflow-hidden">
           {/* Tab Switcher (Only for non-superadmin, or if you want to allow registration) */}
           {!isSuperAdmin && (
             <div className="flex border-b border-slate-100">
@@ -304,10 +312,12 @@ const Login = () => {
               type="submit"
               disabled={isLoading}
               className={clsx(
-                "w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-0.5",
+                "w-full py-[10px] rounded-[14px] text-white font-extrabold text-[12px] flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 tracking-[0.5px] uppercase",
                 isSuperAdmin
-                  ? "bg-[#3A7AFE] hover:opacity-90"
-                  : "bg-[#3A7AFE] hover:opacity-90",
+                  ? "bg-[#3A7AFE] shadow-[0_8px_16px_-4px_rgba(58,122,254,0.4)]"
+                  : selectedRole === "customer" 
+                    ? "bg-[#22c55e] shadow-[0_8px_16px_-4px_rgba(34,197,94,0.4)]"
+                    : "bg-[#3A7AFE] shadow-[0_8px_16px_-4px_rgba(58,122,254,0.4)]"
               )}
             >
               {isLoading ? (

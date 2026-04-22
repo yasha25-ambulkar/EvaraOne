@@ -259,13 +259,13 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
     return (
       <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
         <div style={{ background: "rgba(16,185,129,0.08)", borderRadius: "10px", padding: "7px 9px", border: "1px solid rgba(16,185,129,0.1)" }}>
-          <div style={{ fontSize: "9px", fontWeight: 700, color: "#065f46", textTransform: "uppercase", marginBottom: "3px" }}>TDS</div>
-          <div style={{ fontSize: "15px", fontWeight: 800, color: "#10b981" }}>{tds}</div>
+          <div style={{ fontSize: "9px", fontWeight: 900, color: "#064e3b", textTransform: "uppercase", marginBottom: "3px" }}>TDS</div>
+          <div style={{ fontSize: "15px", fontWeight: 900, color: "#059669" }}>{tds}</div>
           <div style={{ fontSize: "9px", color: "#6b7280", fontWeight: 600 }}>ppm</div>
         </div>
         <div style={{ background: "rgba(249,115,22,0.08)", borderRadius: "10px", padding: "7px 9px", border: "1px solid rgba(249,115,22,0.1)" }}>
-          <div style={{ fontSize: "9px", fontWeight: 700, color: "#9a3412", textTransform: "uppercase", marginBottom: "3px" }}>Temp</div>
-          <div style={{ fontSize: "15px", fontWeight: 800, color: "#f97316" }}>{temp}°C</div>
+          <div style={{ fontSize: "9px", fontWeight: 900, color: "#9a3412", textTransform: "uppercase", marginBottom: "3px" }}>Temp</div>
+          <div style={{ fontSize: "15px", fontWeight: 900, color: "#f97316" }}>{temp}°C</div>
         </div>
       </div>
     );
