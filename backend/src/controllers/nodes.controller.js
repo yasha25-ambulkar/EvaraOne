@@ -1,4 +1,4 @@
-const { db, admin } = require("../config/firebase.js");
+﻿const { db, admin } = require("../config/firebase.js");
 const { Filter } = require("firebase-admin/firestore");
 const { startWorker } = require("../workers/telemetryWorker.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
@@ -32,7 +32,7 @@ const normalizeThingSpeakTimestamp = (ts) => {
 /**
  * Helper to resolve device by document ID OR device_id/node_id
  */
-// ✅ AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
+// âœ… AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
 const resolveDevice = require("../utils/resolveDevice.js");
 
 /**
@@ -88,9 +88,9 @@ function buildEventTimeline(history, currentState) {
 
 exports.getNodes = async (req, res) => {
     try {
-        // ✅ CRITICAL FIX: Don't cache customer-specific queries - always get fresh data
+        // âœ… CRITICAL FIX: Don't cache customer-specific queries - always get fresh data
         // This ensures consistent results when devices are added/removed
-        const filterCustomerId = req.query.customerId || null;
+        const filterCustomerId = req.query.customerId || req.query.customer_id || null;
 
         console.log(`[NodesController] getNodes:`, {
             userId: req.user.uid,
@@ -106,7 +106,7 @@ exports.getNodes = async (req, res) => {
             ? `user:admin:devices${filterCustomerId ? `:${filterCustomerId}` : ""}`
             : `user:${req.user.uid}:devices`;
 
-        // ✅ FIX #18: SKIP DEVICE LIST CACHE FOR CONSISTENT STATUS
+        // âœ… FIX #18: SKIP DEVICE LIST CACHE FOR CONSISTENT STATUS
         // CRITICAL: Status accuracy is more important than small performance gain
         // Device status must ALWAYS reflect current state from DB, not cached state
         // Cache can hide stale status values (device marked ONLINE but truly offline in DB)
@@ -119,7 +119,7 @@ exports.getNodes = async (req, res) => {
         if (!shouldSkipCache && shouldUseCache) {
             const cachedNodes = await cache.get(nodesCacheKey);
             if (cachedNodes) {
-                console.log(`[NodesController] ✅ Cache HIT for key: ${nodesCacheKey}, returned ${cachedNodes.length} devices`);
+                console.log(`[NodesController] âœ… Cache HIT for key: ${nodesCacheKey}, returned ${cachedNodes.length} devices`);
                 return res.status(200).json(cachedNodes);
             }
         }
@@ -132,12 +132,12 @@ exports.getNodes = async (req, res) => {
             // Filter by the provided customer ID
             console.log(`[NodesController] Filtering by customerID: ${filterCustomerId}`);
             query = query.where("customer_id", "==", filterCustomerId);
-            console.log(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
+            console.log(`[NodesController] âœ… NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
         } else if (req.user.role !== "superadmin") {
             // Customer viewing their own devices
             console.log(`[NodesController] Filtering by customer's own ID`);
             query = query.where("customer_id", "==", req.user.customer_id);
-            console.log(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
+            console.log(`[NodesController] âœ… NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
         } else {
             console.log(`[NodesController] Superadmin viewing all devices (no customer_id filter)`);
         }
@@ -146,13 +146,14 @@ exports.getNodes = async (req, res) => {
         console.log(`[NodesController] Query returned ${snapshot.size} device registry entries from DB`);
         console.log(`[NodesController] Device types found:`, snapshot.docs.map(d => ({ id: d.id, device_type: d.data().device_type })));
 
-        // ✅ CRITICAL N+1 FIX: Collect device IDs and batch-fetch metadata
-        // This reduces 400 queries (100 devices × 4 queries each) to ~4 queries
+        // âœ… CRITICAL N+1 FIX: Collect device IDs and batch-fetch metadata
+        // This reduces 400 queries (100 devices Ã— 4 queries each) to ~4 queries
         const typedGroups = {};
         const registryDataMap = {};
         const uniqueZoneIds = new Set();
 
-        // Step 1: Collect all device IDs by type and identify unique zones
+        // Step 1: Collect all device IDs by type and identify unique zones & customers
+        const uniqueCustomerIds = new Set();
         for (const doc of snapshot.docs) {
             const registry = doc.data();
             const type = registry.device_type;
@@ -164,10 +165,15 @@ exports.getNodes = async (req, res) => {
             
             // Collect unique zone IDs (DO NOT query zones in loop)
             if (registry.zone_id) uniqueZoneIds.add(registry.zone_id);
+            
+            // Collect unique customer IDs for batch lookup
+            if (registry.customer_id) uniqueCustomerIds.add(registry.customer_id);
         }
 
-        // Step 2: Pre-fetch unique zones ONCE (not per device)
+        // Step 2: Pre-fetch unique zones and customers ONCE (not per device)
         let zoneMap = {};
+        let customerMap = {};
+        
         if (uniqueZoneIds.size > 0) {
             console.log(`[NodesController] Pre-fetching ${uniqueZoneIds.size} unique zones (batch query)`);
             const zoneRefs = Array.from(uniqueZoneIds).map(id => db.collection("zones").doc(id));
@@ -185,6 +191,27 @@ exports.getNodes = async (req, res) => {
             }
         }
         console.log(`[NodesController] Loaded zone map with ${Object.keys(zoneMap).length} entries`);
+        
+        if (uniqueCustomerIds.size > 0) {
+            console.log(`[NodesController] Pre-fetching ${uniqueCustomerIds.size} unique customers (batch query)`);
+            const customerRefs = Array.from(uniqueCustomerIds).map(id => db.collection("customers").doc(id));
+            
+            // Split into chunks of 500 to respect Firestore limits
+            const CHUNK_SIZE = 500;
+            for (let i = 0; i < customerRefs.length; i += CHUNK_SIZE) {
+                const chunk = customerRefs.slice(i, i + CHUNK_SIZE);
+                const customerDocs = await db.getAll(...chunk);
+                customerDocs.forEach(doc => {
+                    if (doc.exists) {
+                        // Try multiple possible field names for customer name
+                        const customerData = doc.data();
+                        const name = customerData.display_name || customerData.displayName || customerData.name || customerData.customerName || doc.id;
+                        customerMap[doc.id] = name;
+                    }
+                });
+            }
+        }
+        console.log(`[NodesController] Loaded customer map with ${Object.keys(customerMap).length} entries`);
 
         const nodes = [];
 
@@ -220,27 +247,30 @@ exports.getNodes = async (req, res) => {
                 
                 console.log(`[NodesController] Processing device: ID=${id}, type=${type}, label=${meta.label}, category=${meta.category}`);
 
-                // Ownership check only for non-superadmin without an explicit customerId filter
-                if (req.user.role !== "superadmin" && !filterCustomerId) {
-                    if (meta.customer_id !== req.user.customer_id) {
-                        console.log(`[NodesController] ⚠️ Filtering out device ${id}: customer mismatch (meta.customer_id=${meta.customer_id} vs req.user.customer_id=${req.user.customer_id})`);
-                        continue;
-                    }
-                }
+                  const registry = registryDataMap[id];
+                  const effCustomerId = registry?.customer_id || registry?.customerId || meta.customer_id || meta.customerId;
 
-                // ✅ CRITICAL FIX #4: ENFORCE DEVICE VISIBILITY
+                  // Ownership check only for non-superadmin without an explicit customerId filter
+                  if (req.user.role !== "superadmin" && !filterCustomerId) {    
+                      if (effCustomerId !== req.user.customer_id) {
+                          console.log(`[NodesController] âš ï¸ Filtering out device ${id}: customer mismatch (effCustomerId=${effCustomerId} vs req.user.customer_id=${req.user.customer_id})`);
+                          continue;
+                      }
+                  }
+
+                // âœ… CRITICAL FIX #4: ENFORCE DEVICE VISIBILITY
                 // Non-superadmins: only filter if EXPLICITLY marked as hidden (isVisibleToCustomer === false)
                 // If field is missing (old devices), treat as visible by default
-                if (req.user.role !== "superadmin" && meta.isVisibleToCustomer === false) {
-                    console.log(`[NodesController] ⚠️ Filtering out explicitly hidden device ${id} for user ${req.user.uid}`);
+                const effIsVisible = registry?.isVisibleToCustomer ?? meta?.isVisibleToCustomer; if (req.user.role !== "superadmin" && effIsVisible === false) {
+                    console.log(`[NodesController] âš ï¸ Filtering out explicitly hidden device ${id} for user ${req.user.uid}`);
                     continue;  // Skip this device
                 }
                 // Superadmins always see all devices
                 if (req.user.role === "superadmin") {
-                    console.log(`[NodesController] ✅ Superadmin${filterCustomerId ? ` querying customer ${filterCustomerId}` : ''} can see all devices`);
+                    console.log(`[NodesController] âœ… Superadmin${filterCustomerId ? ` querying customer ${filterCustomerId}` : ''} can see all devices`);
                 }
 
-                // ✅ FIX #17: CONSISTENT STATUS CALCULATION
+                // âœ… FIX #17: CONSISTENT STATUS CALCULATION
                 // CRITICAL: Don't use telemetry_snapshot.timestamp as it gets stale
                 // Use only actual telemetry update timestamps
                 // Priority (from most reliable to least):
@@ -251,7 +281,7 @@ exports.getNodes = async (req, res) => {
                 const lastSeen = meta.last_updated_at || meta.last_online_at || meta.lastUpdatedAt || meta.lastUpdated || meta.last_seen || null;
                 const dynamicStatus = deviceState.calculateDeviceStatus(lastSeen);
 
-                // ✅ DETAILED LOGGING: Show why device is online/offline
+                // âœ… DETAILED LOGGING: Show why device is online/offline
                 console.log(`[NodesController] Device ${id}: lastSeen=${lastSeen}, calculatedStatus=${dynamicStatus}, storedStatus=${meta.status}, label=${meta.label}`);
 
                 // Strip sensitive keys
@@ -290,10 +320,11 @@ exports.getNodes = async (req, res) => {
                     last_updated_at: meta.last_updated_at || lastSeen,
                     last_value: meta.last_value ?? null,
                     last_online_at: meta.last_online_at || lastSeen,
-                    zone_name: zoneMap[meta.zone_id] || null
+                    zone_name: zoneMap[meta.zone_id] || null,
+                    customer_name: customerMap[effCustomerId] || null
                 };
 
-                // ✅ FIX: Ensure analytics_template is set (fallback for existing devices)
+                // âœ… FIX: Ensure analytics_template is set (fallback for existing devices)
                 if (!nodeData.analytics_template) {
                     const deviceType = (nodeData.device_type || "").toLowerCase();
                     if (deviceType === "evaratank") nodeData.analytics_template = "EvaraTank";
@@ -329,7 +360,7 @@ exports.getNodes = async (req, res) => {
             }
         }
 
-                console.log(`[NodesController] ✅ Final result: ${nodes.length} devices prepared`);
+                console.log(`[NodesController] âœ… Final result: ${nodes.length} devices prepared`);
                 console.log(`[NodesController] Device details:`, nodes.map(n => ({ 
                     id: n.id, 
                     name: n.label || n.displayName,
@@ -338,7 +369,7 @@ exports.getNodes = async (req, res) => {
                     customer_id: n.customer_id
                 })));
                 
-                // ✅ FIX: Additional detailed logging BEFORE response
+                // âœ… FIX: Additional detailed logging BEFORE response
                 console.log(`[NodesController] Complete device list (IDs):`, nodes.map(n => n.id).join(', '));
                 console.log(`[NodesController] Device types breakdown:`, 
                     nodes.reduce((acc, n) => {
@@ -360,7 +391,7 @@ exports.getNodes = async (req, res) => {
   - Estimated response time improvement: ${Math.round((n1Queries / actualQueries - 1) * 100)}% faster
   - Firestore cost savings: ~${Math.round((1 - actualQueries / n1Queries) * 100)}% reduction`);
 
-        // ✅ FIX #19: DISABLE DEVICE LIST CACHING FOR CONSISTENCY
+        // âœ… FIX #19: DISABLE DEVICE LIST CACHING FOR CONSISTENCY
         // Since we're always fetching fresh from DB to ensure accurate status,
         // there's no point in caching. Status accuracy > performance optimization
         // Once status is stored in DB reliably, we can re-enable caching
@@ -404,6 +435,17 @@ exports.getNodeById = async (req, res) => {
 
         const metadata = metaDoc.data();
         
+        // CRITICAL: Lookup customer name (same as getNodes) for analytics modal
+        const effCustomerId = registry?.customer_id || registry?.customerId || metadata.customer_id || metadata.customerId;
+        let customerName = null;
+        if (effCustomerId) {
+            const customerDoc = await db.collection("customers").doc(effCustomerId).get();
+            if (customerDoc.exists) {
+                const customerData = customerDoc.data();
+                customerName = customerData.display_name || customerData.displayName || customerData.name || customerData.customerName || null;
+            }
+        }
+        
         // SIMPLE: Return all metadata fields from the typed collection
         // Exclude API key for security
         delete metadata.thingspeak_read_api_key;
@@ -412,10 +454,11 @@ exports.getNodeById = async (req, res) => {
         const result = { 
             id: doc.id, 
             ...registry,
-            ...metadata
+            ...metadata,
+            customer_name: customerName
         };
         
-        console.log(`[getNodeById] ✅ Returning config with Channel ID:`, result.thingspeak_channel_id);
+        console.log(`[getNodeById] Returning config with Channel ID:`, result.thingspeak_channel_id, `Customer: ${customerName}`);
         
         await cache.set(`device:${doc.id}:metadata`, result, 3600);
         res.status(200).json(result);
@@ -441,7 +484,7 @@ exports.getNodeTelemetry = async (req, res) => {
             const isOwner = await checkOwnership(req.user.customer_id || req.user.uid, deviceDoc.id, req.user.role, req.user.community_id);
             if (!isOwner) return res.status(403).json({ error: "Unauthorized access" });
 
-            // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
+            // âœ… CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
             if (!checkDeviceVisibilityWithAudit(registry, deviceDoc.id, req.user.uid, req.user.role)) {
                 return res.status(403).json({ error: "Device not visible to your account" });
             }
@@ -462,7 +505,7 @@ exports.getNodeTelemetry = async (req, res) => {
         const storedLastValue = metadata.last_value ?? null;
         const storedStatus = metadata.status || DEVICE_STATUS.OFFLINE;
 
-        // ── FLOW DEVICE PATH ───────────────────────────────────────────────────
+        // â”€â”€ FLOW DEVICE PATH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (["evaraflow", "flow", "flow_meter"].includes(type)) {
             const flowKeys = ['flowField', 'flow_rate', 'flow_rate_field'];
             const totalKeys = ['volumeField', 'current_reading', 'total_reading', 'meter_reading_field'];
@@ -548,7 +591,7 @@ exports.getNodeTelemetry = async (req, res) => {
             }
         }
 
-        // ── TDS DEVICE PATH ───────────────────────────────────────────────────
+        // â”€â”€ TDS DEVICE PATH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (["evaratds", "tds"].includes(type)) {
             const tdsKeys = ['tdsField', 'tds_value', 'tdsValue'];
             const tempKeys = ['tempField', 'temperature', 'temperature_field'];
@@ -648,7 +691,7 @@ exports.getNodeTelemetry = async (req, res) => {
             }
         }
 
-        // ── TANK / DEEP WELL DEVICE PATH ───────────────────────────────────────
+        // â”€â”€ TANK / DEEP WELL DEVICE PATH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const computeTelemetry = (distance, seenAt, status) => {
             const validDistance = Math.min(distance / 100, depth);
             const waterHeight = Math.max(0, depth - validDistance);
@@ -763,7 +806,7 @@ exports.getNodeGraphData = async (req, res) => {
             const isOwner = await checkOwnership(req.user.customer_id || req.user.uid, deviceDoc.id, req.user.role, req.user.community_id);
             if (!isOwner) return res.status(403).json({ error: "Unauthorized" });
 
-            // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
+            // âœ… CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
             if (!checkDeviceVisibilityWithAudit(registry, deviceDoc.id, req.user.uid, req.user.role)) {
                 return res.status(403).json({ error: "Device not visible to your account" });
             }
@@ -876,7 +919,7 @@ exports.getNodeAnalytics = async (req, res) => {
       );
       if (!isOwner) return res.status(403).json({ error: "Unauthorized" });
 
-      // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
+      // âœ… CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
       if (!checkDeviceVisibilityWithAudit(registry, deviceDoc.id, req.user.uid, req.user.role)) {
         return res.status(403).json({ error: "Device not visible to your account" });
       }
@@ -894,7 +937,7 @@ exports.getNodeAnalytics = async (req, res) => {
     if (!channelId || !apiKey)
       return res.status(400).json({ error: "Telemetry configuration missing" });
 
-    // ── Cache ──────────────────────────────────────────────────────────────
+    // â”€â”€ Cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const analyticsCacheKey = `analytics_${deviceDoc.id}_${range || '24H'}_${startDate || ''}_${endDate || ''}`;
     const cachedAnalytics = await cache.get(analyticsCacheKey);
     if (cachedAnalytics) {
@@ -902,7 +945,7 @@ exports.getNodeAnalytics = async (req, res) => {
       return res.status(200).json(cachedAnalytics);
     }
 
-    // ── Build Dynamic ThingSpeak URL ──────────────────────────────────────
+    // â”€â”€ Build Dynamic ThingSpeak URL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let thingspeakUrl;
     if (range === '1W') {
       thingspeakUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&days=7&results=8000`;
@@ -927,7 +970,7 @@ exports.getNodeAnalytics = async (req, res) => {
       });
     }
 
-    // ── Resolve field key ──────────────────────────────────────────────────
+    // â”€â”€ Resolve field key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const sampleFeed = feeds[0] || {};
     const definedField =
       metadata.secondary_field || metadata.water_level_field ||
@@ -938,7 +981,7 @@ exports.getNodeAnalytics = async (req, res) => {
       Object.keys(fieldMapping).find(k => fieldMapping[k] && fieldMapping[k].includes("water_level")) ||
       (sampleFeed.field1 !== undefined ? "field1" : "field2");
 
-    // ── FLOW METER path (unchanged) ────────────────────────────────────────
+    // â”€â”€ FLOW METER path (unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (["evaraflow", "flow", "flow_meter"].includes(type)) {
       const flowKeys = ['flowField', 'flow_rate', 'flow_rate_field'];
       const totalKeys = ['volumeField', 'current_reading', 'total_reading', 'meter_reading_field'];
@@ -1006,7 +1049,7 @@ exports.getNodeAnalytics = async (req, res) => {
       return res.status(200).json({ node_id: req.params.id, status: DEVICE_STATUS.OFFLINE, history: [] });
     }
 
-    // ── TDS path — Extract TDS and temperature values ──────────────────────────────
+    // â”€â”€ TDS path â€” Extract TDS and temperature values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (["evaratds", "tds"].includes(type)) {
       const tdsKeys = ['tdsField', 'tds_value', 'tdsValue'];
       const tempKeys = ['tempField', 'temperature', 'temperature_field'];
@@ -1020,6 +1063,17 @@ exports.getNodeAnalytics = async (req, res) => {
       console.log(`[TDS-Analytics] Device ${req.params.id}:`);
       console.log(`[TDS-Analytics]   tdsField: ${tdsFieldKey}, temperatureField: ${tempFieldKey}`);
       console.log(`[TDS-Analytics]   Total feeds: ${feeds.length}`);
+
+      // CRITICAL: Lookup customer name for the Node Info modal
+      const effCustomerId = registry?.customer_id || registry?.customerId || metadata.customer_id || metadata.customerId;
+      let customerName = null;
+      if (effCustomerId) {
+          const customerDoc = await db.collection("customers").doc(effCustomerId).get();
+          if (customerDoc.exists) {
+              const customerData = customerDoc.data();
+              customerName = customerData.display_name || customerData.displayName || customerData.name || customerData.customerName || null;
+          }
+      }
 
       if (feeds.length > 0) {
         const latestFeed = getLatestFeed(feeds);
@@ -1042,6 +1096,8 @@ exports.getNodeAnalytics = async (req, res) => {
           tdsValue,
           temperature,
           waterQualityRating: quality,
+          location_name: registry?.location_name || metadata?.location_name || "Not specified",
+          customer_name: customerName,
           tdsHistory: feeds.map(f => ({
             value: parseFloat(f[tdsFieldKey]) || 0,
             timestamp: normalizeThingSpeakTimestamp(f.created_at)
@@ -1059,7 +1115,7 @@ exports.getNodeAnalytics = async (req, res) => {
           }))
         };
 
-        console.log(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}`);
+        console.log(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}, Customer: ${customerName}`);
 
         // Sync status back to device doc (metadata collection)
         await db.collection(type).doc(deviceDoc.id).update({
@@ -1088,7 +1144,7 @@ exports.getNodeAnalytics = async (req, res) => {
       return res.status(200).json({ node_id: req.params.id, status: DEVICE_STATUS.OFFLINE, history: [], tdsHistory: [], tempHistory: [] });
     }
 
-    // ── TANK path — NEW: use analytics engine ──────────────────────────────
+    // â”€â”€ TANK path â€” NEW: use analytics engine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // Build readings array for engine (clean format)
     const readings = feeds
@@ -1104,7 +1160,7 @@ exports.getNodeAnalytics = async (req, res) => {
     // Load saved thresholds (null on first run)
     const savedThresholds = await deviceState.loadSavedThresholds(deviceDoc.id);
 
-    // Run the analytics engine — THIS is the 200-reading window classification
+    // Run the analytics engine â€” THIS is the 200-reading window classification
     const analytics = analyzeWaterTank(
       readings,
       { depthM: depth, capacityLitres: capacity },
@@ -1180,3 +1236,4 @@ exports.getNodeAnalytics = async (req, res) => {
     res.status(500).json({ error: "Tank analytics calculation failure" });
   }
 };
+

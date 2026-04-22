@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { adminService } from "../../../services/admin";
 import {
@@ -25,6 +25,7 @@ const CustomerDetails = () => {
   const [client, setClient] = useState<any | null>(null);
   const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nodesLoading, setNodesLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDevice, setEditingDevice] = useState<any | null>(null);
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
@@ -60,21 +61,36 @@ const CustomerDetails = () => {
     if (!customerId) return;
 
     const unsub = deviceService.subscribeToNodeUpdates(
-      (nodesData) => setNodes([nodesData]),
+      (nodesData) => {
+        setNodes(prev => {
+          const index = prev.findIndex(n => n.id === nodesData.id);
+          if (index !== -1) {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], ...nodesData };
+            return updated;
+          }
+          return prev;
+        });
+      },
       { community_id: "ignore_we_are_fetching_all" }
     );
 
     const fetchNodes = async () => {
-      const allNodes = await deviceService.getMapNodes(undefined, customerId);
-      setNodes(allNodes);
+      setNodesLoading(true);
+      try {
+        const allNodes = await deviceService.getMapNodes(undefined, customerId);
+        setNodes(allNodes);
 
-      // KEY CHANGE: Initialize toggle state from isVisibleToCustomer field
-      // Falls back to true if field doesn't exist yet (safe default)
-      const toggleMap: Record<string, boolean> = {};
-      allNodes.forEach((n: any) => {
-        toggleMap[n.id] = n.isVisibleToCustomer !== false; // default true if not set
-      });
-      setDeviceToggles(toggleMap);
+        // KEY CHANGE: Initialize toggle state from isVisibleToCustomer field   
+        // Falls back to true if field doesn't exist yet (safe default)
+        const toggleMap: Record<string, boolean> = {};
+        allNodes.forEach((n: any) => {
+          toggleMap[n.id] = n.isVisibleToCustomer !== false; // default true if not set
+        });
+        setDeviceToggles(toggleMap);
+      } finally {
+        setNodesLoading(false);
+      }
     };
     fetchNodes();
 
@@ -85,7 +101,7 @@ const CustomerDetails = () => {
   const handleDeviceToggle = async (deviceId: string) => {
     const newValue = !deviceToggles[deviceId];
 
-    // Optimistic UI update — toggle immediately in UI
+    // Optimistic UI update â€” toggle immediately in UI
     setDeviceToggles(prev => ({ ...prev, [deviceId]: newValue }));
     setTogglingDeviceId(deviceId);
 
@@ -256,7 +272,7 @@ const CustomerDetails = () => {
               </button>
             </div>
 
-            {nodes.length === 0 ? (
+            {nodesLoading ? (<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-pulse"><div className="h-[140px] bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700"></div><div className="h-[140px] bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700"></div></div>) : nodes.length === 0 ? (
               <div className="text-center py-10 text-slate-400 dark:text-slate-500">
                 <Box size={32} className="mx-auto mb-2 opacity-30" />
                 <p className="font-medium">No devices assigned yet</p>
@@ -327,7 +343,7 @@ const CustomerDetails = () => {
                         <Settings size={14} /> Configure
                       </button>
 
-                      {/* KEY CHANGE: Toggle Switch now calls handleDeviceToggle → backend API */}
+                      {/* KEY CHANGE: Toggle Switch now calls handleDeviceToggle â†’ backend API */}
                       <button
                         type="button"
                         role="switch"
@@ -458,3 +474,4 @@ const CustomerDetails = () => {
 };
 
 export default CustomerDetails;
+

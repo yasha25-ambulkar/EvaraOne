@@ -102,6 +102,8 @@ export const useFirestoreFlowData = (
                     flowRate = parseFloat(docData.flow_rate);
                 } else if (telemetrySnapshot.flow_rate != null && !isNaN(parseFloat(telemetrySnapshot.flow_rate))) {
                     flowRate = parseFloat(telemetrySnapshot.flow_rate);
+                } else if (rawData.field3 && !isNaN(parseFloat(rawData.field3))) {
+                    flowRate = parseFloat(rawData.field3);
                 }
 
                 // Timestamp extraction

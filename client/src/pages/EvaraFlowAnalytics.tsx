@@ -39,7 +39,7 @@ const formatMeterValue = (val: number, isOffline?: boolean) =>
 
 /** Consumption Pattern (Area chart) */
 const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: string; value: number }[] }) => {
-    const [period, setPeriod] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H');
+    const [period, setPeriod] = useState<'1H' | '24H' | '1W' | '1M' | 'RANGE'>('1H');
     const [rangeStart, setRangeStart] = useState<string>('');
     const [rangeEnd, setRangeEnd] = useState<string>('');
     const [isHovered, setIsHovered] = useState(false);
@@ -49,11 +49,91 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
             return [];
         }
 
-        if (period === '24H') {
-            return history.slice(-7).map(d => ({
-                label: d.time,
-                current: d.value
-            }));
+        if (period === '1H') {
+              const now = new Date();
+              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+              let sorted = [...history].map((d) => ({
+                  ...d,
+                  timestampMs: new Date(d.date!).getTime(),
+                  current: d.value || 0
+              })).sort((a, b) => a.timestampMs - b.timestampMs)
+              .filter(d => d.timestampMs >= oneHourAgo.getTime());
+
+              if (sorted.length === 0) return [];
+
+              const interpolated = [];
+              const startBoundary = Math.floor(oneHourAgo.getTime() / 60000) * 60000;
+              const endBoundary = Math.floor(now.getTime() / 60000) * 60000;
+
+              for (let t = startBoundary; t <= endBoundary; t += 60000) {
+                  let dataIdx = 0;
+                  while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                      dataIdx++;
+                  }
+                  const point = sorted[dataIdx];
+                  const nextPoint = sorted[dataIdx + 1];
+                  let value = point?.current || 0;
+                  if (nextPoint && point && nextPoint.timestampMs !== point.timestampMs) {
+                      const progress = (t - point.timestampMs) / (nextPoint.timestampMs - point.timestampMs);
+                      value = point.current + (nextPoint.current - point.current) * progress;
+                  }
+                  interpolated.push({
+                      timestampMs: t,
+                      time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      fullTime: new Date(t).toLocaleString(),
+                      label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      current: value
+                  });
+              }
+              return interpolated;
+          } else if (period === '24H') {
+            let sorted = [...history].map((d) => ({
+                ...d,
+                timestampMs: new Date(d.date!).getTime(),
+                current: d.value || 0
+            })).sort((a, b) => a.timestampMs - b.timestampMs);
+
+            if (sorted.length === 0) return [];
+
+            const now = Date.now();
+            const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
+            const startBoundary = latestBoundary - (3 * 60 * 60000);
+
+            const interpolated = [];
+            for (let t = startBoundary; t <= latestBoundary; t += 60000) { 
+                 let dataIdx = 0;
+                 while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                     dataIdx++;
+                 }
+                 
+                 let point = { 
+                     timestampMs: t, 
+                     label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+                     fullTime: new Date(t).toLocaleString(),
+                     current: 0
+                 };
+                 
+                 if (dataIdx >= sorted.length - 1) {
+                     point.current = sorted[sorted.length-1].current;
+                 } else if (sorted[dataIdx].timestampMs > t) {
+                     point.current = sorted[0].current;
+                 } else {
+                     const p1 = sorted[dataIdx];
+                     const p2 = sorted[dataIdx + 1];
+                     const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
+                     point.current = p1.current + (p2.current - p1.current) * ratio;
+                 }
+                 interpolated.push(point);
+            }
+            
+            interpolated.push({
+                timestampMs: latestBoundary + (5 * 60000), 
+                label: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
+                current: null // Buffer element
+            });
+            
+            return interpolated;
         } else if (period === '1W') {
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const today = new Date();
@@ -176,7 +256,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                     <div className="flex items-center gap-3">
                         {/* Time Range Selector */}
                         <div className="flex bg-[#f8fafc] dark:bg-white/5 p-1 rounded-full border border-slate-100/50 dark:border-white/10 relative overflow-hidden shrink-0 shadow-inner backdrop-blur-md">
-                            {(['24H', '1W', '1M', 'RANGE'] as const).map(p => {
+                            {([ '1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => {
                                 const active = period === p;
                                 return (
                                     <button
@@ -245,11 +325,11 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                         />
 
                         <XAxis
-                            dataKey="label"
+                            dataKey={period === '24H' ? 'label' : 'label'}
+                            minTickGap={40}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             tickLine={false}
-                            tick={<CustomXAxisTick />}
-                            padding={{ left: 20, right: 20 }}
+                            tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                         />
 
                         <Tooltip
@@ -356,7 +436,7 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
 
 /** Total Flow Rate Card - with Time Filter */
 const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: { history: { date?: Date, time: string; value: number }[]; flowRate: number; maxFlowRate: number; className?: string }) => {
-    const [period, setPeriod] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H');
+    const [period, setPeriod] = useState<'1H' | '24H' | '1W' | '1M' | 'RANGE'>('1H');
     const [startDate, setStartDate] = useState(() => {
         const d = new Date();
         d.setHours(d.getHours() - 24);
@@ -382,8 +462,11 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
         const now = new Date();
         let filtered = history;
 
-        if (period === '24H') {
-            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        if (period === '1H') {
+              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+              filtered = history.filter(h => h.date && h.date >= oneHourAgo);
+          } else if (period === '24H') {
+              const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             filtered = history.filter(h => h.date && h.date >= yesterday);
         } else if (period === '1W') {
             const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -427,7 +510,7 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
             </div>
 
             <div className="mt-3 flex bg-[#f8fafc]/50 p-0.5 rounded-lg border border-slate-100/30 w-fit">
-                {(['24H', '1W', '1M', 'RANGE'] as const).map(p => (
+                {([ '1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => (
                     <button
                         key={p}
                         onClick={() => setPeriod(p)}
@@ -718,13 +801,22 @@ const EvaraFlowAnalytics = () => {
 
     // Flow history (for charts)
     const flowHistory = useMemo(() => {
-        return historyFeeds.map((f: any) => {
+        const items = historyFeeds.map((f: any) => {
             const d = new Date(f.timestamp || f.created_at);
             const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
             const rawFlow = f.flow_rate ?? parseFloat(f.raw?.[fieldFlow] as string) ?? 0;
             return { date: d, time, value: Math.max(0, rawFlow) };
         });
-    }, [historyFeeds, fieldFlow]);
+        if (telemetryData) {
+            const now = new Date();
+            items.push({
+                date: now,
+                time: `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`,
+                value: Math.max(0, flowRate)
+            });
+        }
+        return items;
+    }, [historyFeeds, fieldFlow, telemetryData, flowRate]);
 
     // ── Delta Water Reading calculations ──────────────────────────────────────
     const meterHistory = useMemo(() => {
@@ -1115,10 +1207,8 @@ const EvaraFlowAnalytics = () => {
                                     </div>
 
                                     <div className="rounded-xl p-4" style={{ background: 'var(--bg-primary)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Status</p>
-                                        <p className="text-sm font-bold mt-1" style={{ color: effectiveIsOffline ? '#e74c3c' : '#27ae60' }}>
-                                            {effectiveIsOffline ? 'Offline' : 'Online'}
-                                        </p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Assigned To</p>
+                                        <p className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>{deviceInfo?.customer_name || 'Unassigned'}</p>
                                     </div>
                                 </div>
 
@@ -1127,7 +1217,7 @@ const EvaraFlowAnalytics = () => {
                                         className="flex-1 font-semibold py-3 rounded-2xl text-white border-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
                                         style={{ background: '#3A7AFE', fontSize: '14px' }}
                                         onClick={() => {
-                                            const info = `Device Name: ${deviceName}\nHardware ID: ${hardwareId}\nDevice Type: EvaraFlow Monitor\nLocation: ${zoneName || 'Not specified'}\nSubscription: PRO\nStatus: ${effectiveIsOffline ? 'Offline' : 'Online'}`;
+                                            const info = `Device Name: ${deviceName}\nHardware ID: ${hardwareId}\nDevice Type: EvaraFlow Monitor\nLocation: ${zoneName || 'Not specified'}\nSubscription: PRO\nAssigned To: ${deviceInfo?.customer_name || 'Unassigned'}`;
                                             navigator.clipboard.writeText(info);
                                             alert('Node information copied to clipboard!');
                                         }}

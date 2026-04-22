@@ -20,6 +20,7 @@ import { getTankLevel } from "../../utils/telemetryPipeline";
 import { socket } from "../../services/api";
 import { getDeviceAnalyticsRoute } from "../../utils/deviceRouting";
 import { useTelemetry } from "../../hooks/useTelemetry";
+import { type TelemetryData } from "../../services/TelemetryService";
 import { useFirestoreFlowData } from "../../hooks/useFirestoreFlowData";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -115,6 +116,27 @@ function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon |
 const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; snap: any; firestoreFlow?: any }) => {
   const t =
     ((device as any).analytics_template || device.asset_type || "Sensor Node").toLowerCase();
+
+  const findValue = (keys: string[], snapshot?: any, device?: any) => {
+    for (const key of keys) {
+      if (snapshot?.[key] !== undefined && snapshot?.[key] !== null) {
+        return snapshot[key];
+      }
+      if (snapshot?.[key as keyof TelemetryData] !== undefined && snapshot?.[key as keyof TelemetryData] !== null) {
+        return snapshot[key as keyof TelemetryData];
+      }
+      if (snapshot?.values?.[key] !== undefined && snapshot?.values?.[key] !== null) {
+        return snapshot.values[key];
+      }
+      if (device?.last_telemetry?.[key] !== undefined && device?.last_telemetry?.[key] !== null) {
+        return device.last_telemetry[key];
+      }
+      if (device?.telemetry_snapshot?.[key] !== undefined && device?.telemetry_snapshot?.[key] !== null) {
+        return device.telemetry_snapshot[key];
+      }
+    }
+    return null;
+  };
 
   // If it's a tank but no telemetry, show a "Syncing" liquid bar at 0% or placeholder
   if (t === "evaratank" || t === "oht" || t === "sump" || device.asset_type === "tank" || device.asset_type === "sump") {
@@ -232,8 +254,8 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
   }
 
   if (t === "evaratds") {
-    const tds = snap?.tdsValue ?? device.last_telemetry?.tdsValue ?? 0;
-    const temp = snap?.temperature ?? device.last_telemetry?.temperature ?? 0;
+    const tds = findValue(['tdsValue', 'tds_value', 'field4'], snap, device) ?? 0;
+    const temp = findValue(['temperature', 'temp', 'temperature_value', 'field5'], snap, device) ?? 0;
     return (
       <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
         <div style={{ background: "rgba(16,185,129,0.08)", borderRadius: "10px", padding: "7px 9px", border: "1px solid rgba(16,185,129,0.1)" }}>
@@ -250,8 +272,8 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
   }
 
   if (t === "evaraflow") {
-    const rate = snap?.flow_rate ?? firestoreFlow?.flowRate ?? 0;
-    const total = snap?.total_liters ?? firestoreFlow?.volume ?? 0;
+    const rate = Number(findValue(['flow_rate', 'flowRate', 'flow_rate_field', 'field3'], snap, device) ?? firestoreFlow?.flowRate ?? 0);
+    const total = Number(findValue(['total_liters', 'volume', 'meter_reading_field', 'field1'], snap, device) ?? firestoreFlow?.volume ?? 0);
     return (
       <div
         style={{
@@ -285,7 +307,7 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
             {rate.toFixed(2)}
           </div>
           <div style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 600 }}>
-            m³/hr
+            L/min
           </div>
         </div>
         <div
@@ -306,13 +328,13 @@ const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; 
               marginBottom: "3px",
             }}
           >
-            Total
+            Meter Reading
           </div>
           <div style={{ fontSize: "15px", fontWeight: 800, color: "#0891b2" }}>
             {total >= 1000 ? (total / 1000).toFixed(1) + "k" : total.toFixed(0)}
           </div>
           <div style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 600 }}>
-            liters
+            L
           </div>
         </div>
       </div>
