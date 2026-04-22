@@ -243,10 +243,10 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                         </svg>
                     </div>
                     <div className="flex flex-col">
-                        <h2 className="text-[22px] font-black text-[var(--text-primary)] tracking-tight m-0 leading-tight mb-0.5 uppercase">Consumption Pattern</h2>
+                        <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight m-0 leading-tight mb-0.5">Consumption Pattern</h2>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Peak Usage</span>
-                            <span className="text-[20px] font-black tracking-tight text-[var(--text-primary)]">{formatKPIValue(peakUsage, false)} L/min</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Peak Usage</span>
+                            <span className="text-lg font-black tracking-tight text-[var(--text-primary)]">{formatKPIValue(peakUsage, false)} L/min</span>
                         </div>
                     </div>
                 </div>
@@ -262,7 +262,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                                     <button
                                         key={p}
                                         onClick={() => setPeriod(p)}
-                                        className={`relative z-10 px-5 py-2 text-[10px] sm:text-[11px] font-black tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[#64748b] hover:text-[#334155]'
+                                        className={`relative z-10 px-5 py-2 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[#64748b] hover:text-[#334155]'
                                             }`}
                                         style={{
                                             border: 'none',
@@ -325,11 +325,11 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                         />
 
                         <XAxis
-                            dataKey={period === '24H' ? 'label' : 'label'}
+                            dataKey="label"
                             minTickGap={40}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             tickLine={false}
-                            tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
+                            tick={<CustomXAxisTick />}
                         />
 
                         <Tooltip
@@ -371,7 +371,7 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
             {/* Header: HYDROLOGICAL LENS / System Dynamics */}
             <div className="flex justify-between items-start mb-2 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">FLOW RATE</h2>
+                    <h2 className="text-[12px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase tracking-wider">Flow Rate</h2>
                 </div>
                 {/* Top Right Water Drop Icon */}
                 <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
@@ -390,12 +390,12 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
                     </svg>
                 </div>
                 <div className="flex flex-col min-w-0">
-                    <span className="text-[11px] font-black text-[var(--text-primary)] uppercase tracking-widest truncate">Avg Flow Rate</span>
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Avg Flow Rate</span>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-2xl lg:text-3xl font-black tracking-tighter text-[#004F94] leading-tight">
+                        <span className="text-[26px] font-black tracking-tighter text-[#004F94] leading-tight">
                             {formatMeterValue(Math.abs(avgFlow))}
                         </span>
-                        <span className="text-[0.8rem] font-black tracking-tight text-[var(--text-muted)]">L/min</span>
+                        <span className="text-[13px] font-bold text-[var(--text-muted)]">L/min</span>
                     </div>
                 </div>
             </div>
@@ -410,7 +410,7 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
             {/* Header: ALERT MONITOR / Alerts */}
             <div className="flex justify-between items-start mb-2 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">ALERTS</h2>
+                    <h2 className="text-[12px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase tracking-wider">Alerts</h2>
                 </div>
                 {/* Top Right Red Exclamation Icon */}
                 <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-slate-50 dark:border-white/10">
@@ -426,8 +426,8 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
             <div className="mt-auto flex items-center justify-between">
                 {/* Active Alerts Count */}
                 <div className="flex items-baseline gap-1.5">
-                    <span className="text-[36px] font-black text-[var(--text-primary)] leading-none">0</span>
-                    <span className="text-[16px] font-black text-[var(--text-muted)] uppercase tracking-widest">Active</span>
+                    <span className="text-[26px] font-black text-[var(--text-primary)] leading-none">0</span>
+                    <span className="text-[13px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Active</span>
                 </div>
             </div>
         </div>
@@ -487,7 +487,7 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
         <div className={`apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden h-full ${className}`}>
             <div className="flex justify-between items-start mb-1 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase leading-tight">Total Flow Rate</h2>
+                    <h2 className="text-[12px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase tracking-wider leading-tight">Total Flow Rate</h2>
                 </div>
                 <div className="w-8 h-8 rounded-[10px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -503,10 +503,10 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
             </div>
 
             <div className="flex items-baseline gap-1 mt-auto">
-                <span className="text-2xl font-black tracking-tighter text-[#6366f1] leading-none tabular-nums truncate">
+                <span className="text-[26px] font-black tracking-tighter text-[#6366f1] leading-none tabular-nums truncate">
                     {formatMeterValue(totalValue)}
                 </span>
-                <span className="text-[0.7rem] font-black tracking-tight text-[var(--text-muted)]">L</span>
+                <span className="text-[13px] font-bold tracking-tight text-[var(--text-muted)]">L</span>
             </div>
 
             <div className="mt-3 flex bg-[#f8fafc]/50 p-0.5 rounded-lg border border-slate-100/30 w-fit">
@@ -514,7 +514,7 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
                     <button
                         key={p}
                         onClick={() => setPeriod(p)}
-                        className={`px-2 py-0.5 text-[8px] font-black tracking-tight uppercase rounded-md transition-all duration-200 ${
+                        className={`px-2 py-0.5 text-[10px] font-extrabold tracking-tight uppercase rounded-md transition-all duration-200 ${
                             period === p ? 'bg-[#6366f1] text-white shadow-sm' : 'text-[#64748b] hover:text-[#334155]'
                         }`}
                         style={{ border: 'none' }}
@@ -1300,22 +1300,22 @@ const EvaraFlowAnalytics = () => {
                                     </g>
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 pointer-events-none">
-                                    <div className="text-[2.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums">
+                                    <div className="text-[38px] font-black text-[var(--text-primary)] leading-none tabular-nums">
                                         {totalRaw >= 1000 ? (totalRaw / 1000).toFixed(1) : formatKPI(totalRaw)}
                                     </div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
                                         {totalRaw >= 1000 ? 'KL' : 'Liters'}
                                     </div>
                                 </div>
                             </div>
 
                             <div className="text-center mt-2 mb-4">
-                                <p className="text-xs font-bold uppercase tracking-widest m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
-                                <h3 className="text-[2.5rem] font-black text-[var(--text-primary)] m-0 mt-1 tabular-nums leading-none">
+                                <p className="text-[12px] font-black uppercase tracking-wider m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
+                                <h3 className="text-[38px] font-black text-[var(--text-primary)] m-0 mt-1 tabular-nums leading-none">
                                     {formatMeterValue(flowRate)}
-                                    <span className="text-2xl font-medium text-slate-400 ml-1">L/min</span>
+                                    <span className="text-[13px] font-bold text-slate-400 ml-1">L/min</span>
                                 </h3>
-                                <p className="text-xs font-medium m-0 mt-2" style={{ color: '#8E8E93' }}>
+                                <p className="text-[10px] font-bold m-0 mt-2" style={{ color: '#8E8E93' }}>
                                     {effectiveIsOffline && tsIstLabel ? `Offline (${tsIstLabel})` : staleLabel}
                                 </p>
                             </div>
@@ -1331,7 +1331,7 @@ const EvaraFlowAnalytics = () => {
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-4 h-11">
                                             <div className="flex flex-col justify-center h-full">
-                                                <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">WATER USAGE</h2>
+                                                <h2 className="text-[12px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase tracking-wider">WATER USAGE</h2>
                                                 {isSuperAdmin && customerConfig.showWaterSecurity === false && (
                                                     <span className="text-[9px] font-bold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full uppercase w-fit mt-1">HIDDEN FROM CUSTOMER</span>
                                                 )}
@@ -1349,11 +1349,11 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 min-w-0">
                                                 <div className="flex items-center gap-1">
                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">USAGE</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">USAGE</span>
                                                 </div>
-                                                <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums truncate">
+                                                <span className="text-[26px] font-black text-[var(--text-primary)] leading-none tabular-nums truncate">
                                                     {formatMeterValue(deltaVolumeLitres > 0 ? deltaVolumeLitres : totalRaw)}
-                                                    <span className="text-[0.8rem] font-black text-[#94a3b8] ml-0.5">L</span>
+                                                    <span className="text-[13px] font-bold text-[#94a3b8] ml-0.5">L</span>
                                                 </span>
                                             </div>
 
@@ -1361,7 +1361,7 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">FLOW</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">FLOW</span>
                                                 </div>
                                             </div>
                                         </div>
