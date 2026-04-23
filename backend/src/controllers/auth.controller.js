@@ -1,5 +1,5 @@
 const { db, admin } = require("../config/firebase.js");
-
+const logger = require("../utils/logger.js");
 /**
  * Get the current user's profile with role
  * This endpoint has backend permissions to read from Firestore

@@ -1,5 +1,5 @@
 const Redis = require("ioredis");
-
+const logger = require("../utils/logger");
 // ─── #20 FIX: Redis authentication and TLS ───────────────────────────────────
 // ORIGINAL BUG: Redis was created with only a URL — no password, no TLS.
 // An attacker who can reach the Redis port can:

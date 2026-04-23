@@ -6,9 +6,11 @@ const {
   distanceToVolume,
   distanceToPercentage,
 } = require("./waterAnalyticsEngine.js");
+const { computeTankMetrics } = require("../utils/tankMath.js");
 const { DEVICE_STATUS, STATUS_THRESHOLD_MS } = require("../utils/deviceConstants.js");
 const { resolveFieldByName } = require("../utils/fieldMappingResolver.js");
 const { loadChannelMetadata } = require("./channelMetadataService.js");
+const logger = require("../utils/logger");
 
 const OFFLINE_THRESHOLD_MS = STATUS_THRESHOLD_MS; // Use centralized threshold
 
@@ -306,11 +308,17 @@ const processThingSpeakData = async (device, feeds) => {
     await saveThresholds(device.id, analytics.thresholds);
   }
 
+  // ✅ ENFORCED SOURCE OF TRUTH: Execute exact algebraic math (with deadband) rather than ML bounds
+  const exactMath = computeTankMetrics(analytics.currentDistanceCm, {
+    depthM: tankConfig.depthM,
+    deadBandM: device.dead_band_m || device.deadBand || device.configuration?.dead_band_m || 0
+  });
+
   return {
     deviceId: device.id,
     rawDistance: analytics.currentDistanceCm,
     processedLevel: analytics.currentDistanceCm,
-    percentage: analytics.currentPercentage,
+    percentage: exactMath.percentage,
     volume: analytics.currentVolumeLitres,
     lastUpdatedAt,
     status,

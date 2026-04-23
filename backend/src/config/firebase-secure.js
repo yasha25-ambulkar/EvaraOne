@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const { Firestore } = require("@google-cloud/firestore");
 const path = require("path");
 const fs = require("fs");
+const { logger } = require("./pino.js"); // ✅ AUDIT FIX M10: Import logger for structured logging
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Secure Firebase initialization

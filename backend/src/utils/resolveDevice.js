@@ -10,6 +10,7 @@
  */
 
 const { db } = require("../config/firebase.js");
+const logger = require("./logger.js");
 
 async function resolveDevice(id) {
     if (!id) return null;

@@ -36,7 +36,8 @@ const normalizeThingSpeakTimestamp = (ts) => {
 /**
  * Helper to resolve device by document ID OR device_id/node_id
  */
-// âœ… AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
+// ✅ AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
+const { computeTankMetrics } = require("../utils/tankMath.js");
 const resolveDevice = require("../utils/resolveDevice.js");
 
 /**
@@ -291,27 +292,9 @@ exports.getNodes = async (req, res) => {
                 // Strip sensitive keys
                 const { thingspeak_read_api_key, ...safeMeta } = meta;
 
-                // Calculate level_percentage for tank devices
-                let levelPercentage = null;
-                const isTankType = type.toLowerCase().includes("tank") || type.toLowerCase().includes("evara");
-                
-                if (isTankType && meta.last_value !== undefined && meta.last_value !== null) {
-                    // Get tank depth from configuration
-                    const depth = meta.configuration?.depth || 
-                                 meta.configuration?.total_depth || 
-                                 meta.tank_depth || 
-                                 meta.depth || 
-                                 1.2; // Default fallback
-                    
-                    // last_value is raw distance in cm, convert to meters and calculate water height
-                    const rawDistanceCm = parseFloat(meta.last_value);
-                    if (!isNaN(rawDistanceCm) && depth > 0) {
-                        const distanceM = rawDistanceCm / 100;
-                        const validDistance = Math.min(distanceM, depth);
-                        const waterHeightM = Math.max(0, depth - validDistance);
-                        levelPercentage = Math.min(100, (waterHeightM / depth) * 100);
-                    }
-                }
+                // ✅ FIXED: Enforce Single Source of Truth
+                // Pull directly from database document rather than computing locally
+                let levelPercentage = meta.level_percentage ?? null;
 
                 const nodeData = {
                     id,
@@ -338,7 +321,8 @@ exports.getNodes = async (req, res) => {
                     else nodeData.analytics_template = "EvaraTank"; // default
                 }
 
-                // Add calculated level_percentage for tanks
+                // Enforce calculated level_percentage for tanks onto nodes list
+                const isTankType = type.toLowerCase().includes("tank") || type.toLowerCase().includes("evara");
                 if (isTankType && levelPercentage !== null) {
                     nodeData.level_percentage = levelPercentage;
                     // Also update telemetry_snapshot to include level_percentage for frontend
@@ -697,16 +681,17 @@ exports.getNodeTelemetry = async (req, res) => {
 
         // ── TANK / DEEP WELL DEVICE PATH ─────────────────────────────────────────────
         const computeTelemetry = (distance, seenAt, status) => {
-            const validDistance = Math.min(distance / 100, depth);
-            const waterHeight = Math.max(0, depth - validDistance);
-            const levelPercent = Math.min(100, (waterHeight / depth) * 100);
-            const volume = (capacity * levelPercent) / 100;
+            const metrics = computeTankMetrics(distance, {
+                depthM: depth,
+                deadBandM: deviceDoc.data().dead_band_m || deviceDoc.data().deadBand || deviceDoc.data().configuration?.dead_band_m || 0
+            });
+            const volume = (capacity * metrics.percentage) / 100;
             const normalizedSeen = normalizeThingSpeakTimestamp(seenAt);
 
             return {
                 deviceId: deviceDoc.id,
                 distance,
-                level_percentage: levelPercent,
+                level_percentage: metrics.percentage,
                 volume,
                 last_seen: normalizedSeen,
                 last_updated_at: normalizedSeen,

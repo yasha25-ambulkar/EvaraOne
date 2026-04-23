@@ -409,37 +409,29 @@ const EvaraTankAnalytics = () => {
     // ── Derive current metrics ────────────────────────────────────────────────
 
     const metrics = useMemo(() => {
-        const rawField = activeTelemetry?.data?.[localCfg.fieldDepth] as string | number | undefined;
-        const sensorCm = rawField != null ? parseFloat(String(rawField)) : null;
+        const backendPct = activeTelemetry?.level_percentage ?? 0;
+        const capacityLitres = computeCapacityLitres({ 
+            tankShape: localCfg.tankShape, 
+            heightM: localCfg.heightM, 
+            lengthM: localCfg.lengthM, 
+            breadthM: localCfg.breadthM, 
+            radiusM: localCfg.radiusM, 
+            deadBandM: localCfg.deadBandM, 
+            capacityOverrideLitres: localCfg.capacityOverrideLitres 
+        });
 
-        const dims: TankDimensions = {
-            tankShape: localCfg.tankShape,
-            heightM: localCfg.heightM,
-            lengthM: localCfg.lengthM,
-            breadthM: localCfg.breadthM,
-            radiusM: localCfg.radiusM,
-            deadBandM: localCfg.deadBandM,
-            capacityOverrideLitres: localCfg.capacityOverrideLitres,
+        return {
+            percentage: Math.max(0, Math.min(100, backendPct)),
+            volumeLitres: (backendPct / 100) * capacityLitres,
+            capacityLitres: capacityLitres,
+            isDataValid: backendPct != null,
+            isCorrected: activeTelemetry?.is_corrected || false,
+            originalValue: activeTelemetry?.original_value || backendPct,
+            confidence: activeTelemetry?.confidence || 1,
+            pattern: activeTelemetry?.pattern || null,
+            data_label: activeTelemetry?.data_label || null,
+            prediction_mode: activeTelemetry?.prediction_mode || false,
         };
-
-        const calculated = computeTankMetrics({ sensorReadingCm: sensorCm, dims });
-
-        // Use backend processed percentage for consistency
-        const backendPct = activeTelemetry?.level_percentage;
-        if (backendPct != null && isFinite(backendPct)) {
-            return {
-                ...calculated,
-                percentage: Math.max(0, Math.min(100, backendPct)),
-                volumeLitres: (backendPct / 100) * calculated.capacityLitres,
-                // Add correction info
-                isCorrected: activeTelemetry?.is_corrected || false,
-                originalValue: activeTelemetry?.original_value || backendPct,
-                confidence: activeTelemetry?.confidence || 1,
-                pattern: activeTelemetry?.pattern || null
-            };
-        }
-
-        return calculated;
     }, [activeTelemetry, localCfg]);
 
 
@@ -478,7 +470,7 @@ const EvaraTankAnalytics = () => {
         if (tankChartRange === '24H') {
             const now = Date.now();
             const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-            const startBoundary = latestBoundary - (3 * 60 * 60000);
+            const startBoundary = latestBoundary - (4 * 60 * 60000); // 4 hours
             
             let sorted = [...chartData].map((d: any) => ({
                 ...d,
@@ -627,6 +619,18 @@ const EvaraTankAnalytics = () => {
         }
         return chartData;
     }, [chartData, tankChartRange, rangeStart, rangeEnd]);
+
+    const chartTimeTicks = useMemo(() => {
+        if (tankChartRange !== '24H') return undefined;
+        const ticks = [];
+        const now = Date.now();
+        const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
+        const startBoundary = latestBoundary - (4 * 60 * 60000);
+        for (let t = startBoundary; t <= latestBoundary; t += 30 * 60000) {
+            ticks.push(new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+        return ticks;
+    }, [tankChartRange]);
 
     const waterAnalytics = useWaterAnalytics(
         localCfg.heightM,
@@ -1898,7 +1902,8 @@ const EvaraTankAnalytics = () => {
 
                                                 <XAxis 
                                                     dataKey={tankChartRange === '24H' ? 'time' : 'time'}
-                                                    minTickGap={40}
+                                                    ticks={chartTimeTicks}
+                                                    interval={tankChartRange === '24H' ? 0 : 'preserveStartEnd'}
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
@@ -1925,6 +1930,8 @@ const EvaraTankAnalytics = () => {
 
 
                                                 <Tooltip
+                                                    cursor={{ stroke: '#0A84FF', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }}
+                                                    isAnimationActive={false}
                                                     content={(props: any) => {
                                                         const { active, payload } = props;
                                                         if (!active || !payload || payload.length === 0) return null;

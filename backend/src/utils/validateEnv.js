@@ -5,6 +5,8 @@
  * ✅ CRITICAL FIX: Validate production-critical env vars
  */
 
+const { logger } = require("../config/pino.js"); // ✅ AUDIT FIX M10: Import logger for structured logging
+
 const REQUIRED_VARS = [
     "FIREBASE_PROJECT_ID",
     "FIREBASE_CLIENT_EMAIL",

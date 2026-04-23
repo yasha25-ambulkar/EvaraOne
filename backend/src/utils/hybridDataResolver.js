@@ -7,7 +7,7 @@
  * - Use cache when available
  */
 
-const TelemetryArchiveService = require("./telemetryArchiveService");
+const TelemetryArchiveService = require("../services/telemetryArchiveService");
 const admin = require("firebase-admin");
 const axios = require("axios");
 const logger = require("../utils/logger");

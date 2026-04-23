@@ -241,10 +241,12 @@ function startWorker() {
     });
     
     // Then loop with error handling - wrap setInterval callback to catch promise rejections
-    setInterval(() => {
-        runPoll().catch(err => {
+    setInterval(async () => {
+        try {
+            await runPoll();
+        } catch (err) {
             logger.error('[TelemetryWorker] Poll cycle failed', { error: err.message, category: 'telemetry' });
-        });
+        }
     }, POLL_INTERVAL);
     
     // CRITICAL FIX: Start dedicated status cron job (runs every 1 minute)

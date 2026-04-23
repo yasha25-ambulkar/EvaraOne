@@ -754,6 +754,7 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 process.on("uncaughtException", (err) => {
+    console.error("FATAL UNCAUGHT:", err);
     logger.error("[Global] Uncaught Exception thrown", { 
         message: err.message,
         stack: err.stack,

@@ -167,10 +167,12 @@ function startStatusCron() {
   recalculateAllDevicesStatus().catch(err => logger.error('Initial status sweep failed', err, { category: 'cron' }));
   
   // Then run on interval with error handling - wrap setInterval callback to catch promise rejections
-  setInterval(() => {
-    recalculateAllDevicesStatus().catch(err => {
+  setInterval(async () => {
+    try {
+      await recalculateAllDevicesStatus();
+    } catch (err) {
       logger.error('[DeviceStatusCron] Status sweep cycle failed', { error: err.message, category: 'cron' });
-    });
+    }
   }, STATUS_CHECK_INTERVAL);
 }
 
