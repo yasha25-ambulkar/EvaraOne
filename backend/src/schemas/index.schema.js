@@ -21,8 +21,8 @@ exports.createNodeSchema = z.object({
     assetSubType: z.string().optional(),
     zoneId: z.string().optional(),
     customerId: z.string().optional(),
-    latitude: z.union([z.number(), z.string()]).optional(),
-    longitude: z.union([z.number(), z.string()]).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
     // ThingSpeak credentials — MUST match frontend field names
     thingspeakChannelId: z.string().optional(),
     thingspeakReadKey: z.string().optional(),
@@ -66,8 +66,8 @@ exports.updateNodeSchema = z.object({
     zoneId: z.string().optional(),
     customerId: z.string().optional(),
     customer_id: z.string().optional(),
-    latitude: z.union([z.number(), z.string()]).optional(),
-    longitude: z.union([z.number(), z.string()]).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
     // ThingSpeak credentials — all naming variants accepted
     channelId: z.string().optional(),
     readApiKey: z.string().optional(),

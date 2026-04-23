@@ -13,6 +13,13 @@ const AppError = require("../utils/AppError.js");
 const { updateCustomerSchema } = require("../schemas/customer.schema.js");
 const { updateZoneSchema } = require("../schemas/zone.schema.js");
 
+// ✅ CRITICAL FIX #3: Safe number parsing with NaN/Infinity validation
+// Replaces parseFloat() which silently accepts "NaN" and "Infinity" strings
+function parseNumberSafely(val) {
+  const parsed = parseFloat(val);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 exports.createZone = async (req, res) => {
     try {
 
@@ -557,8 +564,8 @@ exports.createNode = async (req, res) => {
             thingspeak_channel_id: thingspeakChannelId || "",
             customer_id: customerId || "",
             zone_id: zoneId || "",
-            latitude: parseFloat(latitude) || null,
-            longitude: parseFloat(longitude) || null,
+            latitude: parseNumberSafely(latitude),
+            longitude: parseNumberSafely(longitude),
             created_at: timestamp,
             updated_at: timestamp
         };
@@ -996,8 +1003,8 @@ exports.updateNode = async (req, res) => {
             await db.collection("devices").doc(deviceDoc.id).update({ customer_id: cid });
         }
 
-        if (body.latitude !== undefined) metaUpdate.latitude = parseFloat(body.latitude);
-        if (body.longitude !== undefined) metaUpdate.longitude = parseFloat(body.longitude);
+        if (body.latitude !== undefined) metaUpdate.latitude = parseNumberSafely(body.latitude);
+        if (body.longitude !== undefined) metaUpdate.longitude = parseNumberSafely(body.longitude);
 
         // Type-specific updates (flexible naming)
         if (type === "evaratank" || type === "tank") {
