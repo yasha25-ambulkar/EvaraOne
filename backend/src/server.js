@@ -2,12 +2,14 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const cors = require("cors");
+const schedule = require("node-schedule");
 const adminRoutes = require("./routes/admin.routes.js");
 const { getDashboardSummary, getHierarchy, getAuditLogs, getZoneStats } = require("./controllers/admin.controller.js");
 const { requireAuth, checkOwnership } = require("./middleware/auth.middleware.js");
 const tenantCheck = require("./middleware/tenantCheck.middleware.js");
 const rbac = require("./middleware/rbac.middleware.js");
 const adminOnly = require("./middleware/adminOnly.middleware.js"); // ✅ FIX #1: RBAC gate
+const { errorHandler } = require("./middleware/errorHandler.js"); // ✅ ISSUE #5: Centralized error handler
 const { startWorker, telemetryEvents } = require("./workers/telemetryWorker.js");
 const socketValidation = require("./services/socketValidation.js"); // ✅ FIX #2: Socket.io validation
 const cache = require("./config/cache.js");
@@ -23,6 +25,8 @@ const validateEnv = require("./utils/validateEnv.js");
 const { httpLogger, requestIdMiddleware, logger } = require("./config/pino.js");
 // ✅ PHASE 2: Cache versioning (Task #11)
 const { initializeCacheVersions } = require("./utils/cacheVersioning.js");
+// ✅ HYBRID CACHING: Telemetry archive service
+const TelemetryArchiveService = require("./services/telemetryArchiveService.js");
 
 // Validate environment before starting
 validateEnv();
@@ -546,62 +550,10 @@ app.get('/api/v1/health', (req, res) => {
   res.status(isHealthy ? 200 : 503).json(health);
 });
 
-// Sentry error handler must be after all controllers and routes
-Sentry.setupExpressErrorHandler(app);
-
-// ============================================================================
-// ✅ TASK #7: Global async error handler
-// Catches all unhandled promise rejections and errors
-// Routes wrapped with asyncHandler() funnel errors here
-// ============================================================================
-app.use((err, req, res, next) => {
-  const isDev = process.env.NODE_ENV !== 'production';
-  const errorId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
-  
-  // Extract useful error info
-  const statusCode = err.status || err.statusCode || 500;
-  const errorMessage = err.message || 'Internal Server Error';
-  const timestamp = new Date().toISOString();
-  
-  // ✅ FIX #7: Log full error server-side (always)
-  console.error(`[Error ${errorId}] ${statusCode} - ${errorMessage}`, {
-    timestamp,
-    method: req.method,
-    path: req.path,
-    url: req.originalUrl,
-    ip: req.ip,
-    userId: req.user?.uid || 'anonymous',
-    userRole: req.user?.role || 'guest',
-    body: req.body ? JSON.stringify(req.body).substring(0, 200) : 'none',
-    stack: err.stack,
-    cause: err.cause ? String(err.cause) : undefined
-  });
-  
-  // ✅ FIX #7: Return generic message to client (prevents info leakage)
-  const publicMessage = {
-    500: "Something went wrong on our end — we have been notified",
-    404: "The requested resource was not found",
-    403: "You do not have permission to access this resource",
-    401: "Authentication required",
-    400: "Bad request — check your input and try again",
-    429: "Too many requests — please try again later",
-    503: "Service temporarily unavailable"
-  }[statusCode] || "An unexpected error occurred";
-  
-  // Send response with error ID for tracking
-  res.status(statusCode).json({
-    success: false,
-    error: publicMessage,
-    errorId: errorId,  // Client can reference this for support tickets
-    status: statusCode,
-    ...(isDev && {
-      // Development: include details for debugging
-      message: errorMessage,
-      stack: err.stack,
-      details: err.details || null
-    })
-  });
-});
+// ✅ ISSUE #5: Register centralized error handler (must be AFTER all routes)
+// Handles Zod validation errors, AppError errors, and unknown errors
+// All controllers should use next(err) or throw AppError
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 8000;
 
@@ -623,6 +575,30 @@ try {
             logger.info('[Server] Cache versioning initialized');
         } catch (err) {
             logger.warn({ error: err.message }, '[Server] Cache versioning initialization failed');
+        }
+
+        // ✅ HYBRID CACHING: Schedule daily telemetry cleanup at 2 AM
+        try {
+            const policy = TelemetryArchiveService.getRetentionPolicy();
+            const cleanupTime = `${policy.cleanupHour} ${policy.cleanupMinute} * * *`; // 2:00 AM every day
+            
+            schedule.scheduleJob(cleanupTime, async () => {
+                logger.info('🧹 [Scheduler] Starting daily telemetry cleanup');
+                const result = await TelemetryArchiveService.cleanupOldTelemetry();
+                
+                if (result.success) {
+                    logger.info(`✅ [Scheduler] Cleanup complete: ${result.devicesProcessed} devices, ${result.recordsDeleted} records deleted`);
+                } else {
+                    logger.error(`❌ [Scheduler] Cleanup failed: ${result.error}`);
+                }
+
+                // Log database statistics
+                await TelemetryArchiveService.logCleanupStats();
+            });
+
+            logger.info(`✅ [Server] Telemetry cleanup scheduled daily at ${policy.cleanupHour}:${String(policy.cleanupMinute).padStart(2, '0')}`);
+        } catch (err) {
+            logger.error({ error: err.message }, '[Server] Telemetry cleanup scheduling failed');
         }
         
         // Initialize our background worker

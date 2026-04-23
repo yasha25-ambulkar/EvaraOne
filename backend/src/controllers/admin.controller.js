@@ -9,6 +9,8 @@ const { getVersionKey, incrementCacheVersion } = require("../utils/cacheVersioni
 const { logAudit } = require("../utils/auditLogger.js");
 // ✅ PHASE 2: HTTP status codes (Task #13)
 const AppError = require("../utils/AppError.js");
+const { updateCustomerSchema } = require("../schemas/customer.schema.js");
+const { updateZoneSchema } = require("../schemas/zone.schema.js");
 
 exports.createZone = async (req, res) => {
     try {
@@ -164,11 +166,12 @@ exports.updateZone = async (req, res) => {
         
         // Superadmin: allow all
         if (req.user.role === "superadmin") {
-            await db.collection("zones").doc(req.params.id).update(req.body);
+            const safeData = updateZoneSchema.parse(req.body);
+            await db.collection("zones").doc(req.params.id).update(safeData);
             // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
             await incrementCacheVersion("zones");
             // ✅ PHASE 2: Task #12 - Log audit trail
-            logAudit(req.user.uid, 'UPDATE', 'zones', req.params.id, req.body);
+            logAudit(req.user.uid, 'UPDATE', 'zones', req.params.id, safeData);
             return res.status(200).json({ success: true });
         }
 
@@ -187,9 +190,10 @@ exports.updateZone = async (req, res) => {
         }
 
         // ✅ Owner verified: proceed with update
-        await db.collection("zones").doc(req.params.id).update(req.body);
+        const safeData = updateZoneSchema.parse(req.body);
+        await db.collection("zones").doc(req.params.id).update(safeData);
         await incrementCacheVersion("zones");
-        logAudit(req.user.uid, 'UPDATE', 'zones', req.params.id, req.body);
+        logAudit(req.user.uid, 'UPDATE', 'zones', req.params.id, safeData);
         res.status(200).json({ success: true });
     } catch (error) {
         if (error instanceof AppError) {
@@ -362,11 +366,12 @@ exports.updateCustomer = async (req, res) => {
             throw new AppError("Access denied", 403);
         }
         
-        await db.collection("customers").doc(req.params.id).update(req.body);
+        const safeData = updateCustomerSchema.parse(req.body);
+        await db.collection("customers").doc(req.params.id).update(safeData);
         // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
         await incrementCacheVersion("customers");
         // ✅ PHASE 2: Task #12 - Log audit trail
-        logAudit(req.user.uid, 'UPDATE', 'customers', req.params.id, req.body);
+        logAudit(req.user.uid, 'UPDATE', 'customers', req.params.id, safeData);
         res.status(200).json({ success: true });
     } catch (error) {
         if (error instanceof AppError) {
@@ -693,36 +698,16 @@ exports.createNode = async (req, res) => {
         console.log(`[createNode-ALL] User: ${customerId}`);
         console.log(`[createNode-ALL] Firestore batch object type: ${batch.constructor.name}`);
         
-        try {
-            console.log(`[createNode-ALL] ⏳ NOW COMMITTING BATCH...`);
-            await batch.commit();
-            console.log(`[createNode-ALL] ✅ Batch.commit() SUCCEEDED!`);
-            console.log(`[createNode-ALL] ✅ Should have written to:`);
-            console.log(`[createNode-ALL]    - devices/${deviceDocId}`);
-            console.log(`[createNode-ALL]    - ${targetCol}/${deviceDocId}`);
-        } catch (batchErr) {
-            console.error(`[createNode-ALL] ❌ BATCH COMMIT FAILED:`);
-            console.error(`[createNode-ALL] Error name: ${batchErr.name}`);
-            console.error(`[createNode-ALL] Error message: ${batchErr.message}`);
-            console.error(`[createNode-ALL] Error code: ${batchErr.code}`);
-            console.error(`[createNode-ALL] Full error:`, JSON.stringify(batchErr, null, 2));
-            
-            // FALLBACK: Try writing REGISTRY directly to devices collection
-            console.log(`[createNode-ALL] 🔄 ATTEMPTING FALLBACK: Direct write to devices collection`);
-            try {
-                await db.collection("devices").doc(deviceDocId).set(registryData);
-                console.log(`[createNode-ALL] ✅ FALLBACK SUCCEEDED: Registry written directly to devices/${deviceDocId}`);
-                
-                // Now try metadata
-                console.log(`[createNode-ALL] 🔄 ATTEMPTING FALLBACK: Direct write to ${targetCol} collection`);
-                await db.collection(targetCol).doc(deviceDocId).set(metadata);
-                console.log(`[createNode-ALL] ✅ FALLBACK SUCCEEDED: Metadata written directly to ${targetCol}/${deviceDocId}`);
-            } catch (fallbackErr) {
-                console.error(`[createNode-ALL] ❌ FALLBACK ALSO FAILED:`);
-                console.error(`[createNode-ALL] Error: ${fallbackErr.message}`);
-                throw new Error(`Failed to create device: ${fallbackErr.message}`);
-            }
-        }
+        // ✅ ISSUE #4 FIX: Atomic batch commit — NO fallback
+        // If batch.commit() fails, the entire operation fails cleanly with 500.
+        // No sequential set() calls = no orphaned records ever.
+        // Central error handler will catch this and return 500 to client.
+        console.log(`[createNode-ALL] ⏳ NOW COMMITTING BATCH...`);
+        await batch.commit();
+        console.log(`[createNode-ALL] ✅ Batch.commit() SUCCEEDED!`);
+        console.log(`[createNode-ALL] ✅ Should have written to:`);
+        console.log(`[createNode-ALL]    - devices/${deviceDocId}`);
+        console.log(`[createNode-ALL]    - ${targetCol}/${deviceDocId}`);
 
         // VERIFICATION: Check that both documents were actually written
         console.log(`[createNode-ALL] 🔍 VERIFYING writes...`);

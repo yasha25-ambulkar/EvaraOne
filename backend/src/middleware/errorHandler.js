@@ -62,18 +62,22 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Handle specific error types
-  let statusCode = 500;
+  // ✅ ISSUE #5: Support both AppError (with statusCode) and named error classes
+  let statusCode = err.statusCode || 500;
 
-  if (err.name === 'ValidationError' || err.name === 'ZodError') {
-    statusCode = 400;
-  } else if (err.name === 'UnauthorizedError') {
-    statusCode = 401;
-  } else if (err.name === 'ForbiddenError') {
-    statusCode = 403;
-  } else if (err.name === 'NotFoundError') {
-    statusCode = 404;
-  } else if (err.name === 'ConflictError') {
-    statusCode = 409;
+  // Override for specific error types if statusCode not set
+  if (!err.statusCode) {
+    if (err.name === 'ValidationError' || err.name === 'ZodError') {
+      statusCode = 400;
+    } else if (err.name === 'UnauthorizedError') {
+      statusCode = 401;
+    } else if (err.name === 'ForbiddenError') {
+      statusCode = 403;
+    } else if (err.name === 'NotFoundError') {
+      statusCode = 404;
+    } else if (err.name === 'ConflictError') {
+      statusCode = 409;
+    }
   }
 
   res.status(statusCode).json(createErrorResponse(err, statusCode));

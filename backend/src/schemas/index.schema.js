@@ -49,7 +49,7 @@ exports.createNodeSchema = z.object({
     temperature: z.number().optional(),
     waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
     location: z.string().optional()
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 exports.updateNodeSchema = z.object({
@@ -127,7 +127,7 @@ exports.updateNodeSchema = z.object({
     location: z.string().optional(),
     tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
     tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
   // ✅ NO passthrough() — Zod strips unknown keys by default
 });
 
@@ -138,7 +138,7 @@ exports.createZoneSchema = z.object({
         country: z.string().min(1),
         zone_code: z.string().optional(),
         description: z.string().optional()
-    })
+    }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 exports.createCustomerSchema = z.object({
@@ -146,7 +146,7 @@ exports.createCustomerSchema = z.object({
         display_name: z.string().min(1),
         email: z.string().email().optional(),
         phone: z.string().optional()
-    })
+    }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 // ─── #10 FIX: Query parameter validation schema ────────────────────────────────
@@ -163,7 +163,7 @@ exports.listQuerySchema = z.object({
     zone_id: z.string().optional(),
     community_id: z.string().optional(),
     customer_id: z.string().optional()
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 // ─── Device Visibility Update Schema ────────────────────────────────────────
@@ -174,7 +174,7 @@ exports.updateDeviceVisibilitySchema = z.object({
   }),
   body: z.object({
     isVisibleToCustomer: z.boolean()
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 // ─── Device Parameters Update Schema ────────────────────────────────────────
@@ -185,5 +185,5 @@ exports.updateDeviceParametersSchema = z.object({
   }),
   body: z.object({
     parameters: z.record(z.string(), z.boolean())
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
 });

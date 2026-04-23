@@ -13,13 +13,17 @@ const tenantCheck = (req, res, next) => {
     const tenantId = req.user.community_id || req.user.customer_id || req.user.uid;
     req.tenant_id = tenantId;
 
-    // Secure payload injection prevention:
-    // If a request tries to create/update data for a tenant they don't belong to, reject it.
-    // ✅ AUDIT FIX L11: Include PATCH and DELETE in mutation checks
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && req.body) {
-         if (req.body.tenant_id && req.body.tenant_id !== req.tenant_id) {
-             return res.status(403).json({ error: "Tenant Isolation Violation: Cannot mutate data outside your tenant namespace." });
-         }
+    // Never trust client-supplied tenant/customer IDs on mutations
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+        // Force overwrite — client body values are completely ignored
+        req.body.tenant_id = req.tenant_id;
+        req.body.customer_id = req.user.customer_id || req.user.uid;
+    }
+
+    // For GET/DELETE, just verify they belong to this tenant
+    // (If the route uses :tenantId parameter in the path)
+    if (req.params.tenantId && req.params.tenantId !== req.tenant_id) {
+        return res.status(403).json({ error: 'Tenant boundary violation' });
     }
 
     next();

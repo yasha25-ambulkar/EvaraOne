@@ -9,6 +9,9 @@ const { db } = require("../config/firebase.js");
 const { fetchAndSaveChannelMetadata } = require("../services/channelMetadataService.js");
 const logger = require("../utils/logger.js");
 const AppError = require("../utils/AppError.js");
+// ✅ ISSUE #6: Add Zod validation middleware
+const validate = require("../middleware/validate.js");
+const { fetchThingSpeakFieldsSchema, saveThingSpeakMetadataSchema } = require("../schemas/thingspeak.schema.js");
 
 /**
  * POST /api/v1/thingspeak/fetch-fields
@@ -35,7 +38,8 @@ const AppError = require("../utils/AppError.js");
  *   }
  * }
  */
-router.post("/fetch-fields", async (req, res) => {
+// ✅ ISSUE #6: Apply Zod validation
+router.post("/fetch-fields", validate(fetchThingSpeakFieldsSchema), async (req, res, next) => {
   try {
     const { channelId, apiKey } = req.body;
 
@@ -44,11 +48,7 @@ router.post("/fetch-fields", async (req, res) => {
       channelId
     });
 
-    // Validation
-    if (!channelId) {
-      throw new AppError("Missing required field: channelId", 400);
-    }
-
+    // ✅ ISSUE #6: channelId already validated by Zod middleware
     // Fetch channel metadata from ThingSpeak (no device save yet)
     const metadata = await require("../services/channelMetadataService.js")
       .fetchChannelMetadataFromThingSpeak(channelId, apiKey);
@@ -63,24 +63,13 @@ router.post("/fetch-fields", async (req, res) => {
       fieldsCount: Object.keys(metadata).length - 3
     });
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       metadata
     });
   } catch (error) {
-    logger.error("[ThingSpeakAPI] Fetch Fields error", {
-      category: "thingspeak",
-      error: error.message
-    });
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(error.toJSON());
-    }
-
-    res.status(500).json({
-      error: "Failed to fetch fields",
-      message: error.message
-    });
+    // ✅ ISSUE #6: Delegate to centralized error handler
+    next(error);
   }
 });
 
@@ -96,7 +85,8 @@ router.post("/fetch-fields", async (req, res) => {
  *   metadata: { field1: "...", field2: "...", ... }
  * }
  */
-router.post("/save-metadata", async (req, res) => {
+// ✅ ISSUE #6: Apply Zod validation
+router.post("/save-metadata", validate(saveThingSpeakMetadataSchema), async (req, res, next) => {
   try {
     const { deviceId, metadata } = req.body;
 
@@ -105,11 +95,7 @@ router.post("/save-metadata", async (req, res) => {
       deviceId
     });
 
-    // Validation
-    if (!deviceId || !metadata) {
-      throw new AppError("Missing required fields: deviceId, metadata", 400);
-    }
-
+    // ✅ ISSUE #6: deviceId and metadata already validated by Zod middleware
     // Verify device exists and user has access
     const deviceDoc = await db.collection("devices").doc(deviceId).get();
     if (!deviceDoc.exists) {
@@ -135,24 +121,13 @@ router.post("/save-metadata", async (req, res) => {
       deviceId
     });
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Metadata saved"
     });
   } catch (error) {
-    logger.error("[ThingSpeakAPI] Save Metadata error", {
-      category: "thingspeak",
-      error: error.message
-    });
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(error.toJSON());
-    }
-
-    res.status(500).json({
-      error: "Failed to save metadata",
-      message: error.message
-    });
+    // ✅ ISSUE #6: Delegate to centralized error handler
+    next(error);
   }
 });
 

@@ -3,6 +3,7 @@ const { z } = require("zod");
 /**
  * TDS (Total Dissolved Solids) Device Schema
  * Validates provisioning and updates for TDS water quality sensors
+ * ✅ ISSUE #6: All schemas use .strict() to reject unknown fields
  */
 
 exports.createTDSDeviceSchema = z.object({
@@ -18,7 +19,7 @@ exports.createTDSDeviceSchema = z.object({
     temperatureField: z.string().optional().default("field2"),
     minThreshold: z.number().optional().default(0),
     maxThreshold: z.number().optional().default(2000),
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields like role, owner_id, etc.
 });
 
 exports.updateTDSDeviceSchema = z.object({
@@ -33,7 +34,7 @@ exports.updateTDSDeviceSchema = z.object({
     longitude: z.number().optional(),
     minThreshold: z.number().optional(),
     maxThreshold: z.number().optional(),
-  })
+  }).strict() // ✅ ISSUE #6: Reject unknown fields
 });
 
 exports.getTDSDeviceSchema = z.object({

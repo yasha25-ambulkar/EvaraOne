@@ -12,6 +12,8 @@ const { checkDeviceVisibilityWithAudit } = require("../utils/checkDeviceVisibili
 const logger = require("../utils/logger.js");
 const { DEVICE_STATUS, STATUS_THRESHOLD_MS } = require("../utils/deviceConstants.js");
 const { resolveFieldKey } = require("../utils/fieldMappingResolver.js");
+// ✅ ISSUE #5: Centralized error handler — use AppError for all errors
+const AppError = require("../utils/AppError.js");
 
 // ✅ AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
 const resolveDevice = require("../utils/resolveDevice.js");
@@ -108,7 +110,7 @@ async function resolveMetadata(deviceDoc) {
  * Get TDS device telemetry
  * Returns latest TDS value, temperature, and quality status
  */
-exports.getTDSTelemetry = async (req, res) => {
+exports.getTDSTelemetry = async (req, res, next) => {
   try {
     const { id: paramId } = req.params;
     console.log(`[TDS-getTDSTelemetry] REQUEST: paramId=${paramId}`);
@@ -117,19 +119,7 @@ exports.getTDSTelemetry = async (req, res) => {
     const deviceDoc = await resolveDevice(paramId);
     if (!deviceDoc) {
       console.error(`[TDS-getTDSTelemetry] ❌ STEP 1 FAILED: Device not found for ID: ${paramId}`);
-      console.error(`[TDS-getTDSTelemetry]    Tried: direct lookup, device_id query, node_id query`);
-      console.error(`[TDS-getTDSTelemetry] ⚠️  TROUBLESHOOTING:`);
-      console.error(`[TDS-getTDSTelemetry]    1. Device may not have been created (check device creation logs)`);
-      console.error(`[TDS-getTDSTelemetry]    2. device_id field may be empty or NULL in database`);
-      console.error(`[TDS-getTDSTelemetry]    3. Device creation may have used a different ID`);
-      return res.status(404).json({ 
-        error: "Device not found",
-        debug: { 
-          paramId, 
-          attemptedMethods: ["direct_id", "device_id_query", "node_id_query"],
-          troubleshooting: "Device does not exist or has no device_id field. Check device creation."
-        }
-      });
+      throw new AppError("Device not found", 404);
     }
 
     const id = deviceDoc.id; // Use the actual Firestore ID for subsequent lookups
@@ -145,10 +135,7 @@ exports.getTDSTelemetry = async (req, res) => {
     console.log(`[TDS-getTDSTelemetry] STEP 2: Checking device type: "${deviceType}"`);
     if (deviceType !== "evaratds" && deviceType !== "tds") {
       console.error(`[TDS-getTDSTelemetry] ❌ STEP 2 FAILED: Invalid device type: "${deviceType}"`);
-      return res.status(400).json({ 
-        error: "Device is not a TDS sensor", 
-        debug: { actualType: deviceType, expected: ["tds", "evaratds"] }
-      });
+      throw new AppError(`Device is not a TDS sensor (found: ${deviceType})`, 400);
     }
     console.log(`[TDS-getTDSTelemetry] ✅ STEP 2 SUCCESS: Device type valid`);
     
@@ -162,7 +149,7 @@ exports.getTDSTelemetry = async (req, res) => {
       );
       if (!isOwner) {
         console.error(`[TDS-getTDSTelemetry] ❌ Ownership check failed`);
-        return res.status(403).json({ error: "Unauthorized access" });
+        throw new AppError("Unauthorized access", 403);
       }
     }
 
@@ -170,7 +157,7 @@ exports.getTDSTelemetry = async (req, res) => {
     // Defense in depth: check visibility in application layer
     if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
       console.error(`[TDS-getTDSTelemetry] ❌ Visibility check failed`);
-      return res.status(403).json({ error: "Device not visible to your account" });
+      throw new AppError("Device not visible to your account", 403);
     }
 
     // Get TDS metadata
@@ -178,12 +165,7 @@ exports.getTDSTelemetry = async (req, res) => {
     const metaDoc = await resolveMetadata(deviceDoc);
     if (!metaDoc) {
       console.error(`[TDS-getTDSTelemetry] ❌ STEP 3 FAILED: Metadata not found`);
-      console.error(`[TDS-getTDSTelemetry]    Tried: direct ID lookup, device_id query, node_id query`);
-      console.error(`[TDS-getTDSTelemetry]    Registry data: device_id=${registry.device_id}, node_id=${registry.node_id}`);
-      return res.status(404).json({ 
-        error: "TDS metadata not found",
-        debug: { deviceId: id, registryDeviceId: registry.device_id, registryNodeId: registry.node_id }
-      });
+      throw new AppError("TDS metadata not found", 404);
     }
     console.log(`[TDS-getTDSTelemetry] ✅ STEP 3 SUCCESS: Metadata resolved`);
     console.log(`[TDS-getTDSTelemetry]    Metadata ID: ${metaDoc.id}`);
@@ -330,26 +312,15 @@ exports.getTDSTelemetry = async (req, res) => {
 
     res.status(200).json(response);
   } catch (error) {
-    console.error("[TDS-getTDSTelemetry] ❌ FATAL ERROR in try-catch:");
-    console.error("[TDS-getTDSTelemetry] Error name:", error.name);
-    console.error("[TDS-getTDSTelemetry] Error message:", error.message);
-    console.error("[TDS-getTDSTelemetry] Error stack:", error.stack);
-    console.error("[TDS-getTDSTelemetry] Full error object:", error);
-    res.status(500).json({ 
-      error: "Failed to fetch telemetry data",
-      debug: {
-        errorName: error.name,
-        errorMessage: error.message,
-        timestamp: new Date().toISOString()
-      }
-    });
+    // ✅ ISSUE #5: Delegate to centralized error handler
+    next(error);
   }
 };
 
 /**
  * Get TDS device historical data (last N readings)
  */
-exports.getTDSHistory = async (req, res) => {
+exports.getTDSHistory = async (req, res, next) => {
   try {
     const { id: paramId } = req.params;
     const hoursParam = parseInt(req.query.hours) || 24;
@@ -373,7 +344,7 @@ exports.getTDSHistory = async (req, res) => {
     // Get device metadata - using resolveDevice for hardware ID support
     const deviceDoc = await resolveDevice(paramId);
     if (!deviceDoc) {
-      return res.status(404).json({ error: "Device not found" });
+      throw new AppError("Device not found", 404);
     }
 
     const id = deviceDoc.id; // Use the actual Firestore ID for subsequent lookups
@@ -382,7 +353,7 @@ exports.getTDSHistory = async (req, res) => {
     // Validate device type - accept both "evaratds" and "tds"
     const deviceTypeHist = registry.device_type?.toLowerCase() || "";
     if (deviceTypeHist !== "evaratds" && deviceTypeHist !== "tds") {
-      return res.status(400).json({ error: "Device is not a TDS sensor" });
+      throw new AppError("Device is not a TDS sensor", 400);
     }
 
     // Check ownership
@@ -394,20 +365,20 @@ exports.getTDSHistory = async (req, res) => {
         req.user.community_id
       );
       if (!isOwner) {
-        return res.status(403).json({ error: "Unauthorized access" });
+        throw new AppError("Unauthorized access", 403);
       }
     }
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
     if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
-      return res.status(403).json({ error: "Device not visible to your account" });
+      throw new AppError("Device not visible to your account", 403);
     }
 
     // Get TDS metadata
     const metaDoc = await resolveMetadata(deviceDoc);
     if (!metaDoc) {
-      console.error(`[TDS-getTDSTelemetry] Metadata not found for device ${id}`);
-      return res.status(404).json({ error: "TDS metadata not found" });
+      console.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);
+      throw new AppError("TDS metadata not found", 404);
     }
 
     const metadata = metaDoc.data();
@@ -415,7 +386,7 @@ exports.getTDSHistory = async (req, res) => {
     const apiKey = metadata.thingspeak_read_api_key?.trim();
 
     if (!channel || !apiKey) {
-      return res.status(400).json({ error: "ThingSpeak credentials missing" });
+      throw new AppError("ThingSpeak credentials missing", 400);
     }
 
     // Fetch historical data from ThingSpeak
@@ -466,11 +437,11 @@ exports.getTDSHistory = async (req, res) => {
       label: metadata.label,
       history: data,
       count: data.length,
-      period_hours: parseInt(hours),
+      period_hours: parseInt(hoursParam),
     });
   } catch (error) {
-    console.error("[TDSController] Error fetching history:", error);
-    res.status(500).json({ error: "Failed to fetch historical data" });
+    // ✅ ISSUE #5: Delegate to centralized error handler
+    next(error);
   }
 };
 

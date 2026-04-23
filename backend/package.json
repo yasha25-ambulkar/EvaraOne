@@ -25,6 +25,7 @@
     "ioredis": "^5.10.0",
     "mqtt": "^5.15.0",
     "node-cache": "^5.1.2",
+    "node-schedule": "^2.1.1",
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
     "pino-pretty": "^10.3.1",
