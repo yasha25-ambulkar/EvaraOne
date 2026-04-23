@@ -24,6 +24,9 @@ const EventEmitter = require('events');
 const telemetryEvents = new EventEmitter();
 telemetryEvents.setMaxListeners(0);
 
+// ✅ CRITICAL FIX #4: Store Firestore listeners for cleanup on shutdown
+const firestoreListeners = [];
+
 const POLL_INTERVAL = 60 * 1000; // 1 minute
 const BATCH_SIZE = 5; // How many concurrent requests to ThingSpeak to avoid ban
 const STATUS_CHECK_INTERVAL = 60 * 1000; // 1 minute cron job
@@ -242,9 +245,56 @@ function startWorker() {
     startStatusCron();
 }
 
+// ✅ CRITICAL FIX #4: Register a Firestore listener for cleanup on shutdown
+function registerFirestoreListener(unsubscribeFn) {
+    if (unsubscribeFn && typeof unsubscribeFn === 'function') {
+        firestoreListeners.push(unsubscribeFn);
+        logger.debug('[TelemetryWorker] Firestore listener registered for cleanup', { count: firestoreListeners.length });
+    }
+}
+
+// ✅ CRITICAL FIX #4: Graceful shutdown handler
+// Called on SIGTERM (Railway, Heroku, or manual shutdown)
+function setupGracefulShutdown() {
+    const shutdownHandler = async (signal) => {
+        logger.info(`[TelemetryWorker] Shutdown signal received (${signal})`, { signal });
+        
+        try {
+            // Unsubscribe from all Firestore listeners
+            let cleanedCount = 0;
+            for (const unsubscribeFn of firestoreListeners) {
+                try {
+                    unsubscribeFn();
+                    cleanedCount++;
+                } catch (err) {
+                    logger.error('[TelemetryWorker] Listener unsubscribe failed on shutdown', { error: err.message });
+                }
+            }
+            
+            if (cleanedCount > 0) {
+                logger.debug('[TelemetryWorker] Firestore listeners cleaned up on shutdown', { count: cleanedCount });
+            }
+            
+            firestoreListeners.length = 0; // Clear the array
+        } catch (err) {
+            logger.error('[TelemetryWorker] Error during graceful shutdown', { error: err.message });
+        }
+        
+        process.exit(0);
+    };
+    
+    process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
+    process.on('SIGINT', () => shutdownHandler('SIGINT'));
+}
+
+// Start graceful shutdown handler when worker starts
+if (require.main === module) {
+    setupGracefulShutdown();
+}
+
 // Standalone execution support (for Render Background Worker)
 if (require.main === module) {
     startWorker();
 }
 
-module.exports = { startWorker, telemetryEvents };
+module.exports = { startWorker, telemetryEvents, registerFirestoreListener };

@@ -218,6 +218,63 @@ end
 return newCount
 `;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ✅ CRITICAL FIX #4: Firestore Listener Memory Leak Prevention
+// Stores unsubscribe functions for each socket to clean up on disconnect
+// ═══════════════════════════════════════════════════════════════════════════
+const firestoreListeners = new Map(); // Map<socketId, unsubscribeFn | Array<unsubscribeFn>>
+
+/**
+ * Register a Firestore listener for a socket
+ * Stores the unsubscribe function so it can be called on disconnect
+ * @param {string} socketId - The socket ID
+ * @param {Function} unsubscribeFn - The unsubscribe function returned by db.collection().onSnapshot()
+ */
+function registerListener(socketId, unsubscribeFn) {
+  if (!socketId || !unsubscribeFn) return;
+  
+  const existing = firestoreListeners.get(socketId);
+  if (existing && typeof existing === 'function') {
+    // Already have one listener, convert to array
+    firestoreListeners.set(socketId, [existing, unsubscribeFn]);
+  } else if (Array.isArray(existing)) {
+    // Already have multiple listeners, add to array
+    existing.push(unsubscribeFn);
+  } else {
+    // First listener for this socket
+    firestoreListeners.set(socketId, unsubscribeFn);
+  }
+}
+
+/**
+ * Unsubscribe from all Firestore listeners for a socket
+ * Called on socket disconnect
+ * @param {string} socketId - The socket ID
+ */
+function cleanupListeners(socketId) {
+  if (!socketId) return;
+  
+  const listeners = firestoreListeners.get(socketId);
+  if (!listeners) return;
+  
+  const listenerArray = Array.isArray(listeners) ? listeners : [listeners];
+  let cleanedCount = 0;
+  
+  for (const unsubscribeFn of listenerArray) {
+    try {
+      unsubscribeFn();
+      cleanedCount++;
+    } catch (err) {
+      logger.error('[Firestore] Listener unsubscribe failed', { socketId, error: err.message });
+    }
+  }
+  
+  firestoreListeners.delete(socketId);
+  if (cleanedCount > 0) {
+    logger.debug('[Firestore] Listeners cleaned up', { socketId, count: cleanedCount });
+  }
+}
+
 io.use(async (socket, next) => {
   try {
     // Get user ID (prefer authenticated UID, fall back to IP)
@@ -265,11 +322,16 @@ io.use(async (socket, next) => {
     logger.debug(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
 
     // ─────────────────────────────────────────
-    // CLEANUP: When this socket disconnects,
-    // decrement the count atomically in Redis
+    // CLEANUP: When this socket disconnects:
+    // 1. Decrement connection count in Redis
+    // 2. Unsubscribe from all Firestore listeners
     // ─────────────────────────────────────────
     socket.on('disconnect', async (reason) => {
       try {
+        // ✅ CRITICAL FIX #4: Clean up Firestore listeners
+        cleanupListeners(socket.id);
+        
+        // Clean up connection count
         if (cache.isRedisReady && cache.redis) {
           const remaining = await cache.redis.decr(redisKey);
           if (remaining <= 0) {
