@@ -194,6 +194,30 @@ if (pubSub) {
 const MAX_CONNECTIONS_PER_USER = 10;
 const CONNECTION_TTL = 86400; // 24 hours (safety net for stale keys)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ✅ CRITICAL FIX #2: Atomic Redis Lua Script for Connection Limiting
+// Prevents race condition where INCR-then-check allows temporary spike to 11
+// ═══════════════════════════════════════════════════════════════════════════
+const CONNECTION_LIMIT_LUA_SCRIPT = `
+local current = redis.call('GET', KEYS[1])
+current = tonumber(current) or 0
+local max = tonumber(ARGV[1])
+local ttl = tonumber(ARGV[2])
+
+-- If already at or above limit, reject atomically
+if current >= max then
+  return 'LIMIT_EXCEEDED'
+end
+
+-- Increment and set TTL on first increment
+local newCount = redis.call('INCR', KEYS[1])
+if newCount == 1 then
+  redis.call('EXPIRE', KEYS[1], ttl)
+end
+
+return newCount
+`;
+
 io.use(async (socket, next) => {
   try {
     // Get user ID (prefer authenticated UID, fall back to IP)
@@ -204,32 +228,38 @@ io.use(async (socket, next) => {
     const redisKey = `socket_connections:${uid}`;
 
     // ─────────────────────────────────────────
-    // ✅ AUDIT FIX C6: Atomic INCR eliminates TOCTOU race
-    // Old: GET count → check → SET count+1 (two concurrent connects both read same count)
-    // New: INCR atomically increments and returns new value (guaranteed unique)
+    // ✅ CRITICAL FIX #2: Atomic Lua script for connection limiting
+    // Old: INCR, check, DECR-if-over (allows spike to 11 during race)
+    // New: Lua script atomically checks count and only INCRs if under limit
+    // Result: Limit is NEVER exceeded, even with concurrent connections
     // ─────────────────────────────────────────
     let currentCount;
     if (cache.isRedisReady && cache.redis) {
-      currentCount = await cache.redis.incr(redisKey);
-      if (currentCount === 1) {
-        // First connection — set TTL
-        await cache.redis.expire(redisKey, CONNECTION_TTL);
+      // Call Lua script atomically: check limit, then INCR if allowed
+      const result = await cache.redis.eval(CONNECTION_LIMIT_LUA_SCRIPT, 1, redisKey, MAX_CONNECTIONS_PER_USER, CONNECTION_TTL);
+      
+      if (result === 'LIMIT_EXCEEDED') {
+        // Atomically rejected by Lua script - counter not incremented
+        logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: at max (${MAX_CONNECTIONS_PER_USER})`);
+        return next(new Error(
+          `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
+        ));
       }
+      
+      // result is the new count
+      currentCount = result;
     } else {
       // Memory fallback (single-instance only)
       currentCount = (parseInt(await cache.get(redisKey)) || 0) + 1;
-      await cache.set(redisKey, currentCount, CONNECTION_TTL);
-    }
-
-    if (currentCount > MAX_CONNECTIONS_PER_USER) {
-      // Over limit — rollback the increment
-      if (cache.isRedisReady && cache.redis) {
-        await cache.redis.decr(redisKey);
+      if (currentCount > MAX_CONNECTIONS_PER_USER) {
+        // Over limit - don't increment, reject
+        await cache.set(redisKey, currentCount - 1, CONNECTION_TTL);
+        logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
+        return next(new Error(
+          `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
+        ));
       }
-      logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
-      return next(new Error(
-        `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
-      ));
+      await cache.set(redisKey, currentCount, CONNECTION_TTL);
     }
 
     logger.debug(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
