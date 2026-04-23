@@ -108,14 +108,14 @@ if (useSecureMQTT) {
     if (fs.existsSync(caCertPath)) {
       mqttOptions.rejectUnauthorized = true;
       mqttOptions.ca = [fs.readFileSync(caCertPath)];
-      console.log(`[MQTT] TLS enabled: CA certificate loaded from ${caCertPath}`);
+      logger.debug(`[MQTT] TLS enabled: CA certificate loaded from ${caCertPath}`);
     } else {
       // Self-signed or development: skip strict verification
       mqttOptions.rejectUnauthorized = false;
-      console.warn(`[MQTT] TLS enabled but CA cert not found at ${caCertPath}. Running with insecure mode (dev only).`);
+      logger.warn(`[MQTT] TLS enabled but CA cert not found at ${caCertPath}. Running with insecure mode (dev only).`);
     }
   } catch (err) {
-    console.error(`[MQTT] Failed to load CA certificate:`, err.message);
+    logger.error(`[MQTT] Failed to load CA certificate:`, err.message);
     process.exit(1);
   }
 
@@ -134,16 +134,16 @@ mqttClient.on('connect', () => {
   failureCount = 0;  // ✅ FIX #6: Reset counter on successful connect
   mqttConnected = true;
   global.mqttConnected = true;
-  console.log('[MQTT] ✅ Connected to broker (backoff reset)');
+  logger.debug('[MQTT] ✅ Connected to broker (backoff reset)');
 
   // Subscribe (this runs EVERY time we connect, not just once)
   mqttClient.subscribe('devices/+/telemetry', (err) => {
     if (err) {
-      console.error('[MQTT] ❌ Subscription failed:', err.message);
+      logger.error('[MQTT] ❌ Subscription failed:', err.message);
       mqttConnected = false;
       global.mqttConnected = false;
     } else {
-      console.log('[MQTT] ✅ Subscribed to devices/+/telemetry');
+      logger.debug('[MQTT] ✅ Subscribed to devices/+/telemetry');
     }
   });
 });
@@ -152,7 +152,7 @@ mqttClient.on('connect', () => {
 mqttClient.on('disconnect', () => {
   mqttConnected = false;
   global.mqttConnected = false;
-  console.warn('[MQTT] ⚠️  Disconnected from broker — waiting to reconnect...');
+  logger.warn('[MQTT] ⚠️  Disconnected from broker — waiting to reconnect...');
 });
 
 // ✅ When there's an error
@@ -164,11 +164,11 @@ mqttClient.on('error', (err) => {
   const backoffMs = calculateBackoff(failureCount);
   const backoffSec = Math.round(backoffMs / 1000);
   
-  console.error(`[MQTT] ❌ Error (attempt ${failureCount}): ${err.message}. Retrying in ${backoffSec}s...`);
+  logger.error(`[MQTT] ❌ Error (attempt ${failureCount}): ${err.message}. Retrying in ${backoffSec}s...`);
   
   // ✅ FIX #6: Manually reconnect with exponential backoff
   setTimeout(() => {
-    console.log(`[MQTT] 🔄 Attempting reconnection (backoff: ${backoffSec}s)`);
+    logger.debug(`[MQTT] 🔄 Attempting reconnection (backoff: ${backoffSec}s)`);
     mqttClient.reconnect();
   }, backoffMs);
 });
@@ -177,7 +177,7 @@ mqttClient.on('error', (err) => {
 mqttClient.on('close', () => {
   mqttConnected = false;
   global.mqttConnected = false;
-  console.warn('[MQTT] ⚠️  Connection closed');
+  logger.warn('[MQTT] ⚠️  Connection closed');
 });
 
 const lastUpdateMap = new Map();
@@ -193,7 +193,7 @@ mqttClient.on('message', async (topic, message) => {
     try {
       rawPayload = JSON.parse(message.toString());
     } catch (parseErr) {
-      console.warn('[MQTT] ❌ Invalid JSON received — ignoring:', message.toString().slice(0, 100));
+      logger.warn('[MQTT] ❌ Invalid JSON received — ignoring:', message.toString().slice(0, 100));
       return; // Stop here, don't process garbage
     }
 
@@ -202,14 +202,14 @@ mqttClient.on('message', async (topic, message) => {
     const parts = topic.split('/');
     const deviceId = parts[1];
     if (!deviceId) {
-      console.warn('[MQTT] ❌ Could not extract device ID from topic:', topic);
+      logger.warn('[MQTT] ❌ Could not extract device ID from topic:', topic);
       return;
     }
 
     // Step C: ✅ FIX #5: Extract API key from message
     const providedApiKey = rawPayload.api_key;
     if (!providedApiKey) {
-      console.warn(`[MQTT] ❌ Missing api_key in message for device ${deviceId}`);
+      logger.warn(`[MQTT] ❌ Missing api_key in message for device ${deviceId}`);
       return;
     }
 
@@ -219,18 +219,18 @@ mqttClient.on('message', async (topic, message) => {
     try {
       const deviceDoc = await db.collection('devices').doc(deviceId).get();
       if (!deviceDoc.exists) {
-        console.warn(`[MQTT] ❌ Unknown device: ${deviceId} — ignoring message`);
+        logger.warn(`[MQTT] ❌ Unknown device: ${deviceId} — ignoring message`);
         return;
       }
       deviceType = deviceDoc.data().device_type;
       storedKeyHash = deviceDoc.data().api_key_hash; // Stored as SHA-256 hash
       
       if (!storedKeyHash) {
-        console.warn(`[MQTT] ❌ Device ${deviceId} has no api_key_hash — rejecting`);
+        logger.warn(`[MQTT] ❌ Device ${deviceId} has no api_key_hash — rejecting`);
         return;
       }
     } catch (lookupErr) {
-      console.error(`[MQTT] ❌ Firestore lookup failed for ${deviceId}:`, lookupErr.message);
+      logger.error(`[MQTT] ❌ Firestore lookup failed for ${deviceId}:`, lookupErr.message);
       return;
     }
 
@@ -250,12 +250,12 @@ mqttClient.on('message', async (topic, message) => {
       );
     } catch (compareErr) {
       // timingSafeEqual throws if lengths differ
-      console.warn(`[MQTT] ❌ Invalid API key length for device ${deviceId}`);
+      logger.warn(`[MQTT] ❌ Invalid API key length for device ${deviceId}`);
       return;
     }
 
     if (!keysMatch) {
-      console.warn(`[MQTT] ❌ Invalid API key for device: ${deviceId}`);
+      logger.warn(`[MQTT] ❌ Invalid API key for device: ${deviceId}`);
       
       // Alert security team
       try {
@@ -272,7 +272,7 @@ mqttClient.on('message', async (topic, message) => {
     // Step F: Get the right schema for this device type
     const schema = getSchema(deviceType);
     if (!schema) {
-      console.warn(`[MQTT] ❌ No schema for device type "${deviceType}" — ignoring`);
+      logger.warn(`[MQTT] ❌ No schema for device type "${deviceType}" — ignoring`);
       return;
     }
 
@@ -287,12 +287,12 @@ mqttClient.on('message', async (topic, message) => {
       const errors = validationErr.errors
         .map(e => `${e.path.join('.')}: ${e.message}`)
         .join(', ');
-      console.warn(`[MQTT] ❌ Invalid payload for device ${deviceId}:`, errors);
+      logger.warn(`[MQTT] ❌ Invalid payload for device ${deviceId}:`, errors);
       return; // Reject the message silently
     }
 
     // Step H: Now payload is SAFE — use it normally
-    console.log(`[MQTT] ✅ Valid & authenticated telemetry from ${deviceId} (${deviceType})`);
+    logger.debug(`[MQTT] ✅ Valid & authenticated telemetry from ${deviceId} (${deviceType})`);
 
     // Emit to Socket.io (only to rooms watching this device)
     if (global.io) {
@@ -318,12 +318,12 @@ mqttClient.on('message', async (topic, message) => {
         });
         lastUpdateMap.set(deviceId, now);
       } catch (writeErr) {
-        console.error(`[MQTT] ❌ Failed to write telemetry for ${deviceId}:`, writeErr.message);
+        logger.error(`[MQTT] ❌ Failed to write telemetry for ${deviceId}:`, writeErr.message);
       }
     }
 
   } catch (err) {
-    console.error('[MQTT] ❌ Unexpected error processing message:', err.message);
+    logger.error('[MQTT] ❌ Unexpected error processing message:', err.message);
   }
 });
 

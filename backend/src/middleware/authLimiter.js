@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
+const logger = require('../utils/logger.js');
 
 /**
  * ✅ TASK #8: Strict rate limiter for authentication endpoints
@@ -33,7 +34,7 @@ const authLimiter = rateLimit({
     return `${ipKey}:${username}`;
   },
   handler: (req, res) => {
-    console.warn('[Auth Rate Limit] ❌ Rate limit exceeded', {
+    logger.warn('[Auth Rate Limit] ❌ Rate limit exceeded', {
       ip: req.ip,
       email: req.body?.email,
       timestamp: new Date().toISOString()

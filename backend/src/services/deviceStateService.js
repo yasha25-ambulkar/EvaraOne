@@ -59,7 +59,7 @@ const calculateDeviceStatus = (lastUpdatedAt) => {
       return DEVICE_STATUS.OFFLINE;
     }
   } catch (err) {
-    console.error("[DeviceStatus] Status calculation error:", err.message);
+    logger.error("[DeviceStatus] Status calculation error:", err.message);
     return DEVICE_STATUS.OFFLINE;
   }
 };
@@ -84,7 +84,7 @@ const loadSavedThresholds = async (deviceId) => {
     }
     return null;
   } catch (err) {
-    console.error(`[DeviceState] loadSavedThresholds failed for ${deviceId}:`, err.message);
+    logger.error(`[DeviceState] loadSavedThresholds failed for ${deviceId}:`, err.message);
     return null;
   }
 };
@@ -104,7 +104,7 @@ const saveThresholds = async (deviceId, thresholds) => {
     // Bust the cache
     await cache.del(`thresholds:${deviceId}`);
   } catch (err) {
-    console.error(`[DeviceState] saveThresholds failed for ${deviceId}:`, err.message);
+    logger.error(`[DeviceState] saveThresholds failed for ${deviceId}:`, err.message);
   }
 };
 
@@ -128,7 +128,7 @@ const processThingSpeakData = async (device, feeds) => {
   // Load channel metadata (field1 → "Meter Reading_7", etc.)
   const channelMetadata = await loadChannelMetadata(device.id);
   if (!channelMetadata) {
-    console.warn(`[DeviceState] ⚠️  No channel metadata for ${device.id} - using legacy resolution`);
+    logger.warn(`[DeviceState] ⚠️  No channel metadata for ${device.id} - using legacy resolution`);
   }
 
   // ── FLOW METER path ───────────────────────────────────────────────────────
@@ -141,22 +141,22 @@ const processThingSpeakData = async (device, feeds) => {
 
     // ✅ NEW: Stable anchor resolution using channel metadata
     if (channelMetadata) {
-      console.log(`[DeviceState] FLOW: Resolving using channel metadata + sensor_field_mapping`);
+      logger.debug(`[DeviceState] FLOW: Resolving using channel metadata + sensor_field_mapping`);
       flowField = resolveFieldByName(channelMetadata, mapping, "flow_rate");
       totalField = resolveFieldByName(channelMetadata, mapping, "total_reading");
       if (flowField && totalField) {
-        console.log(`[DeviceState] ✅ Resolved FLOW using stable anchor: flow=${flowField}, total=${totalField}`);
+        logger.debug(`[DeviceState] ✅ Resolved FLOW using stable anchor: flow=${flowField}, total=${totalField}`);
       } else {
-        console.warn(`[DeviceState] ⚠️  Could not resolve all fields using stable anchor`);
+        logger.warn(`[DeviceState] ⚠️  Could not resolve all fields using stable anchor`);
       }
     }
 
     // Legacy fallback (for devices without channel metadata)
     if (!flowField || !totalField) {
-      console.log(`[DeviceState] FLOW: Using legacy resolution`);
+      logger.debug(`[DeviceState] FLOW: Using legacy resolution`);
       flowField = flowField || device.flow_rate_field || Object.keys(mapping).find(k => mapping[k] === "flow_rate") || "field3";
       totalField = totalField || device.meter_reading_field || Object.keys(mapping).find(k => mapping[k] === "total_reading") || "field1";
-      console.log(`[DeviceState] ✓ Resolved FLOW using legacy: flow=${flowField}, total=${totalField}`);
+      logger.debug(`[DeviceState] ✓ Resolved FLOW using legacy: flow=${flowField}, total=${totalField}`);
     }
 
     const flow_rate = parseFloat(latestFeed[flowField] || 0) || 0;
@@ -183,22 +183,22 @@ const processThingSpeakData = async (device, feeds) => {
 
     // ✅ NEW: Stable anchor resolution using channel metadata
     if (channelMetadata) {
-      console.log(`[DeviceState] TDS: Resolving using channel metadata + sensor_field_mapping`);
+      logger.debug(`[DeviceState] TDS: Resolving using channel metadata + sensor_field_mapping`);
       fieldTDS = resolveFieldByName(channelMetadata, mapping, "tds_value");
       fieldTemp = resolveFieldByName(channelMetadata, mapping, "temperature");
       if (fieldTDS && fieldTemp) {
-        console.log(`[DeviceState] ✅ Resolved TDS using stable anchor: tds=${fieldTDS}, temp=${fieldTemp}`);
+        logger.debug(`[DeviceState] ✅ Resolved TDS using stable anchor: tds=${fieldTDS}, temp=${fieldTemp}`);
       } else {
-        console.warn(`[DeviceState] ⚠️  Could not resolve all fields using stable anchor`);
+        logger.warn(`[DeviceState] ⚠️  Could not resolve all fields using stable anchor`);
       }
     }
 
     // Legacy fallback (for devices without channel metadata)
     if (!fieldTDS || !fieldTemp) {
-      console.log(`[DeviceState] TDS: Using legacy resolution`);
+      logger.debug(`[DeviceState] TDS: Using legacy resolution`);
       fieldTDS = fieldTDS || device.tds_field || Object.keys(mapping).find(k => mapping[k] === "tds_value") || "field2";
       fieldTemp = fieldTemp || device.temperature_field || Object.keys(mapping).find(k => mapping[k] === "temperature") || "field3";
-      console.log(`[DeviceState] ✓ Resolved TDS using legacy: tds=${fieldTDS}, temp=${fieldTemp}`);
+      logger.debug(`[DeviceState] ✓ Resolved TDS using legacy: tds=${fieldTDS}, temp=${fieldTemp}`);
     }
 
     const tdsValue = parseFloat(latestFeed[fieldTDS]) || 0;
@@ -226,33 +226,33 @@ const processThingSpeakData = async (device, feeds) => {
 
   // ✅ NEW: Stable anchor resolution using channel metadata
   if (channelMetadata) {
-    console.log(`[DeviceState] TANK: Resolving using channel metadata + sensor_field_mapping`);
+    logger.debug(`[DeviceState] TANK: Resolving using channel metadata + sensor_field_mapping`);
     fieldKey = resolveFieldByName(channelMetadata, mapping, "water_level");
     if (fieldKey) {
-      console.log(`[DeviceState] ✅ Resolved TANK using stable anchor: level=${fieldKey}`);
+      logger.debug(`[DeviceState] ✅ Resolved TANK using stable anchor: level=${fieldKey}`);
     } else {
-      console.warn(`[DeviceState] ⚠️  Could not resolve water_level using stable anchor`);
+      logger.warn(`[DeviceState] ⚠️  Could not resolve water_level using stable anchor`);
     }
   }
 
   // Legacy fallback (for devices without channel metadata)
   if (!fieldKey) {
-    console.log(`[DeviceState] TANK: Using legacy resolution`);
+    logger.debug(`[DeviceState] TANK: Using legacy resolution`);
     // Try mapping paths in priority order:
     // 1. New schema: device.fields.water_level (recommended)
     if (device.fields && device.fields.water_level) {
       fieldKey = device.fields.water_level;
-      console.log(`[DeviceState] ✓ Using device.fields.water_level: ${fieldKey}`);
+      logger.debug(`[DeviceState] ✓ Using device.fields.water_level: ${fieldKey}`);
     }
     // 2. Old schema: mapping object
     else if (mapping.levelField) {
       fieldKey = mapping.levelField;
-      console.log(`[DeviceState] ✓ Using mapping.levelField: ${fieldKey}`);
+      logger.debug(`[DeviceState] ✓ Using mapping.levelField: ${fieldKey}`);
     }
     // 3. Configuration stored field
     else if (device.configuration?.fieldKey && latestFeed[device.configuration.fieldKey] !== undefined) {
       fieldKey = device.configuration.fieldKey;
-      console.log(`[DeviceState] ✓ Using configuration.fieldKey: ${fieldKey}`);
+      logger.debug(`[DeviceState] ✓ Using configuration.fieldKey: ${fieldKey}`);
     }
     // 4. Scan mapping for "water_level" semantic name
     else {
@@ -261,7 +261,7 @@ const processThingSpeakData = async (device, feeds) => {
       );
       if (mappedField) {
         fieldKey = mappedField;
-        console.log(`[DeviceState] ✓ Found level field in mapping: ${fieldKey}`);
+        logger.debug(`[DeviceState] ✓ Found level field in mapping: ${fieldKey}`);
       }
     }
   }
@@ -269,11 +269,11 @@ const processThingSpeakData = async (device, feeds) => {
   // ✅ CRITICAL: NO IMPLICIT FALLBACK TO field1/field2
   // If we still don't have a field, FAIL explicitly (don't silently use wrong data)
   if (!fieldKey) {
-    console.error(`[DeviceState] ❌ NO FIELD MAPPING for device ${device.id}: no water_level field found`);
-    console.error(`[DeviceState] Device mapping:`, mapping);
-    console.error(`[DeviceState] Device fields:`, device.fields);
-    console.error(`[DeviceState] Channel metadata:`, channelMetadata);
-    console.error(`[DeviceState] Available data keys:`, Object.keys(latestFeed));
+    logger.error(`[DeviceState] ❌ NO FIELD MAPPING for device ${device.id}: no water_level field found`);
+    logger.error(`[DeviceState] Device mapping:`, mapping);
+    logger.error(`[DeviceState] Device fields:`, device.fields);
+    logger.error(`[DeviceState] Channel metadata:`, channelMetadata);
+    logger.error(`[DeviceState] Available data keys:`, Object.keys(latestFeed));
     return null;  // Return null = no data instead of using wrong field
   }
 
@@ -437,9 +437,9 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
     const updateRegistry = db.collection("devices").doc(deviceId).update(registryUpdateObj);
 
     await Promise.all([updateMetadata, updateRegistry]);
-    console.log(`[DeviceState] ✅ Updated telemetry for ${deviceId}: status=${telemetryData.status}, last_seen=${now}`);
+    logger.debug(`[DeviceState] ✅ Updated telemetry for ${deviceId}: status=${telemetryData.status}, last_seen=${now}`);
   } catch (err) {
-    console.error(`[DeviceState] Firestore update failed for ${deviceId}:`, err.message);
+    logger.error(`[DeviceState] Firestore update failed for ${deviceId}:`, err.message);
     throw err;
   }
 };
@@ -489,7 +489,7 @@ const recalculateAllDevicesStatus = async () => {
     } else {
     }
   } catch (err) {
-    console.error("[DeviceState] Status recalculation failed:", err.message);
+    logger.error("[DeviceState] Status recalculation failed:", err.message);
   }
 };
 

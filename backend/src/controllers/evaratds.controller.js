@@ -34,7 +34,7 @@ exports.getEvaraTDS = async (req, res) => {
         const devices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         res.status(200).json(devices);
     } catch (error) {
-        console.error("Failed to get EvaraTDS devices:", error);
+        logger.error("Failed to get EvaraTDS devices:", error);
         res.status(500).json({ error: "Failed to fetch EvaraTDS devices" });
     }
 };
@@ -46,22 +46,22 @@ exports.getEvaraTDS = async (req, res) => {
 exports.getEvaraTDSById = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("DEBUG TDS lookup id:", id);
+        logger.debug("DEBUG TDS lookup id:", id);
 
         const deviceDoc = await resolveDevice(id);
         if (!deviceDoc || !deviceDoc.exists) {
-            console.log("DEBUG TDS doc NOT FOUND");
+            logger.debug("DEBUG TDS doc NOT FOUND");
             return res.status(404).json({ error: "Device not found" });
         }
 
         const docId = deviceDoc.id;
         const doc = await db.collection("evaratds").doc(docId).get();
-        console.log("DEBUG TDS doc exists:", doc.exists);
+        logger.debug("DEBUG TDS doc exists:", doc.exists);
         
         if (!doc.exists) return res.status(404).json({ error: "Metadata not found" });
         res.status(200).json({ id: doc.id, ...doc.data() });
     } catch (error) {
-        console.error("TDS Get error:", error);
+        logger.error("TDS Get error:", error);
         res.status(500).json({ error: "Failed to get TDS data" });
     }
 };

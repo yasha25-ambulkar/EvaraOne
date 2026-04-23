@@ -12,6 +12,7 @@
  */
 
 const { z } = require('zod');
+const logger = require('../utils/logger.js');
 
 /**
  * Schema for list query parameters
@@ -67,7 +68,7 @@ const validateQuery = (req, res, next) => {
     // Replace req.query with validated params
     req.query = validated;
     
-    console.log(`[Query Validation] ✅ Valid query:`, {
+    logger.debug(`[Query Validation] ✅ Valid query:`, {
       limit: validated.limit,
       cursor: validated.cursor ? 'provided' : 'none',
       search: validated.search ? `"${validated.search}"` : 'none'
@@ -76,7 +77,7 @@ const validateQuery = (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.warn(`[Query Validation] ❌ Invalid query params:`, error.errors);
+      logger.warn(`[Query Validation] ❌ Invalid query params:`, error.errors);
       
       return res.status(400).json({
         error: 'Invalid query parameters',

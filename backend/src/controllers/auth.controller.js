@@ -16,7 +16,7 @@ exports.getUserProfile = async (req, res) => {
       });
     }
 
-    console.log(`[AuthController] Getting profile for user: ${uid}`);
+    logger.debug(`[AuthController] Getting profile for user: ${uid}`);
 
     let profileData = null;
     let sourceCollection = "customers";
@@ -42,10 +42,10 @@ exports.getUserProfile = async (req, res) => {
         profileData = superadminSnap.data?.() || superadminSnap.data || superadminSnap;
         sourceCollection = "superadmins";
         role = "superadmin";
-        console.log(`[AuthController] ✅ User found in SUPERADMINS collection`);
+        logger.debug(`[AuthController] ✅ User found in SUPERADMINS collection`);
       }
     } catch (err) {
-      console.error(`[AuthController] Error checking superadmins: ${err.message}`);
+      logger.error(`[AuthController] Error checking superadmins: ${err.message}`);
     }
 
     // If not found in superadmins, try customers (Priority 2)
@@ -73,14 +73,14 @@ exports.getUserProfile = async (req, res) => {
           if (profileData?.role) {
             role = (profileData.role).trim().toLowerCase().replace(/\s+/g, "");
           }
-          console.log(`[AuthController] ✅ User found in CUSTOMERS collection`);
+          logger.debug(`[AuthController] ✅ User found in CUSTOMERS collection`);
         }
       } catch (err) {
-        console.error(`[AuthController] Error checking customers: ${err.message}`);
+        logger.error(`[AuthController] Error checking customers: ${err.message}`);
       }
     }
 
-    console.log(`[AuthController] 🎯 User ${uid} => role: '${role}' (from ${sourceCollection})`);
+    logger.debug(`[AuthController] 🎯 User ${uid} => role: '${role}' (from ${sourceCollection})`);
 
     // Return user profile with correct role
     return res.status(200).json({
@@ -97,7 +97,7 @@ exports.getUserProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[AuthController] Error getting user profile:`, error);
+    logger.error(`[AuthController] Error getting user profile:`, error);
     
     return res.status(500).json({
       success: false,
@@ -127,14 +127,14 @@ exports.verifyToken = async (req, res) => {
     try {
       decodedToken = await admin.auth().verifyIdToken(idToken);
     } catch (firstErr) {
-      console.warn(`[AuthController] First verifyIdToken attempt failed (${firstErr.code || firstErr.message}), retrying once…`);
+      logger.warn(`[AuthController] First verifyIdToken attempt failed (${firstErr.code || firstErr.message}), retrying once…`);
       await new Promise((r) => setTimeout(r, 800));
       // Second attempt — if this throws it will bubble to the outer catch
       decodedToken = await admin.auth().verifyIdToken(idToken);
     }
     
-    console.log(`[AuthController] 🔐 Token verified for user: ${decodedToken.uid}`);
-    console.log(`[AuthController] Email: ${decodedToken.email}`);
+    logger.debug(`[AuthController] 🔐 Token verified for user: ${decodedToken.uid}`);
+    logger.debug(`[AuthController] Email: ${decodedToken.email}`);
 
     // Get the user's profile data
     let profileData = null;
@@ -143,7 +143,7 @@ exports.verifyToken = async (req, res) => {
 
     try {
       // Check superadmins first
-      console.log(`[AuthController] Checking superadmins collection for ${decodedToken.uid}...`);
+      logger.debug(`[AuthController] Checking superadmins collection for ${decodedToken.uid}...`);
       const superadminSnap = await db.collection("superadmins").doc(decodedToken.uid).get();
       
       // Check if snapshot exists - handle both REST and Admin SDK formats
@@ -157,24 +157,24 @@ exports.verifyToken = async (req, res) => {
         superadminExists = !!superadminSnap._document;
       }
       
-      console.log(`[AuthController] Superadmins check - Exists: ${superadminExists}`);
+      logger.debug(`[AuthController] Superadmins check - Exists: ${superadminExists}`);
       
       if (superadminExists) {
         // Try different data access patterns
         profileData = superadminSnap.data?.() || superadminSnap.data || superadminSnap;
         sourceCollection = "superadmins";
         role = "superadmin";
-        console.log(`[AuthController] ✅ User FOUND in SUPERADMINS collection`);
-        console.log(`[AuthController] Profile data:`, profileData);
+        logger.debug(`[AuthController] ✅ User FOUND in SUPERADMINS collection`);
+        logger.debug(`[AuthController] Profile data:`, profileData);
       }
     } catch (err) {
-      console.error(`[AuthController] Error checking superadmins:`, err.message);
+      logger.error(`[AuthController] Error checking superadmins:`, err.message);
     }
 
     // If not in superadmins, check customers
     if (!profileData) {
       try {
-        console.log(`[AuthController] Not in superadmins, checking customers collection...`);
+        logger.debug(`[AuthController] Not in superadmins, checking customers collection...`);
         const customerSnap = await db.collection("customers").doc(decodedToken.uid).get();
         
         // Check if snapshot exists - handle both REST and Admin SDK formats
@@ -188,7 +188,7 @@ exports.verifyToken = async (req, res) => {
           customerExists = !!customerSnap._document;
         }
         
-        console.log(`[AuthController] Customers check - Exists: ${customerExists}`);
+        logger.debug(`[AuthController] Customers check - Exists: ${customerExists}`);
         
         if (customerExists) {
           profileData = customerSnap.data?.() || customerSnap.data || customerSnap;
@@ -198,16 +198,16 @@ exports.verifyToken = async (req, res) => {
           if (profileData?.role) {
             role = (profileData.role).trim().toLowerCase().replace(/\s+/g, "");
           }
-          console.log(`[AuthController] ✅ User FOUND in CUSTOMERS collection`);
+          logger.debug(`[AuthController] ✅ User FOUND in CUSTOMERS collection`);
         } else {
-          console.log(`[AuthController] ⚠️ User NOT found in either superadmins or customers`);
+          logger.debug(`[AuthController] ⚠️ User NOT found in either superadmins or customers`);
         }
       } catch (err) {
-        console.error(`[AuthController] Error checking customers:`, err.message);
+        logger.error(`[AuthController] Error checking customers:`, err.message);
       }
     }
 
-    console.log(`[AuthController] ✨ FINAL RESPONSE: role=${role}, sourceCollection=${sourceCollection}`);
+    logger.debug(`[AuthController] ✨ FINAL RESPONSE: role=${role}, sourceCollection=${sourceCollection}`);
 
     return res.status(200).json({
       success: true,
@@ -222,7 +222,7 @@ exports.verifyToken = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[AuthController] ❌ Error verifying token:`, error);
+    logger.error(`[AuthController] ❌ Error verifying token:`, error);
     
     return res.status(401).json({
       success: false,

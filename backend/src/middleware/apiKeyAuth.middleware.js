@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { db } = require('../config/firebase.js');
 const cache = require('../config/cache.js');
+const logger = require('../utils/logger.js');
 
 /**
  * ✅ FIX #5: API Key Authentication Middleware
@@ -76,7 +77,7 @@ const apiKeyAuth = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('[apiKeyAuth] Authentication error:', error);
+        logger.error('[apiKeyAuth] Authentication error:', error);
         return res.status(500).json({ error: 'Authentication failed' });
     }
 };

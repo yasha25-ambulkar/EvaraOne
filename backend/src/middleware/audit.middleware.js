@@ -1,4 +1,5 @@
 const { db } = require("../config/firebase.js");
+const logger = require("../utils/logger.js");
 
 /**
  * SaaS Architecture: Enterprise Audit Logging
@@ -31,7 +32,7 @@ const auditLog = (actionName) => {
             // Sync to Firestore 'audit_logs' collection
             await db.collection("audit_logs").add(logEntry);
         } catch (err) {
-            console.error("[AuditLog] Failed to record action:", err.message);
+            logger.error("[AuditLog] Failed to record action:", err.message);
         }
     };
 };

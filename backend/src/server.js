@@ -156,15 +156,15 @@ const isCluster = process.env.RAILWAY_REPLICA_COUNT
 
 if (isCluster && !pubSub) {
   // 🚨 LOUD CRASH — better than silent corruption
-  console.error('');
-  console.error('╔══════════════════════════════════════════╗');
-  console.error('║  FATAL: Redis required for clustering    ║');
-  console.error('║  Running without Redis in multi-instance ║');
-  console.error('║  mode will silently break real-time.     ║');
-  console.error('║                                          ║');
-  console.error('║  Fix: Set REDIS_URL environment variable ║');
-  console.error('╚══════════════════════════════════════════╝');
-  console.error('');
+  logger.error('');
+  logger.error('╔══════════════════════════════════════════╗');
+  logger.error('║  FATAL: Redis required for clustering    ║');
+  logger.error('║  Running without Redis in multi-instance ║');
+  logger.error('║  mode will silently break real-time.     ║');
+  logger.error('║                                          ║');
+  logger.error('║  Fix: Set REDIS_URL environment variable ║');
+  logger.error('╚══════════════════════════════════════════╝');
+  logger.error('');
   process.exit(1); // 💀 Stop here. Don't continue.
 }
 
@@ -172,14 +172,14 @@ if (pubSub) {
   try {
     const { createAdapter } = require("@socket.io/redis-adapter");
     io.adapter(createAdapter(pubSub.pub, pubSub.sub));
-    console.log("[Socket.io] ✅ Redis adapter enabled for multi-instance clustering");
+    logger.debug("[Socket.io] ✅ Redis adapter enabled for multi-instance clustering");
   } catch (err) {
-    console.error("[Socket.io] ❌ Redis adapter failed to initialize:", err.message);
+    logger.error("[Socket.io] ❌ Redis adapter failed to initialize:", err.message);
     process.exit(1); // Also crash here — don't pretend it's fine
   }
 } else {
   // Single instance, no Redis — that's fine
-  console.log("[Socket.io] ⚠️  Using in-memory adapter (single instance only)");
+  logger.debug("[Socket.io] ⚠️  Using in-memory adapter (single instance only)");
 }
 
 // ============================================================================
@@ -226,13 +226,13 @@ io.use(async (socket, next) => {
       if (cache.isRedisReady && cache.redis) {
         await cache.redis.decr(redisKey);
       }
-      console.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
+      logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
       return next(new Error(
         `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
       ));
     }
 
-    console.log(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
+    logger.debug(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
 
     // ─────────────────────────────────────────
     // CLEANUP: When this socket disconnects,
@@ -244,24 +244,24 @@ io.use(async (socket, next) => {
           const remaining = await cache.redis.decr(redisKey);
           if (remaining <= 0) {
             await cache.redis.del(redisKey);
-            console.log(`[Socket.io] User ${uid} fully disconnected`);
+            logger.debug(`[Socket.io] User ${uid} fully disconnected`);
           } else {
-            console.log(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+            logger.debug(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
           }
         } else {
           const currentOnDisconnect = parseInt(await cache.get(redisKey)) || 1;
           const remaining = currentOnDisconnect - 1;
           if (remaining <= 0) {
             await cache.del(redisKey);
-            console.log(`[Socket.io] User ${uid} fully disconnected`);
+            logger.debug(`[Socket.io] User ${uid} fully disconnected`);
           } else {
             await cache.set(redisKey, remaining, CONNECTION_TTL);
-            console.log(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+            logger.debug(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
           }
         }
       } catch (cleanupErr) {
         // Don't let cleanup errors break anything
-        console.error('[Socket.io] Disconnect cleanup error:', cleanupErr.message);
+        logger.error('[Socket.io] Disconnect cleanup error:', cleanupErr.message);
       }
     });
 
@@ -271,7 +271,7 @@ io.use(async (socket, next) => {
   } catch (err) {
     // If Redis itself fails, let the connection through
     // (better to have no limit than to block everyone)
-    console.error('[Socket.io] Connection limit check failed:', err.message);
+    logger.error('[Socket.io] Connection limit check failed:', err.message);
     next(); // Fail open
   }
 });
@@ -331,7 +331,7 @@ io.use(async (socket, next) => {
                 // If not found anywhere, return default (will be caught and rejected in next step)
                 return { role: "customer" };
             } catch (e) {
-                console.error("[Socket.io] Firestore lookup error:", e.message);
+                logger.error("[Socket.io] Firestore lookup error:", e.message);
                 throw e;
             }
         })();
@@ -346,7 +346,7 @@ io.use(async (socket, next) => {
             // ====================================================================
             // PART 3: REJECT on failure, never default silently
             // ====================================================================
-            console.error("[Socket.io Auth] User lookup failed:", dbError.message);
+            logger.error("[Socket.io Auth] User lookup failed:", dbError.message);
             return next(new Error("Authentication error: Cannot resolve user role"));
         }
     }
@@ -357,7 +357,7 @@ io.use(async (socket, next) => {
     const role = (userData.role || "customer").trim().toLowerCase().replace(/\s+/g, "");
     
     if (!role || role === '') {
-        console.error("[Socket.io Auth] Invalid role resolved:", role);
+        logger.error("[Socket.io Auth] Invalid role resolved:", role);
         return next(new Error("Authentication error: Invalid role"));
     }
 
@@ -365,7 +365,7 @@ io.use(async (socket, next) => {
     const customer_id = userData.customer_id || userData.id || "";
     
     socket.user = { uid: decodedToken.uid, role, community_id, customer_id };
-    console.log(`[Socket.io Auth] ✅ User ${decodedToken.uid} authenticated => role: '${role}'`);
+    logger.debug(`[Socket.io Auth] ✅ User ${decodedToken.uid} authenticated => role: '${role}'`);
     next();
   } catch (err) {
     next(new Error("Authentication error: Invalid token"));
@@ -373,14 +373,14 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`[Socket.io] Client connected: ${socket.user?.uid || 'Unknown'}`);
+    logger.debug(`[Socket.io] Client connected: ${socket.user?.uid || 'Unknown'}`);
 
     // ✅ FIX #11: AUTO-SUBSCRIBE USER TO THEIR CUSTOMER ROOM
     // When user connects, subscribe them to customer-specific events
     // This allows Emit("device:added", {...}) to reach all users of that customer
     if (socket.user?.customer_id) {
         socket.join(`customer:${socket.user.customer_id}`);
-        console.log(`[Socket.io] ✅ User ${socket.user.uid} subscribed to customer:${socket.user.customer_id}`);
+        logger.debug(`[Socket.io] ✅ User ${socket.user.uid} subscribed to customer:${socket.user.customer_id}`);
     }
 
     // ✅ FIX #2: Validate subscribe_device with Zod
@@ -396,15 +396,15 @@ io.on("connection", (socket) => {
             const deviceId = data.deviceId;
             const isOwner = await checkOwnership(socket.user.customer_id || socket.user.uid, deviceId, socket.user.role, socket.user.community_id);
             if (isOwner) {
-                console.log(`[Socket.io] ✅ Client ${socket.user?.uid} subscribed to device ${deviceId}`);
+                logger.debug(`[Socket.io] ✅ Client ${socket.user?.uid} subscribed to device ${deviceId}`);
                 socket.join(`room:${deviceId}`);
                 socket.emit('subscribe_ack', { success: true, deviceId });
             } else {
-                console.warn(`[Socket.io] ❌ Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`);
+                logger.warn(`[Socket.io] ❌ Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`);
                 socket.emit('error', { message: 'Access denied' });
             }
         } catch (err) {
-            console.warn(`[Socket.io] ❌ Invalid subscribe_device data:`, err.message);
+            logger.warn(`[Socket.io] ❌ Invalid subscribe_device data:`, err.message);
             socket.emit('error', { message: 'Invalid request' });
         }
     });
@@ -417,14 +417,14 @@ io.on("connection", (socket) => {
                 deviceId: rawData
             });
             socket.leave(`room:${data.deviceId}`);
-            console.log(`[Socket.io] ✅ Client ${socket.user?.uid} unsubscribed from device ${data.deviceId}`);
+            logger.debug(`[Socket.io] ✅ Client ${socket.user?.uid} unsubscribed from device ${data.deviceId}`);
         } catch (err) {
-            console.warn(`[Socket.io] ❌ Invalid unsubscribe_device data:`, err.message);
+            logger.warn(`[Socket.io] ❌ Invalid unsubscribe_device data:`, err.message);
         }
     });
 
     socket.on("disconnect", () => {
-        console.log(`[Socket.io] Client disconnected: ${socket.user?.uid}`);
+        logger.debug(`[Socket.io] Client disconnected: ${socket.user?.uid}`);
     });
 });
 
@@ -513,7 +513,7 @@ if (process.env.NODE_ENV === "production") {
     const publicPath = path.join(__dirname, "../../client/dist");
     const fs = require("fs");
     if (fs.existsSync(publicPath)) {
-        console.log(`[Server] Serving frontend from ${publicPath}`);
+        logger.debug(`[Server] Serving frontend from ${publicPath}`);
         app.use(express.static(publicPath));
         
         // SPA catch-all: serve index.html for non-API routes
@@ -525,7 +525,7 @@ if (process.env.NODE_ENV === "production") {
             res.sendFile(path.join(publicPath, "index.html"));
         });
     } else {
-        console.warn(`[Server] Frontend build not found at ${publicPath}`);
+        logger.warn(`[Server] Frontend build not found at ${publicPath}`);
     }
 }
 
@@ -559,15 +559,15 @@ const PORT = process.env.PORT || 8000;
 
 try {
     server.on("error", (err) => {
-        console.error("[Server] Fatal error event:", err);
+        logger.error("[Server] Fatal error event:", err);
         if (err.code === "EADDRINUSE") {
-            console.error(`[Server] Port ${PORT} is already in use.`);
+            logger.error(`[Server] Port ${PORT} is already in use.`);
         }
         process.exit(1);
     });
 
     server.listen(PORT, async () => {
-        console.log(`[Server] ✅ Backend running on port ${PORT}`);
+        logger.debug(`[Server] ✅ Backend running on port ${PORT}`);
         
         // ✅ PHASE 2: Task #11 - Initialize cache versions on startup
         try {
@@ -605,7 +605,7 @@ try {
         startWorker();
     });
 } catch (error) {
-    console.error("[Server] Error during startup:", error);
+    logger.error("[Server] Error during startup:", error);
     process.exit(1);
 }
 
@@ -618,11 +618,11 @@ async function gracefulShutdown() {
     if (isShuttingDown) return;
     isShuttingDown = true;
     
-    console.log("[Server] 🛑 Received shutdown signal, starting graceful shutdown...");
+    logger.debug("[Server] 🛑 Received shutdown signal, starting graceful shutdown...");
     
     // 1. Stop accepting new connections
     server.close(() => {
-        console.log("[Server] HTTP server closed");
+        logger.debug("[Server] HTTP server closed");
     });
     
     // 2. Wait for existing requests to complete (5 second timeout)
@@ -638,13 +638,13 @@ async function gracefulShutdown() {
     if (cache && cache.redis) {
         try {
             await cache.redis.quit();
-            console.log("[Server] Redis connection closed");
+            logger.debug("[Server] Redis connection closed");
         } catch (err) {
-            console.error("[Server] Error closing Redis:", err.message);
+            logger.error("[Server] Error closing Redis:", err.message);
         }
     }
     
-    console.log("[Server] ✅ Graceful shutdown complete");
+    logger.debug("[Server] ✅ Graceful shutdown complete");
     process.exit(0);
 }
 
@@ -653,12 +653,12 @@ process.on("SIGINT", gracefulShutdown);
 
 // Robust error guards for unexpected crashes
 process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    logger.error("Unhandled Rejection at:", promise, "reason:", reason);
     Sentry.captureException(reason);
 });
 
 process.on("uncaughtException", (err) => {
-    console.error("Uncaught Exception thrown:", err);
+    logger.error("Uncaught Exception thrown:", err);
     Sentry.captureException(err);
     // Give Sentry some time to send the error before exiting
     setTimeout(() => {

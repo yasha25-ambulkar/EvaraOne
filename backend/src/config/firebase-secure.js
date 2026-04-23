@@ -58,7 +58,7 @@ const db = new Firestore({
   preferRest: true,  // Use REST API instead of gRPC — fixes hanging connections
 });
 
-console.log("[Firebase] Firestore initialized with REST transport (preferRest: true)");
+logger.debug("[Firebase] Firestore initialized with REST transport (preferRest: true)");
 
 const auth = admin.auth();
 const storage = admin.storage();
@@ -69,9 +69,9 @@ const storage = admin.storage();
     const testStart = Date.now();
     const snapshot = await db.collection("zones").limit(1).get();
     const elapsed = Date.now() - testStart;
-    console.log(`[Firebase] ✅ Firestore connectivity OK (${elapsed}ms, docs: ${snapshot.size})`);
+    logger.debug(`[Firebase] ✅ Firestore connectivity OK (${elapsed}ms, docs: ${snapshot.size})`);
   } catch (err) {
-    console.error("[Firebase] ❌ Firestore connectivity FAILED:", err.message);
+    logger.error("[Firebase] ❌ Firestore connectivity FAILED:", err.message);
   }
 })();
 

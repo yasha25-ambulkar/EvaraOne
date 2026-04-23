@@ -3,6 +3,7 @@ const { Filter } = require("firebase-admin/firestore");
 const { startWorker } = require("../workers/telemetryWorker.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
 const { checkDeviceVisibilityWithAudit } = require("../utils/checkDeviceVisibility.js");
+const logger = require("../utils/logger.js");
 const axios = require("axios");
 const telemetryCache = require("../services/cacheService.js");
 const cache = require("../config/cache.js");
@@ -62,7 +63,7 @@ async function syncNodeStatus(id, type, lastSeen, additionalData = {}) {
 
         await db.collection(typeLower).doc(id).update(updatePayload);
     } catch (err) {
-        console.error(`Status sync failed for ${id}:`, err);
+        logger.error(`Status sync failed for ${id}:`, err);
     }
 }
 
@@ -95,7 +96,7 @@ exports.getNodes = async (req, res) => {
         // This ensures consistent results when devices are added/removed
         const filterCustomerId = req.query.customerId || req.query.customer_id || null;
 
-        console.log(`[NodesController] getNodes:`, {
+        logger.debug(`[NodesController] getNodes:`, {
             userId: req.user.uid,
             userRole: req.user.role,
             filterCustomerId,
@@ -122,32 +123,32 @@ exports.getNodes = async (req, res) => {
         if (!shouldSkipCache && shouldUseCache) {
             const cachedNodes = await cache.get(nodesCacheKey);
             if (cachedNodes) {
-                console.log(`[NodesController] ✅ Cache HIT for key: ${nodesCacheKey}, returned ${cachedNodes.length} devices`);
+                logger.debug(`[NodesController] ✅ Cache HIT for key: ${nodesCacheKey}, returned ${cachedNodes.length} devices`);
                 return res.status(200).json(cachedNodes);
             }
         }
 
-        console.log(`[NodesController] Cache SKIPPED for consistent status (always fresh from DB) for key: ${nodesCacheKey}`);
+        logger.debug(`[NodesController] Cache SKIPPED for consistent status (always fresh from DB) for key: ${nodesCacheKey}`);
 
         let query = db.collection("devices");
 
         if (filterCustomerId) {
             // Filter by the provided customer ID
-            console.log(`[NodesController] Filtering by customerID: ${filterCustomerId}`);
+            logger.debug(`[NodesController] Filtering by customerID: ${filterCustomerId}`);
             query = query.where("customer_id", "==", filterCustomerId);
-            console.log(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
+            logger.debug(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
         } else if (req.user.role !== "superadmin") {
             // Customer viewing their own devices
-            console.log(`[NodesController] Filtering by customer's own ID`);
+            logger.debug(`[NodesController] Filtering by customer's own ID`);
             query = query.where("customer_id", "==", req.user.customer_id);
-            console.log(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
+            logger.debug(`[NodesController] ✅ NOT applying Firestore where-clause for isVisibleToCustomer (would filter out old devices)`);
         } else {
-            console.log(`[NodesController] Superadmin viewing all devices (no customer_id filter)`);
+            logger.debug(`[NodesController] Superadmin viewing all devices (no customer_id filter)`);
         }
 
         const snapshot = await query.get();
-        console.log(`[NodesController] Query returned ${snapshot.size} device registry entries from DB`);
-        console.log(`[NodesController] Device types found:`, snapshot.docs.map(d => ({ id: d.id, device_type: d.data().device_type })));
+        logger.debug(`[NodesController] Query returned ${snapshot.size} device registry entries from DB`);
+        logger.debug(`[NodesController] Device types found:`, snapshot.docs.map(d => ({ id: d.id, device_type: d.data().device_type })));
 
         // ✅ CRITICAL N+1 FIX: Collect device IDs and batch-fetch metadata
         // This reduces 400 queries (100 devices × 4 queries each) to ~4 queries
@@ -178,7 +179,7 @@ exports.getNodes = async (req, res) => {
         let customerMap = {};
         
         if (uniqueZoneIds.size > 0) {
-            console.log(`[NodesController] Pre-fetching ${uniqueZoneIds.size} unique zones (batch query)`);
+            logger.debug(`[NodesController] Pre-fetching ${uniqueZoneIds.size} unique zones (batch query)`);
             const zoneRefs = Array.from(uniqueZoneIds).map(id => db.collection("zones").doc(id));
             
             // Split into chunks of 500 to respect Firestore limits
@@ -193,10 +194,10 @@ exports.getNodes = async (req, res) => {
                 });
             }
         }
-        console.log(`[NodesController] Loaded zone map with ${Object.keys(zoneMap).length} entries`);
+        logger.debug(`[NodesController] Loaded zone map with ${Object.keys(zoneMap).length} entries`);
         
         if (uniqueCustomerIds.size > 0) {
-            console.log(`[NodesController] Pre-fetching ${uniqueCustomerIds.size} unique customers (batch query)`);
+            logger.debug(`[NodesController] Pre-fetching ${uniqueCustomerIds.size} unique customers (batch query)`);
             const customerRefs = Array.from(uniqueCustomerIds).map(id => db.collection("customers").doc(id));
             
             // Split into chunks of 500 to respect Firestore limits
@@ -214,7 +215,7 @@ exports.getNodes = async (req, res) => {
                 });
             }
         }
-        console.log(`[NodesController] Loaded customer map with ${Object.keys(customerMap).length} entries`);
+        logger.debug(`[NodesController] Loaded customer map with ${Object.keys(customerMap).length} entries`);
 
         const nodes = [];
 
@@ -235,20 +236,20 @@ exports.getNodes = async (req, res) => {
         const typeBatches = await Promise.all(
             Object.keys(typedGroups).map(async (type) => {
                 const ids = typedGroups[type];
-                console.log(`[NodesController] Fetching ${ids.length} ${type} metadata documents for IDs:`, ids);
+                logger.debug(`[NodesController] Fetching ${ids.length} ${type} metadata documents for IDs:`, ids);
                 const refs = ids.map(id => db.collection(type.toLowerCase()).doc(id));
                 const metas = await chunkGetAll(refs);
-                console.log(`[NodesController] Successfully loaded ${metas.filter(m => m.exists).length} metadata from ${ids.length} refs for type ${type}`);
+                logger.debug(`[NodesController] Successfully loaded ${metas.filter(m => m.exists).length} metadata from ${ids.length} refs for type ${type}`);
                 return metas.map(m => m.exists ? { id: m.id, meta: m.data(), type } : null).filter(Boolean);
             })
         );
-        console.log(`[NodesController] Total metadata loaded: ${typeBatches.reduce((sum, batch) => sum + batch.length, 0)} devices`);
+        logger.debug(`[NodesController] Total metadata loaded: ${typeBatches.reduce((sum, batch) => sum + batch.length, 0)} devices`);
 
         for (const batch of typeBatches) {
             for (const item of batch) {
                 const { id, meta, type } = item;
                 
-                console.log(`[NodesController] Processing device: ID=${id}, type=${type}, label=${meta.label}, category=${meta.category}`);
+                logger.debug(`[NodesController] Processing device: ID=${id}, type=${type}, label=${meta.label}, category=${meta.category}`);
 
                   const registry = registryDataMap[id];
                   const effCustomerId = registry?.customer_id || registry?.customerId || meta.customer_id || meta.customerId;
@@ -256,7 +257,7 @@ exports.getNodes = async (req, res) => {
                   // Ownership check only for non-superadmin without an explicit customerId filter
                   if (req.user.role !== "superadmin" && !filterCustomerId) {    
                       if (effCustomerId !== req.user.customer_id) {
-                          console.log(`[NodesController] ⚠️  Filtering out device ${id}: customer mismatch (effCustomerId=${effCustomerId} vs req.user.customer_id=${req.user.customer_id})`);
+                          logger.debug(`[NodesController] ⚠️  Filtering out device ${id}: customer mismatch (effCustomerId=${effCustomerId} vs req.user.customer_id=${req.user.customer_id})`);
                           continue;
                       }
                   }
@@ -265,12 +266,12 @@ exports.getNodes = async (req, res) => {
                 // Non-superadmins: only filter if EXPLICITLY marked as hidden (isVisibleToCustomer === false)
                 // If field is missing (old devices), treat as visible by default
                 const effIsVisible = registry?.isVisibleToCustomer ?? meta?.isVisibleToCustomer; if (req.user.role !== "superadmin" && effIsVisible === false) {
-                    console.log(`[NodesController] ⚠️  Filtering out explicitly hidden device ${id} for user ${req.user.uid}`);
+                    logger.debug(`[NodesController] ⚠️  Filtering out explicitly hidden device ${id} for user ${req.user.uid}`);
                     continue;  // Skip this device
                 }
                 // Superadmins always see all devices
                 if (req.user.role === "superadmin") {
-                    console.log(`[NodesController] ✅ Superadmin${filterCustomerId ? ` querying customer ${filterCustomerId}` : ''} can see all devices`);
+                    logger.debug(`[NodesController] ✅ Superadmin${filterCustomerId ? ` querying customer ${filterCustomerId}` : ''} can see all devices`);
                 }
 
                 // ✅ FIX #17: CONSISTENT STATUS CALCULATION
@@ -285,7 +286,7 @@ exports.getNodes = async (req, res) => {
                 const dynamicStatus = deviceState.calculateDeviceStatus(lastSeen);
 
                 // ✅ DETAILED LOGGING: Show why device is online/offline
-                console.log(`[NodesController] Device ${id}: lastSeen=${lastSeen}, calculatedStatus=${dynamicStatus}, storedStatus=${meta.status}, label=${meta.label}`);
+                logger.debug(`[NodesController] Device ${id}: lastSeen=${lastSeen}, calculatedStatus=${dynamicStatus}, storedStatus=${meta.status}, label=${meta.label}`);
 
                 // Strip sensitive keys
                 const { thingspeak_read_api_key, ...safeMeta } = meta;
@@ -363,8 +364,8 @@ exports.getNodes = async (req, res) => {
             }
         }
 
-                console.log(`[NodesController] ✅ Final result: ${nodes.length} devices prepared`);
-                console.log(`[NodesController] Device details:`, nodes.map(n => ({ 
+                logger.debug(`[NodesController] ✅ Final result: ${nodes.length} devices prepared`);
+                logger.debug(`[NodesController] Device details:`, nodes.map(n => ({ 
                     id: n.id, 
                     name: n.label || n.displayName,
                     device_type: n.device_type,
@@ -373,8 +374,8 @@ exports.getNodes = async (req, res) => {
                 })));
                 
                 // ✅ FIX: Additional detailed logging BEFORE response
-                console.log(`[NodesController] Complete device list (IDs):`, nodes.map(n => n.id).join(', '));
-                console.log(`[NodesController] Device types breakdown:`, 
+                logger.debug(`[NodesController] Complete device list (IDs):`, nodes.map(n => n.id).join(', '));
+                logger.debug(`[NodesController] Device types breakdown:`, 
                     nodes.reduce((acc, n) => {
                         const type = n.analytics_template || n.device_type || 'unknown';
                         acc[type] = (acc[type] || 0) + 1;
@@ -386,7 +387,7 @@ exports.getNodes = async (req, res) => {
                 const typeCount = Object.keys(typedGroups).length;
                 const actualQueries = 1 + typeCount + 1; // devices list + type metadata batches + zones batch
                 const n1Queries = 1 + (nodes.length * 4); // N+1 anti-pattern: 1 + per-device metadata + zone + community queries
-                console.log(`[NodesController] QUERY REDUCTION:
+                logger.debug(`[NodesController] QUERY REDUCTION:
   - Actual queries: ${actualQueries}
   - N+1 pattern would use: ${n1Queries}
   - Files loaded: ${nodes.length} devices from ${typeCount} types
@@ -401,17 +402,17 @@ exports.getNodes = async (req, res) => {
         
         // Legacy code - keeping for reference but disabled:
         // if (shouldUseCache && !filterCustomerId) {
-        //     console.log(`[NodesController] Caching superadmin result for ${Math.ceil(nodes.length / 2)} seconds`);
+        //     logger.debug(`[NodesController] Caching superadmin result for ${Math.ceil(nodes.length / 2)} seconds`);
         //     await cache.set(nodesCacheKey, nodes, Math.ceil(nodes.length / 2));
         // } else if (filterCustomerId) {
-        //     console.log(`[NodesController] ALWAYS FRESH: Customer-specific query - NOT cached`);
+        //     logger.debug(`[NodesController] ALWAYS FRESH: Customer-specific query - NOT cached`);
         // }
         
-        console.log(`[NodesController] ALWAYS FRESH: Device list not cached (status accuracy priority)`);
+        logger.debug(`[NodesController] ALWAYS FRESH: Device list not cached (status accuracy priority)`);
         
         res.status(200).json(nodes);
     } catch (error) {
-        console.error(`[NodesController] Error in getNodes:`, error);
+        logger.error(`[NodesController] Error in getNodes:`, error);
         res.status(500).json({ error: "Failed to fetch nodes" });
     }
 };
@@ -461,12 +462,12 @@ exports.getNodeById = async (req, res) => {
             customer_name: customerName
         };
         
-        console.log(`[getNodeById] Returning config with Channel ID:`, result.thingspeak_channel_id, `Customer: ${customerName}`);
+        logger.debug(`[getNodeById] Returning config with Channel ID:`, result.thingspeak_channel_id, `Customer: ${customerName}`);
         
         await cache.set(`device:${doc.id}:metadata`, result, 3600);
         res.status(200).json(result);
     } catch (error) {
-        console.error('[getNodeById] ERROR:', error.message);
+        logger.error('[getNodeById] ERROR:', error.message);
         res.status(500).json({ error: "Failed to fetch node" });
     }
 };
@@ -535,12 +536,12 @@ exports.getNodeTelemetry = async (req, res) => {
             }
 
             const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
-            console.log(`[ThingSpeak] Fetching: ${url}`);
+            logger.debug(`[ThingSpeak] Fetching: ${url}`);
 
             try {
                 const response = await axios.get(url, { timeout: 8000 });
                 const feeds = response.data?.feeds || [];
-                console.log(`[ThingSpeak] Response status 200, feeds: ${feeds.length}`);
+                logger.debug(`[ThingSpeak] Response status 200, feeds: ${feeds.length}`);
 
                 if (!feeds || feeds.length === 0) {
                     return res.status(200).json({
@@ -559,7 +560,7 @@ exports.getNodeTelemetry = async (req, res) => {
                 const flowRate = isNaN(rawFlowRate) ? null : rawFlowRate;
                 const totalUsage = isNaN(rawTotal) ? null : rawTotal;
 
-                console.log(`[ThingSpeak] totalUsage=${totalUsage} flowRate=${flowRate} (fields: total=${totalReadingFieldKey}, flow=${flowRateFieldKey})`);
+                logger.debug(`[ThingSpeak] totalUsage=${totalUsage} flowRate=${flowRate} (fields: total=${totalReadingFieldKey}, flow=${flowRateFieldKey})`);
 
                 const feedTimestamp = latestFeed.created_at;
                 const status = deviceState.calculateDeviceStatus(feedTimestamp);
@@ -582,7 +583,7 @@ exports.getNodeTelemetry = async (req, res) => {
                     raw_data: latestFeed
                 });
             } catch (err) {
-                console.error(`[ThingSpeak] Fetch error for device ${deviceDoc.id}:`, err.message);
+                logger.error(`[ThingSpeak] Fetch error for device ${deviceDoc.id}:`, err.message);
                 return res.status(200).json({
                     deviceId: deviceDoc.id,
                     status: DEVICE_STATUS.UNKNOWN,
@@ -618,15 +619,15 @@ exports.getNodeTelemetry = async (req, res) => {
             }
 
             const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
-            console.log(`[TDS] Fetching: ${url}`);
+            logger.debug(`[TDS] Fetching: ${url}`);
 
             try {
                 const response = await axios.get(url, { timeout: 8000 });
                 const feeds = response.data?.feeds || [];
-                console.log(`[TDS] Response status 200, feeds: ${feeds.length}`);
+                logger.debug(`[TDS] Response status 200, feeds: ${feeds.length}`);
 
                 if (!feeds || feeds.length === 0) {
-                    console.log(`[TDS] No feeds returned`);
+                    logger.debug(`[TDS] No feeds returned`);
                     return res.status(200).json({
                         deviceId: deviceDoc.id,
                         status: DEVICE_STATUS.UNKNOWN,
@@ -644,9 +645,9 @@ exports.getNodeTelemetry = async (req, res) => {
                 const tdsValue = isNaN(rawTdsValue) ? null : rawTdsValue;
                 const temperature = isNaN(rawTemperature) ? null : rawTemperature;
 
-                console.log(`[TDS] Latest feed data:`, latestFeed);
-                console.log(`[TDS] Extracted values: tdsValue=${tdsValue} temperature=${temperature}`);
-                console.log(`[TDS] Extracted from fields: tds_field=${tdsFieldKey} (value in feed=${latestFeed[tdsFieldKey]}), temp_field=${tempFieldKey} (value in feed=${latestFeed[tempFieldKey]})`);
+                logger.debug(`[TDS] Latest feed data:`, latestFeed);
+                logger.debug(`[TDS] Extracted values: tdsValue=${tdsValue} temperature=${temperature}`);
+                logger.debug(`[TDS] Extracted from fields: tds_field=${tdsFieldKey} (value in feed=${latestFeed[tdsFieldKey]}), temp_field=${tempFieldKey} (value in feed=${latestFeed[tempFieldKey]})`);
 
                 const feedTimestamp = latestFeed.created_at;
                 const status = deviceState.calculateDeviceStatus(feedTimestamp);
@@ -680,7 +681,7 @@ exports.getNodeTelemetry = async (req, res) => {
                     raw_data: latestFeed
                 });
             } catch (err) {
-                console.error(`[TDS] Fetch error for device ${deviceDoc.id}:`, err.message);
+                logger.error(`[TDS] Fetch error for device ${deviceDoc.id}:`, err.message);
                 return res.status(200).json({
                     deviceId: deviceDoc.id,
                     status: DEVICE_STATUS.UNKNOWN,
@@ -740,10 +741,10 @@ exports.getNodeTelemetry = async (req, res) => {
                 ) || metadata.water_level_field || metadata.fieldKey || "field1";
 
             const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
-            console.log(`[ThingSpeak] Fetching: ${url}`);
+            logger.debug(`[ThingSpeak] Fetching: ${url}`);
             const response = await axios.get(url, { timeout: 5000 });
             const feeds = response.data?.feeds || [];
-            console.log(`[ThingSpeak] Response status 200, feeds: ${feeds.length}`);
+            logger.debug(`[ThingSpeak] Response status 200, feeds: ${feeds.length}`);
 
             if (!feeds || feeds.length === 0) {
                 return res.status(200).json(baseTelemetry);
@@ -752,7 +753,7 @@ exports.getNodeTelemetry = async (req, res) => {
             const lastFeed = feeds[0];
             const distance = parseFloat(lastFeed[sensorFieldKey]) || 0;
             const feedTimestamp = lastFeed.created_at;
-            console.log(`[ThingSpeak] distance=${distance} (field=${sensorFieldKey})`);
+            logger.debug(`[ThingSpeak] distance=${distance} (field=${sensorFieldKey})`);
 
             const lastStoredTimestamp = metadata.last_updated_at || metadata.last_seen || null;
             if (lastStoredTimestamp && feedTimestamp <= lastStoredTimestamp) {
@@ -779,7 +780,7 @@ exports.getNodeTelemetry = async (req, res) => {
             syncNodeStatus(deviceDoc.id, type, feedTimestamp, {
                 level_percentage: result.level_percentage,
                 distance: distance
-            }).catch(err => console.error("Sync error:", err));
+            }).catch(err => logger.error("Sync error:", err));
 
             telemetryCache.set(cacheKey, result);
             return res.status(200).json(result);
@@ -787,7 +788,7 @@ exports.getNodeTelemetry = async (req, res) => {
             return res.status(200).json(baseTelemetry);
         }
     } catch (error) {
-        console.error("Telemetry error:", error);
+        logger.error("Telemetry error:", error);
         res.status(500).json({ error: "Telemetry fetch failure" });
     }
 };
@@ -895,7 +896,7 @@ exports.getNodeGraphData = async (req, res) => {
             });
         }
     } catch (error) {
-        console.error("Graph data error:", error);
+        logger.error("Graph data error:", error);
         res.status(500).json({ error: "Graph data fetch failure" });
     }
 };
@@ -948,13 +949,13 @@ exports.getNodeGraphDataHybrid = async (req, res) => {
             start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
         }
 
-        console.log(`[HybridGraphData] Device: ${deviceDoc.id}, Range: ${range}, Start: ${start.toISOString()}, End: ${end.toISOString()}`);
+        logger.debug(`[HybridGraphData] Device: ${deviceDoc.id}, Range: ${range}, Start: ${start.toISOString()}, End: ${end.toISOString()}`);
 
         // ✅ Check cache first
         const cacheKey = `graph_hybrid_${deviceDoc.id}_${range}_${start.toISOString()}_${end.toISOString()}`;
         const cached = await cache.get(cacheKey);
         if (cached) {
-            console.log(`✅ [HybridGraphData] Serving from cache`);
+            logger.debug(`✅ [HybridGraphData] Serving from cache`);
             return res.status(200).json({
                 ...cached,
                 cached: true,
@@ -1016,7 +1017,7 @@ exports.getNodeGraphDataHybrid = async (req, res) => {
         res.status(200).json(responseData);
 
     } catch (error) {
-        console.error("[HybridGraphData] Error:", error);
+        logger.error("[HybridGraphData] Error:", error);
         res.status(500).json({
             error: "Graph data fetch failure",
             message: error.message,
@@ -1070,7 +1071,7 @@ exports.getNodeAnalytics = async (req, res) => {
     const analyticsCacheKey = `analytics_${deviceDoc.id}_${range || '24H'}_${startDate || ''}_${endDate || ''}`;
     const cachedAnalytics = await cache.get(analyticsCacheKey);
     if (cachedAnalytics) {
-      console.log(`[NodesController] Serving cached analytics for ${deviceDoc.id}`);
+      logger.debug(`[NodesController] Serving cached analytics for ${deviceDoc.id}`);
       return res.status(200).json(cachedAnalytics);
     }
 
@@ -1170,7 +1171,7 @@ exports.getNodeAnalytics = async (req, res) => {
           flow_rate: flowResult.flow_rate,
           total_liters: flowResult.total_liters,
           status
-        }).catch(err => console.error("Sync error:", err));
+        }).catch(err => logger.error("Sync error:", err));
 
         await cache.set(analyticsCacheKey, flowResult, 300);
         return res.status(200).json(flowResult);
@@ -1189,9 +1190,9 @@ exports.getNodeAnalytics = async (req, res) => {
       if (metadata.tdsField) tdsFieldKey = metadata.tdsField;
       if (metadata.tempField || metadata.temperature_field) tempFieldKey = metadata.tempField || metadata.temperature_field;
 
-      console.log(`[TDS-Analytics] Device ${req.params.id}:`);
-      console.log(`[TDS-Analytics]   tdsField: ${tdsFieldKey}, temperatureField: ${tempFieldKey}`);
-      console.log(`[TDS-Analytics]   Total feeds: ${feeds.length}`);
+      logger.debug(`[TDS-Analytics] Device ${req.params.id}:`);
+      logger.debug(`[TDS-Analytics]   tdsField: ${tdsFieldKey}, temperatureField: ${tempFieldKey}`);
+      logger.debug(`[TDS-Analytics]   Total feeds: ${feeds.length}`);
 
       // CRITICAL: Lookup customer name for the Node Info modal
       const effCustomerId = registry?.customer_id || registry?.customerId || metadata.customer_id || metadata.customerId;
@@ -1244,7 +1245,7 @@ exports.getNodeAnalytics = async (req, res) => {
           }))
         };
 
-        console.log(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}, Customer: ${customerName}`);
+        logger.debug(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}, Customer: ${customerName}`);
 
         // Sync status back to device doc (metadata collection)
         await db.collection(type).doc(deviceDoc.id).update({
@@ -1253,7 +1254,7 @@ exports.getNodeAnalytics = async (req, res) => {
           waterQualityRating: quality,
           lastUpdatedAt: normalizeThingSpeakTimestamp(lastUpdatedAt),
           status
-        }).catch(err => console.error("Metadata sync error:", err));
+        }).catch(err => logger.error("Metadata sync error:", err));
 
         // Sync back to registry (devices collection)
         await db.collection("devices").doc(deviceDoc.id).update({
@@ -1265,7 +1266,7 @@ exports.getNodeAnalytics = async (req, res) => {
             waterQualityRating: quality,
             timestamp: normalizeThingSpeakTimestamp(lastUpdatedAt)
           }
-        }).catch(err => console.error("Registry sync error:", err));
+        }).catch(err => logger.error("Registry sync error:", err));
 
         await cache.set(analyticsCacheKey, tdsResult, 300);
         return res.status(200).json(tdsResult);
@@ -1355,13 +1356,13 @@ exports.getNodeAnalytics = async (req, res) => {
       level_percentage: latestPoint.level,
       currentVolume: latestPoint.volume,
       waterState: analytics.state,
-    }).catch(err => console.error("Metadata update error:", err));
+    }).catch(err => logger.error("Metadata update error:", err));
 
     await cache.set(analyticsCacheKey, tankResult, 300);
     return res.status(200).json(tankResult);
 
   } catch (error) {
-    console.error("Tank Engine Error:", error);
+    logger.error("Tank Engine Error:", error);
     res.status(500).json({ error: "Tank analytics calculation failure" });
   }
 };

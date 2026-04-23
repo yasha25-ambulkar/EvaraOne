@@ -3,6 +3,7 @@ const { Filter } = require("firebase-admin/firestore");
 const cache = require("../config/cache.js");
 const telemetryCache = require("../services/cacheService.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
+const logger = require("../utils/logger.js");
 // ✅ PHASE 2: Cache versioning (Task #11)
 const { getVersionKey, incrementCacheVersion } = require("../utils/cacheVersioning.js");
 // ✅ PHASE 2: Audit logging (Task #12)
@@ -131,13 +132,13 @@ exports.getZoneById = async (req, res) => {
         
         // No owner_customer_id = orphaned zone (shouldn't exist, but reject it anyway)
         if (!zoneOwner) {
-            console.warn(`[Tenant Isolation] Zone ${req.params.id} has no owner — rejecting access`);
+            logger.warn(`[Tenant Isolation] Zone ${req.params.id} has no owner — rejecting access`);
             return res.status(404).json({ error: "Zone not found" });
         }
 
         // Owner must match exactly
         if (zoneOwner !== userTenant) {
-            console.warn(`[Tenant Isolation] Unauthorized zone access attempt`, {
+            logger.warn(`[Tenant Isolation] Unauthorized zone access attempt`, {
                 userId: req.user.uid,
                 zoneId: req.params.id,
                 requestedTenant: userTenant,
@@ -149,7 +150,7 @@ exports.getZoneById = async (req, res) => {
         // ✅ Owner verified: return zone
         res.status(200).json({ id: doc.id, ...zoneData });
     } catch (error) {
-        console.error("[Zone] Get by ID failed:", error.message);
+        logger.error("[Zone] Get by ID failed:", error.message);
         res.status(500).json({ error: "Failed to get zone" });
     }
 };
@@ -278,7 +279,7 @@ exports.getCustomers = async (req, res) => {
         const limitStr = parseInt(limit) || 50;
         let query = db.collection("customers");
 
-        console.log(`[AdminController] getCustomers query:`, { zone_id, community_id, role: req.user.role });
+        logger.debug(`[AdminController] getCustomers query:`, { zone_id, community_id, role: req.user.role });
 
         if (req.user.role !== "superadmin") {
             query = query.where("id", "==", req.user.customer_id || req.user.uid);
@@ -309,19 +310,19 @@ exports.getCustomers = async (req, res) => {
 
         // COMPREHENSIVE FALLBACK: Check alternative field names (zoneId, regionFilter) if no results for zone_id
         if (req.user.role === "superadmin" && zone_id && customers.length === 0) {
-            console.log(`[AdminController] No customers found for zone_id: ${zone_id}, trying fallbacks...`);
+            logger.debug(`[AdminController] No customers found for zone_id: ${zone_id}, trying fallbacks...`);
 
             // Try zoneId (camelCase)
             const zoneIdSnapshot = await db.collection("customers").where("zoneId", "==", zone_id.trim()).limit(limitStr).get();
             if (!zoneIdSnapshot.empty) {
-                console.log(`[AdminController] Found ${zoneIdSnapshot.size} customers via zoneId fallback`);
+                logger.debug(`[AdminController] Found ${zoneIdSnapshot.size} customers via zoneId fallback`);
                 customers = [...customers, ...zoneIdSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))];
             }
 
             // Try regionFilter (legacy)
             const regionSnapshot = await db.collection("customers").where("regionFilter", "==", zone_id.trim()).limit(limitStr).get();
             if (!regionSnapshot.empty) {
-                console.log(`[AdminController] Found ${regionSnapshot.size} customers via regionFilter fallback`);
+                logger.debug(`[AdminController] Found ${regionSnapshot.size} customers via regionFilter fallback`);
                 // Deduplicate by ID
                 const existingIds = new Set(customers.map(c => c.id));
                 regionSnapshot.docs.forEach(doc => {
@@ -333,11 +334,11 @@ exports.getCustomers = async (req, res) => {
             }
         }
 
-        console.log(`[AdminController] Successfully fetched ${customers.length} customers`);
+        logger.debug(`[AdminController] Successfully fetched ${customers.length} customers`);
         await cache.set(cacheKey, customers, 600); // 10 min
         res.status(200).json(customers);
     } catch (error) {
-        console.error("[AdminController] getCustomers CRITICAL ERROR:", error);
+        logger.error("[AdminController] getCustomers CRITICAL ERROR:", error);
         res.status(500).json({ error: "Failed to get customers" });
     }
 };
@@ -408,9 +409,9 @@ exports.deleteCustomer = async (req, res) => {
 exports.createNode = async (req, res) => {
     try {
         // Log complete request body immediately
-        console.log(`\n[createNode] 📨 RECEIVED REQUEST BODY:`);
-        console.log(`[createNode]   Complete body:`, JSON.stringify(req.body, null, 2));
-        console.log(`[createNode]   Body keys:`, Object.keys(req.body));
+        logger.debug(`\n[createNode] 📨 RECEIVED REQUEST BODY:`);
+        logger.debug(`[createNode]   Complete body:`, JSON.stringify(req.body, null, 2));
+        logger.debug(`[createNode]   Body keys:`, Object.keys(req.body));
         
         const {
             displayName,
@@ -440,19 +441,19 @@ exports.createNode = async (req, res) => {
         } = req.body;
 
         // 🔍 DEBUG: Log immediately after destructuring
-        console.log(`\n[createNode] 📥 DESTRUCTURED FROM req.body:`);
-        console.log(`[createNode]   hardwareId: "${hardwareId}"`);
-        console.log(`[createNode]   thingspeakChannelId: "${thingspeakChannelId}"`);
-        console.log(`[createNode]   thingspeakReadKey: "${thingspeakReadKey}"`);
-        console.log(`[createNode]   assetType: "${assetType}"`);
-        console.log(`[createNode]   Full req.body keys:`, Object.keys(req.body));
+        logger.debug(`\n[createNode] 📥 DESTRUCTURED FROM req.body:`);
+        logger.debug(`[createNode]   hardwareId: "${hardwareId}"`);
+        logger.debug(`[createNode]   thingspeakChannelId: "${thingspeakChannelId}"`);
+        logger.debug(`[createNode]   thingspeakReadKey: "${thingspeakReadKey}"`);
+        logger.debug(`[createNode]   assetType: "${assetType}"`);
+        logger.debug(`[createNode]   Full req.body keys:`, Object.keys(req.body));
 
         const timestamp = new Date();
         const idForDevice = hardwareId || `DEV-${Date.now()}`;
         
         // ⚠️ CRITICAL: For TDS devices, hardwareId MUST be provided
         if ((assetType === "EvaraTDS" || assetType === "evaratds" || assetType === "tds") && !hardwareId) {
-            console.error(`[createNode] ❌ CRITICAL: TDS device created without hardwareId!`);
+            logger.error(`[createNode] ❌ CRITICAL: TDS device created without hardwareId!`);
             return res.status(400).json({
                 error: "TDS devices require a hardware ID (node_key)",
                 receivedAssetType: assetType,
@@ -460,7 +461,7 @@ exports.createNode = async (req, res) => {
             });
         }
         
-        console.log(`[createNode] Generated idForDevice: "${idForDevice}"`);
+        logger.debug(`[createNode] Generated idForDevice: "${idForDevice}"`);
         const typeNormalized = (assetType || "evaratank").toLowerCase();
 
         // ============================================================================
@@ -527,24 +528,24 @@ exports.createNode = async (req, res) => {
         const deviceDocRef = db.collection("devices").doc();
         const deviceDocId = deviceDocRef.id;
         
-        console.log(`[createNode] 📌 CRITICAL: Generating document IDs`);
-        console.log(`[createNode]   Generated Firestore ID: ${deviceDocId}`);
-        console.log(`[createNode]   Hardware ID (device_id/node_id): ${idForDevice}`);
-        console.log(`[createNode]   Target collection: ${targetCol}`);
-        console.log(`[createNode] 🔍 REGISTRY DATA TO BE WRITTEN:`);
-        console.log(`[createNode]   device_type: "${registryData.device_type}"`);
-        console.log(`[createNode]   device_id: "${registryData.device_id}"`);
-        console.log(`[createNode]   node_id: "${registryData.node_id}"`);
-        console.log(`[createNode]   All keys:`, Object.keys(registryData));
+        logger.debug(`[createNode] 📌 CRITICAL: Generating document IDs`);
+        logger.debug(`[createNode]   Generated Firestore ID: ${deviceDocId}`);
+        logger.debug(`[createNode]   Hardware ID (device_id/node_id): ${idForDevice}`);
+        logger.debug(`[createNode]   Target collection: ${targetCol}`);
+        logger.debug(`[createNode] 🔍 REGISTRY DATA TO BE WRITTEN:`);
+        logger.debug(`[createNode]   device_type: "${registryData.device_type}"`);
+        logger.debug(`[createNode]   device_id: "${registryData.device_id}"`);
+        logger.debug(`[createNode]   node_id: "${registryData.node_id}"`);
+        logger.debug(`[createNode]   All keys:`, Object.keys(registryData));
         
         batch.set(deviceDocRef, registryData); // Queue but don't write yet
-        console.log(`[createNode] ✅ Registry batch.set() queued for devices/${deviceDocId}`);
+        logger.debug(`[createNode] ✅ Registry batch.set() queued for devices/${deviceDocId}`);
 
         // 🔍 DEBUG: Log what we received from frontend
-        console.log(`\n[createNode] 🎯 RECEIVED FROM FRONTEND:`);
-        console.log(`[createNode]   thingspeakChannelId value: "${thingspeakChannelId}"`);
-        console.log(`[createNode]   thingspeakReadKey value: "${thingspeakReadKey}"`);
-        console.log(`[createNode]   assetType: "${assetType}"`);
+        logger.debug(`\n[createNode] 🎯 RECEIVED FROM FRONTEND:`);
+        logger.debug(`[createNode]   thingspeakChannelId value: "${thingspeakChannelId}"`);
+        logger.debug(`[createNode]   thingspeakReadKey value: "${thingspeakReadKey}"`);
+        logger.debug(`[createNode]   assetType: "${assetType}"`);
 
         // 2. Prepare METADATA entry (Detailed)
         let metadata = {
@@ -563,9 +564,9 @@ exports.createNode = async (req, res) => {
         };
 
         // 🔍 DEBUG: Log metadata BEFORE adding device type specific data
-        console.log(`[createNode] 📝 METADATA BASE CREATED:`);
-        console.log(`[createNode]   thingspeak_channel_id will be: "${metadata.thingspeak_channel_id}"`);
-        console.log(`[createNode]   thingspeak_read_api_key will be: "${metadata.thingspeak_read_api_key}"`);
+        logger.debug(`[createNode] 📝 METADATA BASE CREATED:`);
+        logger.debug(`[createNode]   thingspeak_channel_id will be: "${metadata.thingspeak_channel_id}"`);
+        logger.debug(`[createNode]   thingspeak_read_api_key will be: "${metadata.thingspeak_read_api_key}"`);
 
         // ✅ FIX #7: Add PROPER FIELD MAPPING SCHEMA (Semantic names → ThingSpeak fields)
         // BEFORE: sensor_field_mapping had backwards mapping [field] → "semantic_name"
@@ -609,9 +610,9 @@ exports.createNode = async (req, res) => {
                 [rateField]: "flow_rate",
                 [readingField]: "current_reading"
             };
-            console.log(`[createNode-FLOW] 📝 Storing Flow metadata:`);
-            console.log(`[createNode-FLOW]   Channel ID: "${metadata.thingspeak_channel_id}"`);
-            console.log(`[createNode-FLOW]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'EMPTY'}"`);
+            logger.debug(`[createNode-FLOW] 📝 Storing Flow metadata:`);
+            logger.debug(`[createNode-FLOW]   Channel ID: "${metadata.thingspeak_channel_id}"`);
+            logger.debug(`[createNode-FLOW]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'EMPTY'}"`);
         } else if (targetCol === "evaratds") {
             metadata.configuration = {
                 type: "TDS",
@@ -639,41 +640,41 @@ exports.createNode = async (req, res) => {
             metadata.tdsHistory = [];
             metadata.tempHistory = [];
             
-            console.log(`[createNode-TDS] 📝 Storing TDS metadata:`);
-            console.log(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
-            console.log(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
-            console.log(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
-            console.log(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
-            console.log(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
-            console.log(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
-            console.log(`[createNode-TDS]   Fields mapping:`, metadata.fields);
+            logger.debug(`[createNode-TDS] 📝 Storing TDS metadata:`);
+            logger.debug(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
+            logger.debug(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
+            logger.debug(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
+            logger.debug(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
+            logger.debug(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
+            logger.debug(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
+            logger.debug(`[createNode-TDS]   Fields mapping:`, metadata.fields);
         }
 
         // Critical Fix: Use SAME document ID for metadata as registry
         // This ensures fetch can find metadata using the registry document ID
-        console.log(`[createNode] � QUEUING METADATA BATCH OPERATION`);
-        console.log(`[createNode]   Target collection: ${targetCol}`);
-        console.log(`[createNode]   Document ID: ${deviceDocId}`);
-        console.log(`[createNode]   Metadata object keys:`, Object.keys(metadata));
-        console.log(`[createNode]   device_id in metadata: "${metadata.device_id}"`);
-        console.log(`[createNode]   node_id in metadata: "${metadata.node_id}"`);
+        logger.debug(`[createNode] � QUEUING METADATA BATCH OPERATION`);
+        logger.debug(`[createNode]   Target collection: ${targetCol}`);
+        logger.debug(`[createNode]   Document ID: ${deviceDocId}`);
+        logger.debug(`[createNode]   Metadata object keys:`, Object.keys(metadata));
+        logger.debug(`[createNode]   device_id in metadata: "${metadata.device_id}"`);
+        logger.debug(`[createNode]   node_id in metadata: "${metadata.node_id}"`);
         
         const metadataRef = db.collection(targetCol).doc(deviceDocId);
         batch.set(metadataRef, metadata);
-        console.log(`[createNode] ✅ Metadata batch.set() queued for ${targetCol}/${deviceDocId}`);
+        logger.debug(`[createNode] ✅ Metadata batch.set() queued for ${targetCol}/${deviceDocId}`);
 
-        console.log(`\n[createNode-ALL] 🎯 STORING in ${targetCol} collection:`);
-        console.log(`[createNode-ALL] Document ID: ${deviceDocId}`);
-        console.log(`[createNode-ALL] hardware ID (device_id/node_id): ${idForDevice}`);
-        console.log(`[createNode-ALL] device_type: ${typeNormalized}`);
-        console.log(`[createNode-ALL] Full registry keys:`, Object.keys(registryData));
-        console.log(`[createNode-ALL] Full metadata keys:`, Object.keys(metadata));
-        console.log(`[createNode-ALL] Registry device_id: ${registryData.device_id}`);
-        console.log(`[createNode-ALL] Registry node_id: ${registryData.node_id}`);
-        console.log(`[createNode-ALL] Metadata device_id: ${metadata.device_id}`);
-        console.log(`[createNode-ALL] Metadata node_id: ${metadata.node_id}`);
-        console.log(`[createNode-ALL] thingspeak_channel_id VALUE:`, metadata.thingspeak_channel_id);
-        console.log(`[createNode-ALL] thingspeak_read_api_key VALUE:`, metadata.thingspeak_read_api_key);
+        logger.debug(`\n[createNode-ALL] 🎯 STORING in ${targetCol} collection:`);
+        logger.debug(`[createNode-ALL] Document ID: ${deviceDocId}`);
+        logger.debug(`[createNode-ALL] hardware ID (device_id/node_id): ${idForDevice}`);
+        logger.debug(`[createNode-ALL] device_type: ${typeNormalized}`);
+        logger.debug(`[createNode-ALL] Full registry keys:`, Object.keys(registryData));
+        logger.debug(`[createNode-ALL] Full metadata keys:`, Object.keys(metadata));
+        logger.debug(`[createNode-ALL] Registry device_id: ${registryData.device_id}`);
+        logger.debug(`[createNode-ALL] Registry node_id: ${registryData.node_id}`);
+        logger.debug(`[createNode-ALL] Metadata device_id: ${metadata.device_id}`);
+        logger.debug(`[createNode-ALL] Metadata node_id: ${metadata.node_id}`);
+        logger.debug(`[createNode-ALL] thingspeak_channel_id VALUE:`, metadata.thingspeak_channel_id);
+        logger.debug(`[createNode-ALL] thingspeak_read_api_key VALUE:`, metadata.thingspeak_read_api_key);
         
         // ⚠️ VALIDATION: Ensure required fields are present
         if (!metadata.device_id) {
@@ -683,87 +684,87 @@ exports.createNode = async (req, res) => {
             throw new Error(`[VALIDATION FAILED] Metadata node_id is empty or missing!`);
         }
         if (!metadata.thingspeak_channel_id || !metadata.thingspeak_read_api_key) {
-            console.warn(`[VALIDATION WARNING] ThingSpeak credentials missing for TDS device - will not be able to fetch telemetry`);
+            logger.warn(`[VALIDATION WARNING] ThingSpeak credentials missing for TDS device - will not be able to fetch telemetry`);
         }
         
-        console.log(`[createNode-ALL] 📋 COMPLETE METADATA OBJECT:`, JSON.stringify(metadata, null, 2));
-        console.log(`[createNode-ALL] 📋 COMPLETE REGISTRY OBJECT:`, JSON.stringify(registryData, null, 2));
+        logger.debug(`[createNode-ALL] 📋 COMPLETE METADATA OBJECT:`, JSON.stringify(metadata, null, 2));
+        logger.debug(`[createNode-ALL] 📋 COMPLETE REGISTRY OBJECT:`, JSON.stringify(registryData, null, 2));
 
         // Write BOTH documents at once with matching IDs
         // If batch.commit() fails, NEITHER document is written
-        console.log(`[createNode-ALL] ⏳ READY TO COMMIT BATCH`);
-        console.log(`[createNode-ALL] Batch will contain:`);
-        console.log(`[createNode-ALL]   1. Registry: devices/${deviceDocId}`);
-        console.log(`[createNode-ALL]   2. Metadata: ${targetCol}/${deviceDocId}`);
-        console.log(`[createNode-ALL] User: ${customerId}`);
-        console.log(`[createNode-ALL] Firestore batch object type: ${batch.constructor.name}`);
+        logger.debug(`[createNode-ALL] ⏳ READY TO COMMIT BATCH`);
+        logger.debug(`[createNode-ALL] Batch will contain:`);
+        logger.debug(`[createNode-ALL]   1. Registry: devices/${deviceDocId}`);
+        logger.debug(`[createNode-ALL]   2. Metadata: ${targetCol}/${deviceDocId}`);
+        logger.debug(`[createNode-ALL] User: ${customerId}`);
+        logger.debug(`[createNode-ALL] Firestore batch object type: ${batch.constructor.name}`);
         
         // ✅ ISSUE #4 FIX: Atomic batch commit — NO fallback
         // If batch.commit() fails, the entire operation fails cleanly with 500.
         // No sequential set() calls = no orphaned records ever.
         // Central error handler will catch this and return 500 to client.
-        console.log(`[createNode-ALL] ⏳ NOW COMMITTING BATCH...`);
+        logger.debug(`[createNode-ALL] ⏳ NOW COMMITTING BATCH...`);
         await batch.commit();
-        console.log(`[createNode-ALL] ✅ Batch.commit() SUCCEEDED!`);
-        console.log(`[createNode-ALL] ✅ Should have written to:`);
-        console.log(`[createNode-ALL]    - devices/${deviceDocId}`);
-        console.log(`[createNode-ALL]    - ${targetCol}/${deviceDocId}`);
+        logger.debug(`[createNode-ALL] ✅ Batch.commit() SUCCEEDED!`);
+        logger.debug(`[createNode-ALL] ✅ Should have written to:`);
+        logger.debug(`[createNode-ALL]    - devices/${deviceDocId}`);
+        logger.debug(`[createNode-ALL]    - ${targetCol}/${deviceDocId}`);
 
         // VERIFICATION: Check that both documents were actually written
-        console.log(`[createNode-ALL] 🔍 VERIFYING writes...`);
+        logger.debug(`[createNode-ALL] 🔍 VERIFYING writes...`);
         let registryValid = false;
         let metadataValid = false;
         
         try {
-            console.log(`[createNode-ALL] 🔍 Checking devices/${deviceDocId}...`);
+            logger.debug(`[createNode-ALL] 🔍 Checking devices/${deviceDocId}...`);
             const verifyRegistry = await db.collection("devices").doc(deviceDocId).get();
             if (verifyRegistry.exists) {
-                console.log(`[createNode-ALL] ✅ VERIFIED: Registry document EXISTS in devices/${deviceDocId}`);
+                logger.debug(`[createNode-ALL] ✅ VERIFIED: Registry document EXISTS in devices/${deviceDocId}`);
                 const regData = verifyRegistry.data();
-                console.log(`[createNode-ALL]    device_id: "${regData.device_id}"`);
-                console.log(`[createNode-ALL]    node_id: "${regData.node_id}"`);
-                console.log(`[createNode-ALL]    device_type: "${regData.device_type}"`);
-                console.log(`[createNode-ALL]    assetType: "${regData.assetType}"`);
-                console.log(`[createNode-ALL]    displayName: "${regData.displayName}"`);
-                console.log(`[createNode-ALL]    All registry keys:`, Object.keys(regData).join(", "));
+                logger.debug(`[createNode-ALL]    device_id: "${regData.device_id}"`);
+                logger.debug(`[createNode-ALL]    node_id: "${regData.node_id}"`);
+                logger.debug(`[createNode-ALL]    device_type: "${regData.device_type}"`);
+                logger.debug(`[createNode-ALL]    assetType: "${regData.assetType}"`);
+                logger.debug(`[createNode-ALL]    displayName: "${regData.displayName}"`);
+                logger.debug(`[createNode-ALL]    All registry keys:`, Object.keys(regData).join(", "));
                 
                 if (regData.device_id && regData.node_id) {
                     registryValid = true;
-                    console.log(`[createNode-ALL] ✅ Registry has required fields (device_id, node_id)`);
+                    logger.debug(`[createNode-ALL] ✅ Registry has required fields (device_id, node_id)`);
                 } else {
-                    console.error(`[createNode-ALL] ❌ WARNING: Registry missing device_id or node_id!`);
+                    logger.error(`[createNode-ALL] ❌ WARNING: Registry missing device_id or node_id!`);
                 }
             } else {
-                console.error(`[createNode-ALL] ❌ CRITICAL: Registry document NOT found in devices/${deviceDocId}`);
+                logger.error(`[createNode-ALL] ❌ CRITICAL: Registry document NOT found in devices/${deviceDocId}`);
             }
 
-            console.log(`[createNode-ALL] 🔍 Checking ${targetCol}/${deviceDocId}...`);
+            logger.debug(`[createNode-ALL] 🔍 Checking ${targetCol}/${deviceDocId}...`);
             const verifyMetadata = await db.collection(targetCol).doc(deviceDocId).get();
             if (verifyMetadata.exists) {
-                console.log(`[createNode-ALL] ✅ VERIFIED: Metadata document EXISTS in ${targetCol}/${deviceDocId}`);
+                logger.debug(`[createNode-ALL] ✅ VERIFIED: Metadata document EXISTS in ${targetCol}/${deviceDocId}`);
                 metadataValid = true;
                 const metaData = verifyMetadata.data();
-                console.log(`[createNode-ALL]    device_id: "${metaData.device_id}"`);
-                console.log(`[createNode-ALL]    node_id: "${metaData.node_id}"`);
-                console.log(`[createNode-ALL]    thingspeak_channel_id: "${metaData.thingspeak_channel_id}"`);
-                console.log(`[createNode-ALL]    thingspeak_read_api_key: ${metaData.thingspeak_read_api_key ? '✅ SET' : '❌ MISSING'}`);
-                console.log(`[createNode-ALL]    All metadata keys:`, Object.keys(metaData).join(", "));
+                logger.debug(`[createNode-ALL]    device_id: "${metaData.device_id}"`);
+                logger.debug(`[createNode-ALL]    node_id: "${metaData.node_id}"`);
+                logger.debug(`[createNode-ALL]    thingspeak_channel_id: "${metaData.thingspeak_channel_id}"`);
+                logger.debug(`[createNode-ALL]    thingspeak_read_api_key: ${metaData.thingspeak_read_api_key ? '✅ SET' : '❌ MISSING'}`);
+                logger.debug(`[createNode-ALL]    All metadata keys:`, Object.keys(metaData).join(", "));
             } else {
-                console.error(`[createNode-ALL] ❌ CRITICAL: Metadata document NOT found in ${targetCol}/${deviceDocId}`);
-                console.error(`[createNode-ALL]    This means batch.set() for metadata DID NOT WORK!`);
-                console.error(`[createNode-ALL]    Collection: ${targetCol}`);
-                console.error(`[createNode-ALL]    Expected to see collection in Firestore, but it's empty or doesn't exist!`);
+                logger.error(`[createNode-ALL] ❌ CRITICAL: Metadata document NOT found in ${targetCol}/${deviceDocId}`);
+                logger.error(`[createNode-ALL]    This means batch.set() for metadata DID NOT WORK!`);
+                logger.error(`[createNode-ALL]    Collection: ${targetCol}`);
+                logger.error(`[createNode-ALL]    Expected to see collection in Firestore, but it's empty or doesn't exist!`);
             }
         } catch (verifyErr) {
-            console.error(`[createNode-ALL] ❌ Verification check threw exception:`, verifyErr.message);
-            console.error(`[createNode-ALL]    Stack:`, verifyErr.stack);
+            logger.error(`[createNode-ALL] ❌ Verification check threw exception:`, verifyErr.message);
+            logger.error(`[createNode-ALL]    Stack:`, verifyErr.stack);
         }
         
-        console.log(`[createNode-ALL] ─── VERIFICATION SUMMARY ───`);
-        console.log(`[createNode-ALL]    Registry written: ${registryValid ? '✅' : '❌'}`);
-        console.log(`[createNode-ALL]    Metadata written: ${metadataValid ? '✅' : '❌'}`);
+        logger.debug(`[createNode-ALL] ─── VERIFICATION SUMMARY ───`);
+        logger.debug(`[createNode-ALL]    Registry written: ${registryValid ? '✅' : '❌'}`);
+        logger.debug(`[createNode-ALL]    Metadata written: ${metadataValid ? '✅' : '❌'}`);
         if (!metadataValid) {
-            console.error(`[createNode-ALL] ⚠️  CRITICAL ISSUE: Metadata not written! Device will be unfetchable!`);
+            logger.error(`[createNode-ALL] ⚠️  CRITICAL ISSUE: Metadata not written! Device will be unfetchable!`);
         }
 
         // SaaS Invalidation: Flush all user-specific and aggregate dashboard caches
@@ -776,7 +777,7 @@ exports.createNode = async (req, res) => {
             ]);
         } catch (cacheErr) {
             // Cache clear failure is not fatal — device was already created successfully
-            console.warn('[Device] Cache clear failed:', cacheErr.message);
+            logger.warn('[Device] Cache clear failed:', cacheErr.message);
         }
 
         // ✅ FIX #8: EMIT REAL-TIME SOCKET EVENT (CRITICAL)
@@ -784,7 +785,7 @@ exports.createNode = async (req, res) => {
         // AFTER: Socket event pushes new device to all connected clients immediately
         // ✅ NEW: Fetch and save channel metadata for stable anchor architecture
         if (thingspeakChannelId && thingspeakReadKey) {
-            console.log(`[createNode] 🔄 Fetching and saving channel metadata for device ${deviceDocId}`);
+            logger.debug(`[createNode] 🔄 Fetching and saving channel metadata for device ${deviceDocId}`);
             try {
                 const { fetchAndSaveChannelMetadata } = require("../services/channelMetadataService.js");
                 const channelMeta = await fetchAndSaveChannelMetadata(
@@ -794,12 +795,12 @@ exports.createNode = async (req, res) => {
                 );
                 
                 if (channelMeta) {
-                    console.log(`[createNode] ✅ Channel metadata saved successfully`);
+                    logger.debug(`[createNode] ✅ Channel metadata saved successfully`);
                 } else {
-                    console.warn(`[createNode] ⚠️  Channel metadata fetch returned null (non-fatal)`);
+                    logger.warn(`[createNode] ⚠️  Channel metadata fetch returned null (non-fatal)`);
                 }
             } catch (metaErr) {
-                console.warn(`[createNode] ⚠️  Failed to fetch/save channel metadata (non-fatal):`, metaErr.message);
+                logger.warn(`[createNode] ⚠️  Failed to fetch/save channel metadata (non-fatal):`, metaErr.message);
             }
         }
 
@@ -817,10 +818,10 @@ exports.createNode = async (req, res) => {
                     device: fullDevice,
                     timestamp: new Date().toISOString()
                 });
-                console.log(`[Device] 📡 Emitted device:added to customer ${customerId}`);
+                logger.debug(`[Device] 📡 Emitted device:added to customer ${customerId}`);
             }
         } catch (socketErr) {
-            console.warn('[Device] Socket emission failed (non-fatal):', socketErr.message);
+            logger.warn('[Device] Socket emission failed (non-fatal):', socketErr.message);
         }
 
         return res.status(201).json({
@@ -848,11 +849,11 @@ exports.createNode = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('\n[Device] ❌ CREATE DEVICE FAILED:');
-        console.error(`[Device] Error message: ${error.message}`);
-        console.error(`[Device] Error code: ${error.code}`);
-        console.error(`[Device] Full error:`, error);
-        console.error(`[Device] Stack trace:`, error.stack);
+        logger.error('\n[Device] ❌ CREATE DEVICE FAILED:');
+        logger.error(`[Device] Error message: ${error.message}`);
+        logger.error(`[Device] Error code: ${error.code}`);
+        logger.error(`[Device] Full error:`, error);
+        logger.error(`[Device] Stack trace:`, error.stack);
         
         // Return error response with details for debugging
         res.status(500).json({ 
@@ -866,11 +867,11 @@ exports.createNode = async (req, res) => {
 
 exports.getNodes = async (req, res) => {
     try {
-        console.log(`[AdminController] getNodes for user:`, req.user.uid, "role:", req.user.role);
+        logger.debug(`[AdminController] getNodes for user:`, req.user.uid, "role:", req.user.role);
         const nodesCacheKey = req.user.role === "superadmin"
             ? "user:admin:devices"
             : `user:${req.user.customer_id || req.user.uid}:devices`;
-        console.log(`[AdminController] Cache Key:`, nodesCacheKey);
+        logger.debug(`[AdminController] Cache Key:`, nodesCacheKey);
         const cachedNodes = await cache.get(nodesCacheKey);
         if (cachedNodes) return res.status(200).json(cachedNodes);
 
@@ -922,13 +923,13 @@ exports.getNodes = async (req, res) => {
                 let analyticsTemplate = registryData.analytics_template;
                 if (!analyticsTemplate) {
                     const deviceType = (registryData.device_type || "").toLowerCase();
-                    console.log(`[AdminController] Auto-injecting analytics_template for device ${id}: device_type="${deviceType}"`);
+                    logger.debug(`[AdminController] Auto-injecting analytics_template for device ${id}: device_type="${deviceType}"`);
                     if (deviceType === "evaratank") analyticsTemplate = "EvaraTank";
                     else if (deviceType === "evaradeep") analyticsTemplate = "EvaraDeep";
                     else if (deviceType === "evaraflow") analyticsTemplate = "EvaraFlow";
                     else if (deviceType === "evaratds") analyticsTemplate = "EvaraTDS";
                     else analyticsTemplate = "EvaraTank"; // default
-                    console.log(`[AdminController] Injected: analyticsTemplate="${analyticsTemplate}"`);
+                    logger.debug(`[AdminController] Injected: analyticsTemplate="${analyticsTemplate}"`);
                 }
 
                 const deviceObject = {
@@ -947,7 +948,7 @@ exports.getNodes = async (req, res) => {
             }
         }
 
-        console.log(`[AdminController] Final devices with analytics_template:`, devices.map(d => ({ id: d.id, type: d.device_type, template: d.analytics_template })));
+        logger.debug(`[AdminController] Final devices with analytics_template:`, devices.map(d => ({ id: d.id, type: d.device_type, template: d.analytics_template })));
 
         await cache.set(nodesCacheKey, devices, 300); // 5 min
         res.status(200).json(devices);
@@ -1117,7 +1118,7 @@ exports.updateNode = async (req, res) => {
                 success: true,
                 timestamp: new Date().toISOString()
             });
-            console.log(`[AdminController] ✅ device:updated event emitted for device: ${deviceDoc.id}, customer: ${customerId}`);
+            logger.debug(`[AdminController] ✅ device:updated event emitted for device: ${deviceDoc.id}, customer: ${customerId}`);
         }
 
         res.status(200).json({ success: true });
@@ -1173,12 +1174,12 @@ exports.deleteNode = async (req, res) => {
                 success: true,
                 timestamp: new Date().toISOString()
             });
-            console.log(`[AdminController] ✅ device:deleted event emitted for device: ${deviceId}, customer: ${customerId}`);
+            logger.debug(`[AdminController] ✅ device:deleted event emitted for device: ${deviceId}, customer: ${customerId}`);
         }
 
         res.status(200).json({ success: true });
     } catch (error) {
-        console.error("[AdminController] deleteNode error:", error);
+        logger.error("[AdminController] deleteNode error:", error);
         res.status(500).json({ error: "Failed to delete device" });
     }
 };
@@ -1208,7 +1209,7 @@ exports.getDashboardSummary = async (req, res) => {
         const devicesSnapshot = await nodesQuery.get();
         const actualNodeCount = devicesSnapshot.size;
 
-        console.log(`[Dashboard] Real-time node count: ${actualNodeCount}`);
+        logger.debug(`[Dashboard] Real-time node count: ${actualNodeCount}`);
 
         const [customersSnap, zonesSnap] = await Promise.all([
             customersQuery.count().get(),
@@ -1233,11 +1234,11 @@ exports.getDashboardSummary = async (req, res) => {
             system_health: actualNodeCount > 0 ? 92 : 0
         };
 
-        console.log(`[Dashboard] Returning stats:`, result);
+        logger.debug(`[Dashboard] Returning stats:`, result);
 
         res.status(200).json(result);
     } catch (error) {
-        console.error("[Dashboard] Failed to get summary:", error.message);
+        logger.error("[Dashboard] Failed to get summary:", error.message);
         res.status(500).json({ error: "Failed to get dashboard summary" });
     }
 };
@@ -1269,7 +1270,7 @@ exports.getHierarchy = async (req, res) => {
         await cache.set(cacheKey, zones, 600); // 10 min
         res.status(200).json(zones);
     } catch (error) {
-        console.error("Hierarchy fetch error:", error);
+        logger.error("Hierarchy fetch error:", error);
         res.status(500).json({ error: "Failed to get hierarchy" });
     }
 };
@@ -1312,7 +1313,7 @@ exports.getAuditLogs = async (req, res) => {
             nextCursor
         });
     } catch (error) {
-        console.error("[AdminController] getAuditLogs error:", error.message);
+        logger.error("[AdminController] getAuditLogs error:", error.message);
         res.status(500).json({ error: "Failed to get audit logs" });
     }
 };
@@ -1366,7 +1367,7 @@ exports.getZoneStats = async (req, res) => {
         await cache.set(cacheKey, zoneStats, 300); // 5 min cache
         res.status(200).json(zoneStats);
     } catch (error) {
-        console.error("[AdminController] getZoneStats error:", error);
+        logger.error("[AdminController] getZoneStats error:", error);
         res.status(500).json({ error: "Failed to get zone statistics" });
     }
 };
@@ -1399,7 +1400,7 @@ exports.getDashboardInit = async (req, res) => {
         await cache.set(cacheKey, result, 180); // 3 min
         res.status(200).json(result);
     } catch (error) {
-        console.error("[Init] Aggregate failure:", error.message);
+        logger.error("[Init] Aggregate failure:", error.message);
         res.status(500).json({ error: "Aggregate fetch failed" });
     }
 };
@@ -1429,7 +1430,7 @@ exports.getSystemConfig = async (req, res) => {
         }
         res.status(200).json(doc.data());
     } catch (error) {
-        console.error("[AdminController] getSystemConfig error:", error);
+        logger.error("[AdminController] getSystemConfig error:", error);
         res.status(500).json({ error: "Failed to get system configuration" });
     }
 };
@@ -1448,7 +1449,7 @@ exports.updateSystemConfig = async (req, res) => {
         
         res.status(200).json({ success: true, message: "System configuration updated" });
     } catch (error) {
-        console.error("[AdminController] updateSystemConfig error:", error);
+        logger.error("[AdminController] updateSystemConfig error:", error);
         res.status(500).json({ error: "Failed to update system configuration" });
     }
 };
@@ -1514,13 +1515,13 @@ exports.updateDeviceVisibility = async (req, res) => {
                 success: true,
                 timestamp: new Date().toISOString()
             });
-            console.log(`[AdminController] ✅ device:updated event emitted for visibility change: ${deviceDoc.id}`);
+            logger.debug(`[AdminController] ✅ device:updated event emitted for visibility change: ${deviceDoc.id}`);
         }
 
-        console.log(`[AdminController] Device ${id} visibility set to: ${isVisibleToCustomer}`);
+        logger.debug(`[AdminController] Device ${id} visibility set to: ${isVisibleToCustomer}`);
         return res.status(200).json({ success: true, isVisibleToCustomer });
     } catch (error) {
-        console.error("[AdminController] updateDeviceVisibility error:", error);
+        logger.error("[AdminController] updateDeviceVisibility error:", error);
         return res.status(500).json({ error: "Failed to update device visibility" });
     }
 };
@@ -1589,13 +1590,13 @@ exports.updateDeviceParameters = async (req, res) => {
                 success: true,
                 timestamp: new Date().toISOString()
             });
-            console.log(`[AdminController] ✅ device:updated event emitted for parameter changes: ${deviceDoc.id}`);
+            logger.debug(`[AdminController] ✅ device:updated event emitted for parameter changes: ${deviceDoc.id}`);
         }
 
-        console.log(`[AdminController] Device ${id} parameters updated:`, customer_config);
+        logger.debug(`[AdminController] Device ${id} parameters updated:`, customer_config);
         return res.status(200).json({ success: true, customer_config });
     } catch (error) {
-        console.error("[AdminController] updateDeviceParameters error:", error);
+        logger.error("[AdminController] updateDeviceParameters error:", error);
         return res.status(500).json({ error: "Failed to update device parameters" });
     }
 };

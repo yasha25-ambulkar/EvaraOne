@@ -86,12 +86,12 @@ const requireAuth = async (req, res, next) => {
         next();
     } catch (error) {
         // ✅ FIX #3: Log full error server-side, send generic message to client
-        console.error('[Auth] ❌ Token verification FAILED:');
-        console.error('[Auth] Error name:', error.name);
-        console.error('[Auth] Error message:', error.message);
-        console.error('[Auth] Error code:', error.code);
-        console.error('[Auth] Token (first 50 chars):', idToken ? idToken.substring(0, 50) + '...' : 'NONE');
-        console.error('[Auth] Full error:', error);
+        logger.error('[Auth] ❌ Token verification FAILED:');
+        logger.error('[Auth] Error name:', error.name);
+        logger.error('[Auth] Error message:', error.message);
+        logger.error('[Auth] Error code:', error.code);
+        logger.error('[Auth] Token (first 50 chars):', idToken ? idToken.substring(0, 50) + '...' : 'NONE');
+        logger.error('[Auth] Full error:', error);
         
         logger.error("Token verification failed", error, { category: 'auth' });
 

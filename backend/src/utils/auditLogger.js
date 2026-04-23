@@ -28,7 +28,7 @@ const { db } = require("../config/firebase.js");
  */
 function logAudit(userId, action, resourceType, resourceId, metadata = {}) {
     if (!userId || !action || !resourceType || !resourceId) {
-        console.warn('[AuditLogger] Missing required fields');
+        logger.warn('[AuditLogger] Missing required fields');
         return;
     }
 
@@ -43,7 +43,7 @@ function logAudit(userId, action, resourceType, resourceId, metadata = {}) {
         server_time: new Date().getTime()
     }).catch(err => {
         // Audit log failure shouldn't crash app
-        console.error(`[AuditLogger] Failed to log: ${action} ${resourceType}#${resourceId}`, err.message);
+        logger.error(`[AuditLogger] Failed to log: ${action} ${resourceType}#${resourceId}`, err.message);
     });
 }
 

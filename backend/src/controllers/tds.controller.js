@@ -28,80 +28,80 @@ async function resolveMetadata(deviceDoc) {
   const id = deviceDoc.id;
   const registry = deviceDoc.data();
 
-  console.log(`[resolveMetadata] Attempting to resolve metadata for device ${id}`);
+  logger.debug(`[resolveMetadata] Attempting to resolve metadata for device ${id}`);
   
   // 1. Try lookup by device DocID (standard pattern - most common)
-  console.log(`[resolveMetadata] Step 1: Trying direct lookup by ID: ${id}`);
+  logger.debug(`[resolveMetadata] Step 1: Trying direct lookup by ID: ${id}`);
   let metaDoc = await db.collection("evaratds").doc(id).get();
   if (metaDoc.exists) {
-    console.log(`[resolveMetadata] ✅ Found by direct ID`);
+    logger.debug(`[resolveMetadata] ✅ Found by direct ID`);
     return metaDoc;
   }
-  console.log(`[resolveMetadata] ❌ Not found by direct ID`);
+  logger.debug(`[resolveMetadata] ❌ Not found by direct ID`);
 
   // 2. Query by hardware device_id field
   if (registry.device_id) {
-    console.log(`[resolveMetadata] Step 2: Trying query by device_id: "${registry.device_id}"`);
+    logger.debug(`[resolveMetadata] Step 2: Trying query by device_id: "${registry.device_id}"`);
     const q1 = await db.collection("evaratds").where("device_id", "==", registry.device_id).limit(1).get();
     if (!q1.empty) {
-      console.log(`[resolveMetadata] ✅ Found by device_id`);
+      logger.debug(`[resolveMetadata] ✅ Found by device_id`);
       return q1.docs[0];
     }
-    console.log(`[resolveMetadata] ❌ Not found by device_id`);
+    logger.debug(`[resolveMetadata] ❌ Not found by device_id`);
     
     // Also try case-insensitive match
-    console.log(`[resolveMetadata] Step 2b: Trying case-insensitive device_id: "${registry.device_id?.toLowerCase()}"`);
+    logger.debug(`[resolveMetadata] Step 2b: Trying case-insensitive device_id: "${registry.device_id?.toLowerCase()}"`);
     const q1Lower = await db.collection("evaratds").where("device_id", "==", registry.device_id?.toLowerCase()).limit(1).get();
     if (!q1Lower.empty) {
-      console.log(`[resolveMetadata] ✅ Found by lowercase device_id`);
+      logger.debug(`[resolveMetadata] ✅ Found by lowercase device_id`);
       return q1Lower.docs[0];
     }
-    console.log(`[resolveMetadata] ❌ Not found by lowercase device_id`);
+    logger.debug(`[resolveMetadata] ❌ Not found by lowercase device_id`);
   } else {
-    console.log(`[resolveMetadata] ⚠️  No device_id in registry`);
+    logger.debug(`[resolveMetadata] ⚠️  No device_id in registry`);
   }
 
   // 3. Query by hardware node_id field
   if (registry.node_id) {
-    console.log(`[resolveMetadata] Step 3: Trying query by node_id: "${registry.node_id}"`);
+    logger.debug(`[resolveMetadata] Step 3: Trying query by node_id: "${registry.node_id}"`);
     const q2 = await db.collection("evaratds").where("node_id", "==", registry.node_id).limit(1).get();
     if (!q2.empty) {
-      console.log(`[resolveMetadata] ✅ Found by node_id`);
+      logger.debug(`[resolveMetadata] ✅ Found by node_id`);
       return q2.docs[0];
     }
-    console.log(`[resolveMetadata] ❌ Not found by node_id`);
+    logger.debug(`[resolveMetadata] ❌ Not found by node_id`);
     
     // Also try case-insensitive match
-    console.log(`[resolveMetadata] Step 3b: Trying case-insensitive node_id: "${registry.node_id?.toLowerCase()}"`);
+    logger.debug(`[resolveMetadata] Step 3b: Trying case-insensitive node_id: "${registry.node_id?.toLowerCase()}"`);
     const q2Lower = await db.collection("evaratds").where("node_id", "==", registry.node_id?.toLowerCase()).limit(1).get();
     if (!q2Lower.empty) {
-      console.log(`[resolveMetadata] ✅ Found by lowercase node_id`);
+      logger.debug(`[resolveMetadata] ✅ Found by lowercase node_id`);
       return q2Lower.docs[0];
     }
-    console.log(`[resolveMetadata] ❌ Not found by lowercase node_id`);
+    logger.debug(`[resolveMetadata] ❌ Not found by lowercase node_id`);
   } else {
-    console.log(`[resolveMetadata] ⚠️  No node_id in registry`);
+    logger.debug(`[resolveMetadata] ⚠️  No node_id in registry`);
   }
 
   // 4. Try lookup by the ID parameter itself (if it was hardware ID)
-  console.log(`[resolveMetadata] Step 4: Trying reverse lookup - treating ID as device_id`);
+  logger.debug(`[resolveMetadata] Step 4: Trying reverse lookup - treating ID as device_id`);
   const q3 = await db.collection("evaratds").where("device_id", "==", id).limit(1).get();
   if (!q3.empty) {
-    console.log(`[resolveMetadata] ✅ Found by ID as device_id`);
+    logger.debug(`[resolveMetadata] ✅ Found by ID as device_id`);
     return q3.docs[0];
   }
-  console.log(`[resolveMetadata] ❌ Not found by ID as device_id`);
+  logger.debug(`[resolveMetadata] ❌ Not found by ID as device_id`);
 
-  console.log(`[resolveMetadata] Step 5: Trying reverse lookup - treating ID as node_id`);
+  logger.debug(`[resolveMetadata] Step 5: Trying reverse lookup - treating ID as node_id`);
   const q4 = await db.collection("evaratds").where("node_id", "==", id).limit(1).get();
   if (!q4.empty) {
-    console.log(`[resolveMetadata] ✅ Found by ID as node_id`);
+    logger.debug(`[resolveMetadata] ✅ Found by ID as node_id`);
     return q4.docs[0];
   }
-  console.log(`[resolveMetadata] ❌ Not found by ID as node_id`);
+  logger.debug(`[resolveMetadata] ❌ Not found by ID as node_id`);
 
-  console.log(`[resolveMetadata] ❌ METADATA RESOLUTION COMPLETE: NO METADATA FOUND FOR ${id}`);
-  console.log(`[resolveMetadata] Registry had: device_id=${registry.device_id}, node_id=${registry.node_id}`);
+  logger.debug(`[resolveMetadata] ❌ METADATA RESOLUTION COMPLETE: NO METADATA FOUND FOR ${id}`);
+  logger.debug(`[resolveMetadata] Registry had: device_id=${registry.device_id}, node_id=${registry.node_id}`);
   
   return null;
 }
@@ -113,31 +113,31 @@ async function resolveMetadata(deviceDoc) {
 exports.getTDSTelemetry = async (req, res, next) => {
   try {
     const { id: paramId } = req.params;
-    console.log(`[TDS-getTDSTelemetry] REQUEST: paramId=${paramId}`);
+    logger.debug(`[TDS-getTDSTelemetry] REQUEST: paramId=${paramId}`);
     
     // Get device metadata - using resolveDevice for hardware ID support
     const deviceDoc = await resolveDevice(paramId);
     if (!deviceDoc) {
-      console.error(`[TDS-getTDSTelemetry] ❌ STEP 1 FAILED: Device not found for ID: ${paramId}`);
+      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 1 FAILED: Device not found for ID: ${paramId}`);
       throw new AppError("Device not found", 404);
     }
 
     const id = deviceDoc.id; // Use the actual Firestore ID for subsequent lookups
     const registry = deviceDoc.data();
-    console.log(`[TDS-getTDSTelemetry] ✅ STEP 1 SUCCESS: Device resolved`);
-    console.log(`[TDS-getTDSTelemetry]    Document ID: ${id}`);
-    console.log(`[TDS-getTDSTelemetry]    device_type: ${registry.device_type}`);
-    console.log(`[TDS-getTDSTelemetry]    device_id: ${registry.device_id}`);
-    console.log(`[TDS-getTDSTelemetry]    node_id: ${registry.node_id}`);
+    logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 1 SUCCESS: Device resolved`);
+    logger.debug(`[TDS-getTDSTelemetry]    Document ID: ${id}`);
+    logger.debug(`[TDS-getTDSTelemetry]    device_type: ${registry.device_type}`);
+    logger.debug(`[TDS-getTDSTelemetry]    device_id: ${registry.device_id}`);
+    logger.debug(`[TDS-getTDSTelemetry]    node_id: ${registry.node_id}`);
     
     // Validate device type - accept both "evaratds" and "tds"
     const deviceType = registry.device_type?.toLowerCase() || "";
-    console.log(`[TDS-getTDSTelemetry] STEP 2: Checking device type: "${deviceType}"`);
+    logger.debug(`[TDS-getTDSTelemetry] STEP 2: Checking device type: "${deviceType}"`);
     if (deviceType !== "evaratds" && deviceType !== "tds") {
-      console.error(`[TDS-getTDSTelemetry] ❌ STEP 2 FAILED: Invalid device type: "${deviceType}"`);
+      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 2 FAILED: Invalid device type: "${deviceType}"`);
       throw new AppError(`Device is not a TDS sensor (found: ${deviceType})`, 400);
     }
-    console.log(`[TDS-getTDSTelemetry] ✅ STEP 2 SUCCESS: Device type valid`);
+    logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 2 SUCCESS: Device type valid`);
     
     // ✅ CRITICAL FIX: Check ownership
     if (req.user.role !== "superadmin") {
@@ -148,7 +148,7 @@ exports.getTDSTelemetry = async (req, res, next) => {
         req.user.community_id
       );
       if (!isOwner) {
-        console.error(`[TDS-getTDSTelemetry] ❌ Ownership check failed`);
+        logger.error(`[TDS-getTDSTelemetry] ❌ Ownership check failed`);
         throw new AppError("Unauthorized access", 403);
       }
     }
@@ -156,26 +156,26 @@ exports.getTDSTelemetry = async (req, res, next) => {
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
     // Defense in depth: check visibility in application layer
     if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
-      console.error(`[TDS-getTDSTelemetry] ❌ Visibility check failed`);
+      logger.error(`[TDS-getTDSTelemetry] ❌ Visibility check failed`);
       throw new AppError("Device not visible to your account", 403);
     }
 
     // Get TDS metadata
-    console.log(`[TDS-getTDSTelemetry] STEP 3: Resolving metadata for device ${id}`);
+    logger.debug(`[TDS-getTDSTelemetry] STEP 3: Resolving metadata for device ${id}`);
     const metaDoc = await resolveMetadata(deviceDoc);
     if (!metaDoc) {
-      console.error(`[TDS-getTDSTelemetry] ❌ STEP 3 FAILED: Metadata not found`);
+      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 3 FAILED: Metadata not found`);
       throw new AppError("TDS metadata not found", 404);
     }
-    console.log(`[TDS-getTDSTelemetry] ✅ STEP 3 SUCCESS: Metadata resolved`);
-    console.log(`[TDS-getTDSTelemetry]    Metadata ID: ${metaDoc.id}`);
+    logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 3 SUCCESS: Metadata resolved`);
+    logger.debug(`[TDS-getTDSTelemetry]    Metadata ID: ${metaDoc.id}`);
 
     const metadata = metaDoc.data();
     const channel = metadata.thingspeak_channel_id?.trim();
     const apiKey = metadata.thingspeak_read_api_key?.trim();
 
     if (!channel || !apiKey) {
-      console.warn(`[TDS-getTDSTelemetry] ⚠️  ThingSpeak credentials missing, returning empty telemetry`);
+      logger.warn(`[TDS-getTDSTelemetry] ⚠️  ThingSpeak credentials missing, returning empty telemetry`);
       // Return partial response instead of erroring - device exists but no data
       const response = {
         id,
@@ -203,7 +203,7 @@ exports.getTDSTelemetry = async (req, res, next) => {
     // Fetch latest data from ThingSpeak
     const latestData = await fetchLatestData(channel, apiKey);
     if (!latestData) {
-      console.warn(`[TDS-getTDSTelemetry] ⚠️  Failed to fetch ThingSpeak data, returning empty telemetry`);
+      logger.warn(`[TDS-getTDSTelemetry] ⚠️  Failed to fetch ThingSpeak data, returning empty telemetry`);
       // Return partial response instead of erroring
       const response = {
         id,
@@ -233,18 +233,18 @@ exports.getTDSTelemetry = async (req, res, next) => {
     // Find which ThingSpeak field holds each sensor value
     const mapping = metadata.sensor_field_mapping || {};
     
-    console.log("[TDS-getTDSTelemetry] Sensor field mapping:", mapping);
+    logger.debug("[TDS-getTDSTelemetry] Sensor field mapping:", mapping);
     
     const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
     const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
     
-    console.log("[TDS-getTDSTelemetry] Resolved TDS field:", tdsField, "Value:", latestData[tdsField]);
-    console.log("[TDS-getTDSTelemetry] Resolved Temp field:", tempField, "Value:", latestData[tempField]);
+    logger.debug("[TDS-getTDSTelemetry] Resolved TDS field:", tdsField, "Value:", latestData[tdsField]);
+    logger.debug("[TDS-getTDSTelemetry] Resolved Temp field:", tempField, "Value:", latestData[tempField]);
 
     const tdsValue = parseFloat(latestData[tdsField]) || null;
     const temperature = parseFloat(latestData[tempField]) || null;
 
-    console.log("[TDS-getTDSTelemetry] Final TDS Value:", tdsValue, "Temp:", temperature);
+    logger.debug("[TDS-getTDSTelemetry] Final TDS Value:", tdsValue, "Temp:", temperature);
 
     const config = metadata.configuration || {};
 
@@ -303,7 +303,7 @@ exports.getTDSTelemetry = async (req, res, next) => {
         status: status
       }
     }).catch(err => {
-      console.warn("[TDS] Warning: Could not update device record:", err.message);
+      logger.warn("[TDS] Warning: Could not update device record:", err.message);
       // Non-critical, don't fail the request
     });
 
@@ -377,7 +377,7 @@ exports.getTDSHistory = async (req, res, next) => {
     // Get TDS metadata
     const metaDoc = await resolveMetadata(deviceDoc);
     if (!metaDoc) {
-      console.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);
+      logger.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);
       throw new AppError("TDS metadata not found", 404);
     }
 
@@ -404,9 +404,9 @@ exports.getTDSHistory = async (req, res, next) => {
     const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
     const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
 
-    console.log("[TDS-getTDSHistory] Field mapping:", mapping);
-    console.log("[TDS-getTDSHistory] Resolved TDS field:", tdsField);
-    console.log("[TDS-getTDSHistory] Resolved Temp field:", tempField);
+    logger.debug("[TDS-getTDSHistory] Field mapping:", mapping);
+    logger.debug("[TDS-getTDSHistory] Resolved TDS field:", tdsField);
+    logger.debug("[TDS-getTDSHistory] Resolved Temp field:", tempField);
 
     const data = response.data.feeds.map((feed) => {
       const tdsValue = parseFloat(feed[tdsField]) || null;
@@ -430,7 +430,7 @@ exports.getTDSHistory = async (req, res, next) => {
       };
     });
 
-    console.log("[TDS-getTDSHistory] Returning", data.length, 'history points');
+    logger.debug("[TDS-getTDSHistory] Returning", data.length, 'history points');
     
     res.status(200).json({
       id,
@@ -500,7 +500,7 @@ exports.getTDSConfig = async (req, res) => {
       sensor_field_mapping: metadata.sensor_field_mapping || {},
     });
   } catch (error) {
-    console.error("[TDSController] Error fetching config:", error);
+    logger.error("[TDSController] Error fetching config:", error);
     res.status(500).json({ error: "Failed to fetch configuration" });
   }
 };
@@ -573,12 +573,12 @@ exports.updateTDSConfig = async (req, res) => {
         success: true,
         timestamp: new Date().toISOString()
       });
-      console.log(`[TDSController] ✅ device:updated event emitted for TDS config update: ${id}`);
+      logger.debug(`[TDSController] ✅ device:updated event emitted for TDS config update: ${id}`);
     }
 
     res.status(200).json({ success: true, message: "Configuration updated" });
   } catch (error) {
-    console.error("[TDSController] Error updating config:", error);
+    logger.error("[TDSController] Error updating config:", error);
     res.status(500).json({ error: "Failed to update configuration" });
   }
 };
@@ -618,7 +618,7 @@ exports.getTDSAnalytics = async (req, res) => {
     }
 
     const metaDoc = await resolveMetadata(deviceDoc);
-    if (!metaDoc) {      console.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);      return res.status(404).json({ error: "TDS device not found" });
+    if (!metaDoc) {      logger.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);      return res.status(404).json({ error: "TDS device not found" });
     }
 
     const metadata = metaDoc.data();
@@ -672,7 +672,7 @@ exports.getTDSAnalytics = async (req, res) => {
 
     res.status(200).json(analytics);
   } catch (error) {
-    console.error("[TDSController] Error fetching analytics:", error);
+    logger.error("[TDSController] Error fetching analytics:", error);
     res.status(500).json({ error: "Failed to fetch analytics" });
   }
 };

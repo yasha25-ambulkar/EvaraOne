@@ -168,7 +168,7 @@ async function processDevice(device) {
             updated_at: now
         }).catch(err => {
             if (err.code === 'not-found') {
-                console.warn(`[TelemetryWorker] Registry doc not found for ${device.id}, skipping registry update`);
+                logger.warn(`[TelemetryWorker] Registry doc not found for ${device.id}, skipping registry update`);
             } else {
                 throw err;
             }
@@ -205,7 +205,7 @@ async function processDevice(device) {
             ? `TDS: ${telemetryData.tds_value}ppm, Temp: ${telemetryData.temperature}°C`
             : `${telemetryData.percentage.toFixed(1)}%`;
             
-        console.log(`[TelemetryWorker] Updated ${device.id}: ${detail} (${telemetryData.status})`);
+        logger.debug(`[TelemetryWorker] Updated ${device.id}: ${detail} (${telemetryData.status})`);
     } catch (err) {
         logger.error(`Error processing device ${device.id}`, err, { category: "telemetry", deviceId: device.id });
     }

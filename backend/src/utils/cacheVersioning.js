@@ -41,7 +41,7 @@ async function getVersionKey(prefix) {
         const version = versionDoc.exists ? versionDoc.data().version : 1;
         return `${prefix}_v${version}`;
     } catch (err) {
-        console.error(`[CacheVersioning] Failed to get version for ${prefix}:`, err.message);
+        logger.error(`[CacheVersioning] Failed to get version for ${prefix}:`, err.message);
         // Fallback to v1 on error (will cause cache miss but won't crash)
         return `${prefix}_v1`;
     }
@@ -61,11 +61,11 @@ async function incrementCacheVersion(resourceType) {
             { merge: true }
         );
         
-        console.log(`[CacheVersioning] Incremented ${resourceType} version (invalidates all ${resourceType}_* keys)`);
+        logger.debug(`[CacheVersioning] Incremented ${resourceType} version (invalidates all ${resourceType}_* keys)`);
     } catch (err) {
         // Version increment failure is non-critical
         // Next request will still work (just cache miss, then fresh data)
-        console.warn(`[CacheVersioning] Failed to increment ${resourceType}:`, err.message);
+        logger.warn(`[CacheVersioning] Failed to increment ${resourceType}:`, err.message);
     }
 }
 
@@ -90,10 +90,10 @@ async function initializeCacheVersions() {
             
             if (!exists.exists) {
                 await versionRef.set({ version: 1, created_at: new Date() });
-                console.log(`[CacheVersioning] Initialized ${type} version to 1`);
+                logger.debug(`[CacheVersioning] Initialized ${type} version to 1`);
             }
         } catch (err) {
-            console.warn(`[CacheVersioning] Failed to initialize ${type}:`, err.message);
+            logger.warn(`[CacheVersioning] Failed to initialize ${type}:`, err.message);
         }
     }
 }

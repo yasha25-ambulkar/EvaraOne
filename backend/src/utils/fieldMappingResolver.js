@@ -21,7 +21,7 @@ module.exports = {
    */
   resolveFieldByName(channelMetadata, fieldMapping, internalKey) {
     if (!channelMetadata || !fieldMapping || !internalKey) {
-      console.warn(`[FieldMappingResolver] Missing params for resolveFieldByName:`, {
+      logger.warn(`[FieldMappingResolver] Missing params for resolveFieldByName:`, {
         hasMetadata: !!channelMetadata,
         hasMapping: !!fieldMapping,
         internalKey
@@ -33,7 +33,7 @@ module.exports = {
     // e.g., internalKey="flow_rate" → fieldName="Flow Rate"
     const fieldName = fieldMapping[internalKey];
     if (!fieldName) {
-      console.warn(`[FieldMappingResolver] Internal key not in mapping: ${internalKey}`, { fieldMapping });
+      logger.warn(`[FieldMappingResolver] Internal key not in mapping: ${internalKey}`, { fieldMapping });
       return null;
     }
 
@@ -45,12 +45,12 @@ module.exports = {
       
       // Match (case-insensitive)
       if (metadataName.trim().toLowerCase() === fieldName.trim().toLowerCase()) {
-        console.log(`[FieldMappingResolver] ✅ Resolved ${internalKey} → "${fieldName}" → ${fieldKey}`);
+        logger.debug(`[FieldMappingResolver] ✅ Resolved ${internalKey} → "${fieldName}" → ${fieldKey}`);
         return fieldKey;
       }
     }
 
-    console.warn(`[FieldMappingResolver] Field name not in metadata: ${fieldName}`, { 
+    logger.warn(`[FieldMappingResolver] Field name not in metadata: ${fieldName}`, { 
       internalKey,
       channelMetadata 
     });

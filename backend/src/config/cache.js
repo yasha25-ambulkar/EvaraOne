@@ -81,22 +81,22 @@ class CacheProvider {
                 this.redis = new Redis(redisUrl, buildRedisOptions());
 
                 this.redis.on("connect", () => {
-                    console.log("[Cache] Redis Connected");
+                    logger.debug("[Cache] Redis Connected");
                     this.isRedisReady = true;
                 });
                 this.redis.on("error", (err) => {
-                    console.warn("[Cache] Redis Unavailable, using memory fallback:", err.message);
+                    logger.warn("[Cache] Redis Unavailable, using memory fallback:", err.message);
                     this.isRedisReady = false;
                 });
                 this.redis.on("close", () => {
-                    console.warn("[Cache] Redis connection closed");
+                    logger.warn("[Cache] Redis connection closed");
                     this.isRedisReady = false;
                 });
             } catch (err) {
-                console.error("[Cache] Failed to initialise Redis:", err.message);
+                logger.error("[Cache] Failed to initialise Redis:", err.message);
             }
         } else {
-            console.warn("[Cache] REDIS_URL not set — using in-memory cache (not suitable for production)");
+            logger.warn("[Cache] REDIS_URL not set — using in-memory cache (not suitable for production)");
         }
     }
 
@@ -170,8 +170,8 @@ class CacheProvider {
         const pub = new Redis(process.env.REDIS_URL, opts);
         const sub = new Redis(process.env.REDIS_URL, opts);
 
-        pub.on("error", (e) => console.warn("[Cache:pub] Redis pub error:", e.message));
-        sub.on("error", (e) => console.warn("[Cache:sub] Redis sub error:", e.message));
+        pub.on("error", (e) => logger.warn("[Cache:pub] Redis pub error:", e.message));
+        sub.on("error", (e) => logger.warn("[Cache:sub] Redis sub error:", e.message));
 
         return { pub, sub };
     }
