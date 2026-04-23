@@ -166,8 +166,12 @@ function startStatusCron() {
   // Run immediately on startup
   recalculateAllDevicesStatus().catch(err => logger.error('Initial status sweep failed', err, { category: 'cron' }));
   
-  // Then run on interval
-  setInterval(recalculateAllDevicesStatus, STATUS_CHECK_INTERVAL);
+  // Then run on interval with error handling - wrap setInterval callback to catch promise rejections
+  setInterval(() => {
+    recalculateAllDevicesStatus().catch(err => {
+      logger.error('[DeviceStatusCron] Status sweep cycle failed', { error: err.message, category: 'cron' });
+    });
+  }, STATUS_CHECK_INTERVAL);
 }
 
 // Support standalone execution (e.g., Railway background worker)

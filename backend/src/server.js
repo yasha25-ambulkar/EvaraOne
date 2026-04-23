@@ -745,12 +745,20 @@ process.on("SIGINT", gracefulShutdown);
 
 // Robust error guards for unexpected crashes
 process.on("unhandledRejection", (reason, promise) => {
-    logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+    logger.error("[Global] Unhandled Promise Rejection", { 
+        reason: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
+        promise: promise?.toString?.() || 'unknown'
+    });
     Sentry.captureException(reason);
 });
 
 process.on("uncaughtException", (err) => {
-    logger.error("Uncaught Exception thrown:", err);
+    logger.error("[Global] Uncaught Exception thrown", { 
+        message: err.message,
+        stack: err.stack,
+        code: err.code
+    });
     Sentry.captureException(err);
     // Give Sentry some time to send the error before exiting
     setTimeout(() => {

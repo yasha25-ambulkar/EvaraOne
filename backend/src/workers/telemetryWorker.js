@@ -235,11 +235,17 @@ async function runPoll() {
 function startWorker() {
     logger.info(`TelemetryWorker initialized, polling every ${POLL_INTERVAL}ms`, { category: "telemetry", interval: POLL_INTERVAL });
     
-    // Run immediately once
-    runPoll();
+    // Run immediately once with error handling
+    runPoll().catch(err => {
+        logger.error('[TelemetryWorker] Initial poll failed', { error: err.message, category: 'telemetry' });
+    });
     
-    // Then loop
-    setInterval(runPoll, POLL_INTERVAL);
+    // Then loop with error handling - wrap setInterval callback to catch promise rejections
+    setInterval(() => {
+        runPoll().catch(err => {
+            logger.error('[TelemetryWorker] Poll cycle failed', { error: err.message, category: 'telemetry' });
+        });
+    }, POLL_INTERVAL);
     
     // CRITICAL FIX: Start dedicated status cron job (runs every 1 minute)
     startStatusCron();
