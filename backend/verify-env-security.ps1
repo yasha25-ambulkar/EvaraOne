@@ -1,4 +1,3 @@
-#!/usr/bin/env pwsh
 # Git History .env Security Verification Script
 # Run this to verify .env files are properly excluded from Git
 
@@ -6,34 +5,15 @@ Write-Host "🔐 Git History Security Verification Script" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-$GREEN = 'Green'
-$RED = 'Red'
-$YELLOW = 'Yellow'
-
-function Check-Pass {
-    param([string]$Message)
-    Write-Host "✓ PASS: $Message" -ForegroundColor $GREEN
-}
-
-function Check-Fail {
-    param([string]$Message)
-    Write-Host "✗ FAIL: $Message" -ForegroundColor $RED
-    exit 1
-}
-
-function Check-Warn {
-    param([string]$Message)
-    Write-Host "⚠ WARN: $Message" -ForegroundColor $YELLOW
-}
-
 # TEST 1: Verify .env is NOT tracked
 Write-Host "TEST 1: Verify .env is NOT tracked" -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
-$trackedEnvFiles = git ls-files | Select-String "^\.env$", "^backend/.env$"
-if ($trackedEnvFiles -match "\.env") {
-    Check-Fail ".env is still tracked in Git!"
+$trackedEnvFiles = git ls-files | Select-String "^\.env$"
+if ($trackedEnvFiles) {
+    Write-Host "✗ FAIL: .env is still tracked in Git!" -ForegroundColor Red
+    exit 1
 } else {
-    Check-Pass ".env is NOT tracked in Git"
+    Write-Host "✓ PASS: .env is NOT tracked in Git" -ForegroundColor Green
 }
 Write-Host ""
 
