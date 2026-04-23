@@ -9,6 +9,8 @@ export interface TelemetryData {
   level_percentage?: number | null;
   depth_value?: number | null;
   temperature_value?: number | null;
+  tdsValue?: number | null;
+  tds_value?: number | null;
   flow_rate?: number | null;
   total_liters?: number | null;
 
@@ -60,9 +62,11 @@ class TelemetryService {
         deviceId: deviceId,
         level_percentage: data.level_percentage ?? null,
         depth_value: data.distance ?? null,
-        temperature_value: null,
-        flow_rate: null,
-        total_liters: data.volume ?? null,
+        temperature_value: data.temperature ?? data.temp ?? null,
+        temperature: data.temperature ?? data.temp ?? null,
+        tdsValue: data.tdsValue ?? data.tds_value ?? null,
+        flow_rate: data.flow_rate ?? data.flowRate ?? data.waterFlow ?? data.raw_data?.[data.flow_rate_field] ?? data.raw_data?.field3 ?? null,
+        total_liters: data.volume ?? data.total_liters ?? data.raw_data?.[data.meter_reading_field] ?? data.raw_data?.field1 ?? null,
         distance: data.distance,
         waterLevel: data.level_percentage,
       };

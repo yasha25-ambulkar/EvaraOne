@@ -103,7 +103,6 @@ const saveThresholds = async (deviceId, thresholds) => {
     });
     // Bust the cache
     await cache.del(`thresholds:${deviceId}`);
-    console.log(`[DeviceState] Saved thresholds for ${deviceId}: lower=${thresholds.lower}, upper=${thresholds.upper}`);
   } catch (err) {
     console.error(`[DeviceState] saveThresholds failed for ${deviceId}:`, err.message);
   }
@@ -487,9 +486,7 @@ const recalculateAllDevicesStatus = async () => {
     
     if (updates.length > 0) {
       await Promise.all(updates);
-      console.log(`[DeviceState] Status recalculation complete: ${updates.length} updates`);
     } else {
-      console.log('[DeviceState] Status recalculation complete: No changes needed');
     }
   } catch (err) {
     console.error("[DeviceState] Status recalculation failed:", err.message);
