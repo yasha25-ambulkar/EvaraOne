@@ -12,7 +12,6 @@ import {
   Wifi,
   MapPin,
   Key,
-  Gauge,
   Droplets,
   FlaskConical,
   Waves,
@@ -75,15 +74,6 @@ const DEVICE_TYPES = [
     desc: "Pumps, flow meters, pipelines",
     color: "text-cyan-600",
     bg: "bg-cyan-50",
-  },
-  {
-    value: "tds",
-    label: "EvaraTDS",
-    icon: FlaskConical,
-    template: "EvaraTDS",
-    desc: "Water quality and TDS sensors",
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
   },
   {
     value: "tds",

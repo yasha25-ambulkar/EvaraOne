@@ -84,8 +84,10 @@ api.interceptors.response.use(
   },
   (error: AxiosError) => {
     const status = error.response?.status;
-    const message = (error.response?.data as any)?.error || error.message;
-    console.error(`[API Error] ${status || 'Network'}: ${message}`, {
+    const errorData = error.response?.data as any;
+    const message = errorData?.error?.message || errorData?.error || error.message;
+    
+    console.error(`[API Error] ${status || 'Network'}: ${typeof message === 'object' ? JSON.stringify(message) : message}`, {
         url: error.config?.url,
         method: error.config?.method,
         headers: error.config?.headers

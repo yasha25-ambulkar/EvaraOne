@@ -22,17 +22,22 @@ const getPublicMessage = (statusCode) => {
 };
 
 const createErrorResponse = (error, statusCode = 500) => {
+  const isDevelopment = isDev();
+  
   return {
     success: false,
     error: {
-      // Production: generic message — NEVER the real error.message
-      message: isDev()
+      // In development: show actual error message for debugging
+      // In production: show safe generic message
+      message: isDevelopment
         ? (error.message || 'Internal Server Error')
         : getPublicMessage(statusCode),
-      code: error.code || 'INTERNAL_ERROR',
+      code: error.code || 'APP_ERROR',
       statusCode,
       // Stack ONLY in development — stripped in production
-      ...(isDev() && error.stack ? { stack: error.stack } : {}),
+      ...(isDevelopment && error.stack ? { stack: error.stack } : {}),
+      // Additional context for auth/validation errors
+      ...(error.details && isDevelopment ? { details: error.details } : {}),
     },
     timestamp: new Date().toISOString()
   };

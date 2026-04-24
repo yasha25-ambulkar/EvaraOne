@@ -1,14 +1,23 @@
 const { z } = require("zod");
 
 /**
- * ✅ ISSUE #6: ThingSpeak Configuration Schemas
- * Validates ThingSpeak channel configuration requests
+ * ThingSpeak Configuration Schemas
+ * NOTE: No .strict() — avoids rejecting extra fields the frontend may send
  */
 
 exports.fetchThingSpeakFieldsSchema = z.object({
-  channelId: z.string().min(1, "Channel ID is required"),
-  apiKey: z.string().optional()
-}).strict(); // ✅ Reject unknown fields
+  channelId: z
+    .string()
+    .min(1, "Channel ID is required")
+    .trim()
+    .refine((id) => /^\d+$/.test(id.trim()), "Channel ID must contain only digits"),
+
+  apiKey: z
+    .union([z.string().trim().max(100), z.literal("")])
+    .optional()
+    .nullable()
+    .default(""),
+});
 
 exports.saveThingSpeakMetadataSchema = z.object({
   deviceId: z.string().min(1, "Device ID is required"),
@@ -22,6 +31,8 @@ exports.saveThingSpeakMetadataSchema = z.object({
     field6: z.string().optional(),
     field7: z.string().optional(),
     field8: z.string().optional(),
-    fetched_at: z.string().optional()
-  }).strict()
-}).strict(); // ✅ Reject unknown fields
+    fetched_at: z.string().optional(),
+    channel_name: z.string().optional(),
+    channel_description: z.string().optional(),
+  }),
+});

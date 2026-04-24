@@ -19,20 +19,26 @@ exports.createNodeSchema = z.object({
     deviceName: z.string().optional(),
     assetType: z.string().min(1),
     assetSubType: z.string().optional(),
+    subType: z.string().optional(),        // ✅ Added to match frontend
     zoneId: z.string().optional(),
     customerId: z.string().optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
-    // ThingSpeak credentials — MUST match frontend field names
+    
+    // ThingSpeak credentials
     thingspeakChannelId: z.string().optional(),
     thingspeakReadKey: z.string().optional(),
     channelId: z.string().optional(),
     readApiKey: z.string().optional(),
+    
     // Field mappings
     waterLevelField: z.string().optional(),
     borewellDepthField: z.string().optional(),
     meterReadingField: z.string().optional(),
     flowRateField: z.string().optional(),
+    tdsField: z.string().optional(),         // ✅ Added missing field
+    temperatureField: z.string().optional(), // ✅ Added missing field
+    
     // Physical dimensions
     capacity: z.union([z.number(), z.string()]).optional(),
     depth: z.union([z.number(), z.string()]).optional(),
@@ -41,15 +47,17 @@ exports.createNodeSchema = z.object({
     staticDepth: z.union([z.number(), z.string()]).optional(),
     dynamicDepth: z.union([z.number(), z.string()]).optional(),
     rechargeThreshold: z.union([z.number(), z.string()]).optional(),
-    // Location
+    
+    // Connectivity / Status
     hardwareId: z.string().optional(),
     status: z.string().optional(),
+    
     // TDS specific
     tdsValue: z.number().optional(),
     temperature: z.number().optional(),
     waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
     location: z.string().optional()
-  }).strict() // ✅ ISSUE #6: Reject unknown fields
+  }).strict() // Reject unknown fields for security
 });
 
 exports.updateNodeSchema = z.object({

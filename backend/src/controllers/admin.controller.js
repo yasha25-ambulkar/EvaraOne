@@ -424,6 +424,8 @@ exports.createNode = async (req, res) => {
             displayName,
             deviceName,
             assetType,
+            assetSubType, // Existing
+            subType,      // ✅ Added to match frontend
             zoneId,
             customerId,
             thingspeakChannelId,
@@ -528,6 +530,7 @@ exports.createNode = async (req, res) => {
             },
             // ✅ FIX: Set analytics_template so frontend can filter by device type
             analytics_template: assetType || "EvaraTank",
+            subType: subType || assetSubType || "", // ✅ Added for registry consistency
             created_at: timestamp
         };
 
@@ -566,6 +569,7 @@ exports.createNode = async (req, res) => {
             zone_id: zoneId || "",
             latitude: parseNumberSafely(latitude),
             longitude: parseNumberSafely(longitude),
+            subType: subType || assetSubType || "", // ✅ Added for metadata consistency
             created_at: timestamp,
             updated_at: timestamp
         };
