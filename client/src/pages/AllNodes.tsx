@@ -198,10 +198,20 @@ const ANALYTICS_CONFIG: Record<
 const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
   const cfg = CATEGORY_CONFIG[(node.category as NodeCategory) || "OHT"] || CATEGORY_CONFIG["OHT"];
 
-  // DRIVER FIX: Compute status in real-time using the same logic as Analytics pages
   const realtimeSnapshot = realtimeStatuses[node.id];
-  const effectiveLastSeen = realtimeSnapshot?.timestamp || realtimeSnapshot?.created_at || node.last_seen || node.last_online_at || node.updated_at || null;
-  const currentStatus = computeDeviceStatus(effectiveLastSeen);
+  const base = realtimeSnapshot || node.last_telemetry || {};
+  const effectiveTs = 
+    base.timestamp || 
+    base.lastUpdatedAt || 
+    base.last_updated_at || 
+    base.created_at || 
+    base.last_seen || 
+    node.last_seen || 
+    node.last_online_at || 
+    node.updated_at || 
+    null;
+
+  const currentStatus = computeDeviceStatus(effectiveTs);
   const isOnline = currentStatus === "Online";
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
   const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
@@ -447,10 +457,22 @@ const AllNodes = () => {
     const matchAnalytics =
       analyticsFilter === "all" || n.analytics_template === analyticsFilter;
 
-    // Consistent status calculation for filtering
-    const snapshot = realtimeStatuses[n.id] || n || {};
-    const effectiveLastSeen = snapshot.timestamp || snapshot.created_at || n.last_seen || n.last_online_at || n.updated_at || null;
-    const currentStatus = computeDeviceStatus(effectiveLastSeen);
+    // UNIVERSAL STATUS RESOLUTION: Matches TDSCard.tsx and mapNodeData.
+    // Prioritize socket snapshot → then node last_telemetry → then node direct fields.
+    const snap = realtimeStatuses[n.id];
+    const base = snap || n.last_telemetry || {};
+    const effectiveTs = 
+      base.timestamp || 
+      base.lastUpdatedAt || 
+      base.last_updated_at || 
+      base.created_at || 
+      base.last_seen || 
+      n.last_seen || 
+      n.last_online_at || 
+      null;
+
+    const currentStatus = computeDeviceStatus(effectiveTs);
+
     const matchStatus = statusFilter === "all" || currentStatus === statusFilter;
     const q = search.toLowerCase();
     const matchSearch =
@@ -459,13 +481,23 @@ const AllNodes = () => {
       (n.location_name || "").toLowerCase().includes(q) ||
       n.node_key.toLowerCase().includes(q);
     return matchAnalytics && matchStatus && matchSearch;
-  }), [nodes, analyticsFilter, statusFilter, search]);
+  }), [nodes, analyticsFilter, statusFilter, search, realtimeStatuses]);
 
   const { onlineCount, offlineCount } = useMemo(() => {
     const statuses = nodes.map(n => {
       const snap = realtimeStatuses[n.id];
-      const ts = snap?.timestamp || snap?.created_at || n.last_seen || n.last_online_at || n.updated_at || null;
-      return computeDeviceStatus(ts);
+      const base = snap || n.last_telemetry || {};
+      const effectiveTs = 
+        base.timestamp || 
+        base.lastUpdatedAt || 
+        base.last_updated_at || 
+        base.created_at || 
+        base.last_seen || 
+        n.last_seen || 
+        n.last_online_at || 
+        null;
+
+      return computeDeviceStatus(effectiveTs);
     });
     const online = statuses.filter(s => s === "Online").length;
     const offline = statuses.filter(s => s === "Offline").length;

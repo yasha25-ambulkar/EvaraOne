@@ -103,7 +103,11 @@ class NodeService {
     // BEFORE falling back to last_online_at (which is just when the server polled last).
     const lastSeenTime = 
       data.last_telemetry?.timestamp || 
+      data.last_telemetry?.lastUpdatedAt ||
+      data.last_telemetry?.last_updated_at ||
       data.last_telemetry?.created_at || 
+      data.lastUpdatedAt ||
+      data.last_updated_at ||
       data.last_seen || 
       data.last_telemetry_seen || 
       data.last_online_at || 

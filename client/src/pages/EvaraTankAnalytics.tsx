@@ -461,8 +461,12 @@ const EvaraTankAnalytics = () => {
     const chartData = useMemo(() => {
         // DATA INTEGRITY: Base the chart on the merged result which combines 
         // 10,000+ points of history with new live feeds.
-        return dataMergingService.getChartData(mergedDataResult.mergedData, 10000, metrics.capacityLitres);
-    }, [mergedDataResult.mergedData, metrics.capacityLitres]);
+        const data = dataMergingService.getChartData(mergedDataResult.mergedData, 10000, metrics.capacityLitres);
+        return data.map((d: any) => ({
+            ...d,
+            levelCm: (d.level / 100) * (localCfg.heightM * 100)
+        }));
+    }, [mergedDataResult.mergedData, metrics.capacityLitres, localCfg.heightM]);
 
     const filteredChartData = useMemo(() => {
         if (!chartData || chartData.length === 0) return [];
@@ -504,6 +508,7 @@ const EvaraTankAnalytics = () => {
                      point.level = p1.level + (p2.level - p1.level) * ratio;
                      point.volume = p1.volume + (p2.volume - p1.volume) * ratio;
                  }
+                 point.levelCm = (point.level / 100) * (localCfg.heightM * 100);
                  interpolated.push(point);
             }
             
@@ -513,7 +518,8 @@ const EvaraTankAnalytics = () => {
                 time: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
                 level: null,
-                volume: null
+                volume: null,
+                levelCm: null
             });
             
             return interpolated;
@@ -542,6 +548,7 @@ const EvaraTankAnalytics = () => {
                     time: days[targetDate.getDay()],
                     timestamp: targetDate.toISOString(),
                     level: avgLevel ?? 0,
+                    levelCm: ((avgLevel ?? 0) / 100) * (localCfg.heightM * 100),
                     volume: avgVolume ?? 0
                 });
             }
@@ -572,6 +579,7 @@ const EvaraTankAnalytics = () => {
                     time: `Week ${4 - i}`,
                     timestamp: targetDate.toISOString(),
                     level: avgLevel ?? 0,
+                    levelCm: ((avgLevel ?? 0) / 100) * (localCfg.heightM * 100),
                     volume: avgVolume ?? 0
                 });
             }
@@ -610,6 +618,7 @@ const EvaraTankAnalytics = () => {
                         time: ts.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit' }),
                         timestamp: ts.toISOString(),
                         level: data.level / data.count,
+                        levelCm: ((data.level / data.count) / 100) * (localCfg.heightM * 100),
                         volume: data.volume / data.count
                     };
                 });
@@ -618,7 +627,7 @@ const EvaraTankAnalytics = () => {
             return rangeFeeds;
         }
         return chartData;
-    }, [chartData, tankChartRange, rangeStart, rangeEnd]);
+    }, [chartData, tankChartRange, rangeStart, rangeEnd, localCfg.heightM]);
 
     const chartTimeTicks = useMemo(() => {
         if (tankChartRange !== '24H') return undefined;
@@ -847,8 +856,8 @@ const EvaraTankAnalytics = () => {
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
                             {/* Status Button (Pill Style) */}
-                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm border-none transition-all duration-300 text-white ${isOffline ? 'bg-[#FF3B30]' : 'bg-[#34C759]'}`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all duration-300 ${isOffline ? 'bg-[#fee2e2] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30]' : 'bg-[#dcfce7] text-[#166534] border border-[#166534]/30 dark:bg-transparent dark:text-[#34C759] dark:border dark:border-[#34C759]'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-[#991b1b]' : 'bg-[#166534]'}`} />
                                 {isOffline ? 'Offline' : 'Online'}
                             </div>
 
@@ -856,7 +865,7 @@ const EvaraTankAnalytics = () => {
                             <button
                                 onClick={() => refetch()}
                                 disabled={analyticsFetching}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 border-none ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff] hover:bg-[#0062d6] text-white'}`}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
                             >
                                 <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
                                     {analyticsFetching ? 'sync' : 'refresh'}
@@ -866,7 +875,7 @@ const EvaraTankAnalytics = () => {
 
                             <button
                                 onClick={() => setShowNodeInfo(true)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#AF52DE] hover:bg-[#9d44ce] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Info size={12} className="stroke-[2.5px]" />
                                 Node Info
@@ -875,7 +884,7 @@ const EvaraTankAnalytics = () => {
                             {/* Parameters Button */}
                             <button
                                 onClick={() => setShowParams(true)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#FFB340] hover:bg-[#f5a623] text-amber-900 border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Settings size={12} className="stroke-[2.5px]" />
                                 Parameters
@@ -885,7 +894,7 @@ const EvaraTankAnalytics = () => {
                             {user?.role === 'superadmin' && (
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#FF3B30] hover:bg-[#e0352b] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
                                     Delete Node
@@ -1848,7 +1857,7 @@ const EvaraTankAnalytics = () => {
                                                 style={{ opacity: showTankLevel ? 1 : 0.3 }}
                                             >
                                                 <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm" style={{ background: '#0A84FF' }} />
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-primary)]">TANK LEVEL (%)</span>
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-primary)]">TANK LEVEL (cm)</span>
                                             </button>
 
                                             <button
@@ -1911,11 +1920,11 @@ const EvaraTankAnalytics = () => {
 
 
 
-                                                {/* LEFT Y-AXIS - LEVEL % */}
+                                                {/* LEFT Y-AXIS - LEVEL cm */}
 
-                                                <YAxis yAxisId="left" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#0A84FF' }}
+                                                <YAxis yAxisId="left" domain={[0, localCfg.heightM * 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#0A84FF' }}
 
-                                                    label={{ value: 'Level (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10, fill: '#0A84FF', fontWeight: 600 } }} />
+                                                    label={{ value: 'Level (cm)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10, fill: '#0A84FF', fontWeight: 600 } }} />
 
 
 
@@ -1953,14 +1962,14 @@ const EvaraTankAnalytics = () => {
                                                                 <p style={{ margin: '0 0 2px 0', fontWeight: 700, fontSize: 13, color: "var(--text-primary)" }}>{dateStr} &nbsp; {timeStr}</p>
                                                                 {payload.map((entry: any, i: number) => (
                                                                     <p key={i} style={{ margin: '4px 0 0', fontSize: 13, color: entry.color, fontWeight: 600 }}>
-                                                                        {entry.name === 'Tank Level (%)' ? `Tank Level (%) : ${entry.value?.toFixed(2)}%` : `Volume : ${entry.value?.toFixed(2)} L`}
+                                                                        {entry.name === 'Tank Level (cm)' ? `Tank Level : ${entry.value?.toFixed(1)} cm` : `Volume : ${entry.value?.toFixed(2)} L`}
                                                                     </p>
                                                                 ))}
                                                             </div>
                                                         );
                                                     }}
                                                 />
-                                                {showTankLevel && <Area yAxisId="left" type="monotone" name="Tank Level (%)" dataKey="level" stroke="#0A84FF" fillOpacity={1} fill="url(#colorLevel)" strokeWidth={2.5} dot={false} />}
+                                                {showTankLevel && <Area yAxisId="left" type="monotone" name="Tank Level (cm)" dataKey="levelCm" stroke="#0A84FF" fillOpacity={1} fill="url(#colorLevel)" strokeWidth={2.5} dot={false} />}
                                                 {showVolume && <Area yAxisId="right" type="monotone" name="Volume" dataKey="volume" stroke="#FF9500" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2.5} dot={false} />}
                                             </AreaChart>
 

@@ -17,7 +17,7 @@ interface Props {
 
 export const FormField = ({ label, required, icon: Icon, error, hint, className = '', children }: Props) => (
     <div className={className}>
-        <label className="flex items-center gap-2 text-sm font-bold text-[var(--modal-text-color)] mb-2">
+        <label className="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-slate-400 mb-2">
             {Icon && <Icon size={16} className="text-purple-600 dark:text-purple-400" />}
             {label} {required && '*'}
         </label>

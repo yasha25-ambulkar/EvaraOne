@@ -200,8 +200,8 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
                         <div className="flex items-center gap-2 flex-wrap pb-1">
 
                             {/* Offline / Online pill */}
-                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm border-none text-white ${isOffline ? 'bg-[#FF3B30]' : 'bg-[#34C759]'}`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm ${isOffline ? 'bg-[#fee2e2] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30]' : 'bg-[#dcfce7] text-[#166534] border border-[#166534]/30 dark:bg-transparent dark:text-[#34C759] dark:border dark:border-[#34C759]'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-[#991b1b]' : 'bg-[#166534]'}`} />
                                 {isOffline ? 'Offline' : 'Online'}
                             </div>
 
@@ -209,7 +209,7 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
                             <button
                                 onClick={handleRefresh}
                                 disabled={isRefreshing}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 border-none ${isRefreshing ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff] hover:bg-[#0062d6] text-white'}`}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 ${isRefreshing ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
                             >
                                 <RefreshCw size={12} className={clsx('stroke-[2.5px]', isRefreshing && 'animate-spin')} />
                                 {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
@@ -218,7 +218,7 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
                             {/* Node Info */}
                             <button
                                 onClick={() => setShowNodeInfo(true)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#AF52DE] hover:bg-[#9d44ce] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Info size={12} className="stroke-[2.5px]" />
                                 Node Info
@@ -227,7 +227,7 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
                             {/* Parameters */}
                             <button
                                 onClick={() => setShowParams(true)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#FFB340] hover:bg-[#f5a623] text-amber-900 border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Settings size={12} className="stroke-[2.5px]" />
                                 Parameters
@@ -236,7 +236,7 @@ const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H
                             {/* Delete */}
                             <button
                                 onClick={() => setShowDeleteConfirm(true)}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-[#FF3B30] hover:bg-[#e0352b] text-white border-none rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
                             >
                                 <Trash2 size={12} className="stroke-[2.5px]" />
                                 Delete Node

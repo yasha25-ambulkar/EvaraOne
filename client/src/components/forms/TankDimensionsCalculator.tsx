@@ -74,7 +74,7 @@ const DimInput = ({
   <div className="flex flex-col gap-1">
     <label
       htmlFor={`tank-dim-${dimKey}`}
-      className="flex items-center gap-1.5 text-[11px] font-[700] text-slate-600 dark:text-slate-300 uppercase tracking-wide"
+      className="flex items-center gap-1.5 text-[11px] font-[700] text-gray-600 dark:text-slate-400 uppercase tracking-wide"
       title={tooltip}
     >
       <Ruler size={10} className="text-indigo-400" />
@@ -91,12 +91,12 @@ const DimInput = ({
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(dimKey, e.target.value)}
-      className={`${inputClassName} ${error ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100' : ''}`}
+      className={`${inputClassName} ${error ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100 dark:bg-red-950/30 dark:border-red-500/50' : ''}`}
       aria-invalid={!!error}
       aria-describedby={error ? `tank-dim-${dimKey}-err` : undefined}
     />
     {error && (
-      <p id={`tank-dim-${dimKey}-err`} className="flex items-center gap-1 text-[10px] text-red-500 font-[500]">
+      <p id={`tank-dim-${dimKey}-err`} className="flex items-center gap-1 text-[10px] text-red-500 dark:text-red-400 font-[500]">
         <AlertCircle size={9} /> {error}
       </p>
     )}
@@ -129,14 +129,14 @@ export const TankDimensionsCalculator = ({
   }, [formValues]);
 
   return (
-    <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100 space-y-4">
+    <div className="p-4 rounded-2xl bg-indigo-50/40 dark:bg-[var(--bg-secondary)] border border-indigo-100 dark:border-white/10 space-y-4">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-700 uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-[11px] font-[800] text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
           <Ruler size={13} /> Tank Dimensions
         </div>
         {result && (
-          <span className="flex items-center gap-1 text-[10px] font-[700] text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+          <span className="flex items-center gap-1 text-[10px] font-[700] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20">
             <CheckCircle2 size={10} /> Calculated
           </span>
         )}
@@ -145,7 +145,7 @@ export const TankDimensionsCalculator = ({
       {/* ── Shape + Unit selectors ── */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[11px] font-[700] text-slate-500 uppercase tracking-wide mb-1">
+          <label className="block text-[11px] font-[700] text-gray-600 dark:text-slate-400 uppercase tracking-wide mb-1">
             Tank Shape
           </label>
           <select
@@ -159,7 +159,7 @@ export const TankDimensionsCalculator = ({
           </select>
         </div>
         <div>
-          <label className="block text-[11px] font-[700] text-slate-500 uppercase tracking-wide mb-1">
+          <label className="block text-[11px] font-[700] text-gray-600 dark:text-slate-400 uppercase tracking-wide mb-1">
             Unit of Measurement
           </label>
           <select
@@ -184,7 +184,7 @@ export const TankDimensionsCalculator = ({
             className={`px-3 py-1 rounded-full text-[10px] font-[700] transition-all ${
               !useDiameter
                 ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             Radius
@@ -195,7 +195,7 @@ export const TankDimensionsCalculator = ({
             className={`px-3 py-1 rounded-full text-[10px] font-[700] transition-all ${
               useDiameter
                 ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             Diameter
@@ -242,16 +242,16 @@ export const TankDimensionsCalculator = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/80 border border-emerald-200"
+            className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-500/30"
           >
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={16} className="text-emerald-600" />
+            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-[10px] font-[700] text-emerald-600 uppercase tracking-wide">
+              <p className="text-[10px] font-[700] text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                 Calculated Capacity
               </p>
-              <p className="text-[14px] font-[800] text-emerald-800 tracking-tight mt-0.5">
+              <p className="text-[14px] font-[800] text-emerald-800 dark:text-emerald-100 tracking-tight mt-0.5">
                 {result.display}
               </p>
             </div>

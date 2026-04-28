@@ -301,10 +301,21 @@ html.dark .modal-card-glass input:-webkit-autofill:hover,
 html.dark .modal-card-glass input:-webkit-autofill:focus,
 .dark .modal-card-glass input:-webkit-autofill,
 .dark .modal-card-glass input:-webkit-autofill:hover,
-.dark .modal-card-glass input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.06) inset !important;
-  -webkit-text-fill-color: #ffffff !important;
-  caret-color: #ffffff;
+.dark .modal-card-glass input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill,
+.dark input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-secondary) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: var(--text-primary);
+}
+
+/* Fallback for --input-bg if used in utility classes */
+:root {
+  --input-bg: var(--modal-input-bg);
+}
+.dark {
+  --input-bg: var(--bg-secondary);
 }
 
 /* Fix browser autofill background override in light mode modal inputs */

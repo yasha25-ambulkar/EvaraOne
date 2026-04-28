@@ -288,7 +288,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
   };
 
   const inp = (error?: any) =>
-    `w-full px-3.5 py-2.5 h-10 min-h-[40px] rounded-xl border text-sm outline-none transition-all duration-150 text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)] ${error ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:bg-red-900/20 dark:border-red-500/50" : "bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20"}`;
+    `w-full px-3.5 py-2.5 h-10 min-h-[40px] rounded-xl border text-sm outline-none transition-all duration-150 text-[var(--modal-text-color)] placeholder:text-gray-400 dark:placeholder:text-slate-500 ${error ? "border-red-300 bg-red-50 dark:bg-red-950/30 focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:border-red-500/50" : "bg-[var(--bg-secondary)] border-[var(--modal-input-border)] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20"}`;
 
 
   return (
@@ -362,17 +362,17 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                       key={type.value}
                       type="button"
                       onClick={() => setValue("device_type", type.value)}
-                      className={`relative p-4 rounded-2xl border-2 text-left transition-all duration-200 ${isSelected ? "border-emerald-500 bg-emerald-50/60 shadow-md" : "border-slate-100 bg-white/40 hover:border-slate-200 hover:bg-white/60"}`}
+                      className={`relative p-4 rounded-2xl border-2 text-left transition-all duration-200 ${isSelected ? "border-emerald-500 bg-emerald-900/30 shadow-md" : "border-slate-100 dark:border-white/10 bg-[var(--bg-secondary)] hover:border-slate-200"}`}
                     >
                       <div
                         className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 ${type.bg} ${type.color}`}
                       >
                         <type.icon size={17} />
                       </div>
-                      <div className="text-[13px] font-[700] text-slate-800 leading-tight">
+                      <div className="text-[13px] font-[700] text-[var(--text-primary)] leading-tight">
                         {type.label}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                      <div className="text-[10px] text-[var(--text-muted)] mt-0.5 leading-tight">
                         {type.desc}
                       </div>
                       {isSelected && (
@@ -395,16 +395,20 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     <button
                       type="button"
                       onClick={() => setAssetSubType("tank")}
-                      className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${assetSubType === "tank" ? "border-indigo-500 bg-indigo-50 shadow-sm" : "border-slate-100 bg-white/60 hover:border-slate-200"}`}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                        assetSubType === "tank" 
+                          ? "border-indigo-500 bg-indigo-900/30 shadow-sm" 
+                          : "border-slate-100 dark:border-white/10 bg-[var(--bg-secondary)] hover:border-slate-200"
+                      }`}
                     >
-                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                        <Droplets size={14} />
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <Droplets size={16} />
                       </div>
                       <div>
-                        <p className="text-[12px] font-[700] text-slate-800">
+                        <p className="text-[12px] font-[700] text-[var(--text-primary)]">
                           Overhead Tank
                         </p>
-                        <p className="text-[9px] text-slate-500">
+                        <p className="text-[9px] text-[var(--text-muted)]">
                           OHT / Ground tank
                         </p>
                       </div>
@@ -417,16 +421,20 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     <button
                       type="button"
                       onClick={() => setAssetSubType("sump")}
-                      className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${assetSubType === "sump" ? "border-indigo-500 bg-indigo-50 shadow-sm" : "border-slate-100 bg-white/60 hover:border-slate-200"}`}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                        assetSubType === "sump" 
+                          ? "border-indigo-500 bg-indigo-900/30 shadow-sm" 
+                          : "border-slate-100 dark:border-white/10 bg-[var(--bg-secondary)] hover:border-slate-200"
+                      }`}
                     >
-                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                        <Waves size={14} />
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <Waves size={16} />
                       </div>
                       <div>
-                        <p className="text-[12px] font-[700] text-slate-800">
+                        <p className="text-[12px] font-[700] text-[var(--text-primary)]">
                           Underground Sump
                         </p>
-                        <p className="text-[9px] text-slate-500">
+                        <p className="text-[9px] text-[var(--text-muted)]">
                           Sump / cistern
                         </p>
                       </div>
@@ -645,7 +653,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                 {/* Inline coordinate inputs */}
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <p className="text-[9px] font-[700] text-slate-400 uppercase tracking-wider mb-1">
+                    <p className="text-[9px] font-[700] text-gray-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                       Latitude
                     </p>
                     <input
@@ -661,7 +669,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[9px] font-[700] text-slate-400 uppercase tracking-wider mb-1">
+                    <p className="text-[9px] font-[700] text-gray-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                       Longitude
                     </p>
                     <input

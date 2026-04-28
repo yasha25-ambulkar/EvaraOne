@@ -66,14 +66,14 @@ export default function DeviceCard({ device, isLoading }: DeviceCardProps) {
 
   return (
     <div
-      className="apple-glass-card rounded-[18px] p-4 h-full flex flex-col justify-between transition-all gap-4 group hover:shadow-md border border-[var(--card-border)]"
+      className="apple-glass-card rounded-[18px] p-5 h-full flex flex-col justify-between transition-all gap-4 group hover:shadow-md border border-[var(--card-border)]"
       style={{ minHeight: '100px' }}
     >
       {/* ── Top Row ── */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2.5" style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex justify-between items-center min-w-0 gap-3 w-full">
+        <div className="flex items-center gap-2.5 min-w-0" style={{ flex: 1, minWidth: 0 }}>
           <h3
-            className="text-[16px] font-[800] truncate text-[var(--dashboard-heading)]"
+            className="text-[16px] font-[800] truncate min-w-0 text-[var(--dashboard-heading)]"
             title={label}
           >
             {label}
@@ -85,7 +85,7 @@ export default function DeviceCard({ device, isLoading }: DeviceCardProps) {
 
         {/* Status badge */}
         <span
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-[800] shrink-0 ml-2"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-[800] shrink-0 ml-2 mr-1"
           style={
             online
               ? {

@@ -140,7 +140,7 @@ export const ThingSpeakFieldSelector = ({
       {/* ── Credentials ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <div>
-          <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>
+          <label className="block text-[11px] font-[700] mb-1 uppercase text-gray-600 dark:text-slate-400 tracking-wider">
             Channel ID *
           </label>
           <input
@@ -152,7 +152,7 @@ export const ThingSpeakFieldSelector = ({
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>
+          <label className="block text-[11px] font-[700] mb-1 uppercase text-gray-600 dark:text-slate-400 tracking-wider">
             Read API Key *
           </label>
           <input

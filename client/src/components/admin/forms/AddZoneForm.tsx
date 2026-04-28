@@ -96,9 +96,10 @@ export const AddZoneForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const inputClass = (error?: any) => `
         w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)]
-        ${error
+        ${
+          error
             ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:bg-red-900/20 dark:border-red-500/50'
-            : 'bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:apple-glass-card'
+            : 'bg-[var(--bg-secondary)] border-[var(--modal-input-border)] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:apple-glass-card'
         }
     `;
 

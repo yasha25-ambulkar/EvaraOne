@@ -77,11 +77,11 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
   };
 
   const inputClass = (error?: any) => `
-        w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm text-[var(--modal-text-color)] placeholder:text-[var(--modal-placeholder-color)]
+        w-full px-4 py-3 rounded-2xl border transition-all duration-300 outline-none text-sm
         ${
           error
-            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:bg-red-900/20 dark:border-red-500/50'
-            : 'bg-[var(--modal-input-bg)] border-[var(--modal-input-border)] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            ? 'border-red-300 bg-red-50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:bg-red-900/20 dark:border-red-500/50 dark:text-red-200'
+            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--modal-input-border)] placeholder:text-[var(--modal-placeholder-color)] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
         }
     `;
 
