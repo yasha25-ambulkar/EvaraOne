@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import clsx from 'clsx';
 
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 
@@ -827,7 +828,6 @@ const EvaraTankAnalytics = () => {
                                     Home
 
                                 </button>
-
                                 <span className="material-icons" style={{ fontSize: '16px', color: "var(--text-muted)" }}>chevron_right</span>
 
                                 <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: "var(--text-muted)" }}>
@@ -856,8 +856,16 @@ const EvaraTankAnalytics = () => {
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
                             {/* Status Button (Pill Style) */}
-                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all duration-300 ${isOffline ? 'bg-[#fee2e2] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30]' : 'bg-[#dcfce7] text-[#166534] border border-[#166534]/30 dark:bg-transparent dark:text-[#34C759] dark:border dark:border-[#34C759]'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-[#991b1b]' : 'bg-[#166534]'}`} />
+                            <div className={clsx(
+                                "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                isOffline
+                                    ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                    : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                            )}>
+                                <div className={clsx(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                )} />
                                 {isOffline ? 'Offline' : 'Online'}
                             </div>
 
@@ -1582,11 +1590,11 @@ const EvaraTankAnalytics = () => {
                                         {showVolumeParam && (
                                             <div className="grid grid-cols-2 gap-2 w-full">
                                                 <div className="text-left rounded-xl p-3 flex flex-col justify-center" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                                    <p className="text-[10px] font-bold uppercase tracking-wider m-0 mb-1" style={{ color: "var(--text-primary)" }}>Total Cap</p>
+                                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: '0 0 4px 0' }}>Total Cap</p>
                                                     <p className="text-lg font-black m-0 tracking-tight" style={{ color: "var(--text-primary)" }}>{Math.round(metrics.capacityLitres).toLocaleString()} L</p>
                                                 </div>
                                                 <div className="text-left rounded-xl p-3 flex flex-col justify-center" style={{ background: 'rgba(0,122,255,0.05)', border: '1px solid rgba(0,122,255,0.1)' }}>
-                                                    <p className="text-[10px] font-bold uppercase tracking-wider m-0 mb-1" style={{ color: '#007AFF' }}>Current Volume</p>
+                                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: '0 0 4px 0' }}>Current Volume</p>
                                                     <p className="text-lg font-black m-0 tracking-tight" style={{ color: '#004BA0' }}>{Math.round(smoothedLatestPoint?.volume ?? metrics.volumeLitres).toLocaleString()} L</p>
                                                 </div>
                                             </div>
@@ -1626,7 +1634,7 @@ const EvaraTankAnalytics = () => {
                                             <Info size={14} color="#1C1C1E" className="cursor-help opacity-60 hover:opacity-100" />
                                         </div>
                                         <div className="flex flex-col mt-2">
-                                            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--text-primary)" }}>Est. Time Until Empty</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>Est. Time Until Empty</span>
                                             <span className="text-lg font-black tracking-tight mt-0.5" style={{ color: "var(--text-primary)" }}>
                                                 {waterAnalytics.estimatedEmptyTimeMinutes ?
                                                     `${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes / 60)}h ${Math.floor(waterAnalytics.estimatedEmptyTimeMinutes % 60)}m`
@@ -1643,7 +1651,7 @@ const EvaraTankAnalytics = () => {
                                             <Info size={14} color="#1C1C1E" className="cursor-help opacity-60 hover:opacity-100" />
                                         </div>
                                         <div className="flex flex-col mt-2">
-                                            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--text-primary)" }}>Est. Time Until Full</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>Est. Time Until Full</span>
                                             <span className="text-lg font-black tracking-tight mt-0.5" style={{ color: "var(--text-primary)" }}>
                                                 {waterAnalytics.estimatedFullTimeMinutes ?
                                                     (waterAnalytics.estimatedFullTimeMinutes > 60 ?
@@ -1688,7 +1696,7 @@ const EvaraTankAnalytics = () => {
                                             </div>
                                         </div>
                                         <div className="flex flex-col mt-auto pt-1 gap-0.5">
-                                            <p className="text-[12px] font-black uppercase tracking-wider m-0" style={{ color: "var(--text-primary)" }}>Fill Rate</p>
+                                            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>Fill Rate</p>
                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.fillRateLpm > 500 ? '#FF3B30' : '#34C759' }}>
                                                 {waterAnalytics.fillRateLpm > 500 ? (
                                                     <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
@@ -1718,7 +1726,7 @@ const EvaraTankAnalytics = () => {
                                             </div>
                                         </div>
                                         <div className="flex flex-col mt-auto pt-1 gap-0.5">
-                                            <p className="text-[12px] font-black uppercase tracking-wider m-0" style={{ color: "var(--text-primary)" }}>Consumption</p>
+                                            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>Consumption</p>
                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.drainRateLpm > 500 ? '#FF3B30' : '#FF3B30' }}>
                                                 {waterAnalytics.drainRateLpm > 500 ? (
                                                     <span style={{ fontSize: '13px', color: '#FF3B30' }}>Invalid reading</span>
@@ -1753,7 +1761,7 @@ const EvaraTankAnalytics = () => {
                                             </button>
                                         </div>
                                         <div className="flex flex-col mt-auto pt-1 gap-0.5">
-                                            <p className="text-[12px] font-black uppercase tracking-wider m-0" style={{ color: "var(--text-primary)" }}>Alerts</p>
+                                            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>Alerts</p>
                                             <p className="text-[26px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: waterAnalytics.alerts.activeCount > 0 ? '#FF3B30' : '#1C1C1E' }}>
                                                 {waterAnalytics.alerts.activeCount} <span className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Active</span>
                                             </p>
@@ -1775,7 +1783,7 @@ const EvaraTankAnalytics = () => {
                                             </button>
                                         </div>
                                         <div className="flex flex-col mt-auto pt-1 gap-0.5">
-                                            <p className="text-[12px] font-black uppercase tracking-wider m-0" style={{ color: "var(--text-primary)" }}>Device Health</p>
+                                            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>Device Health</p>
                                             <p className={`leading-[1.1] font-black m-0 tracking-tight ${waterAnalytics.deviceHealth.status === 'Healthy' ? 'text-[26px]' : 'text-[18px]'
                                                 }`} style={{ color: waterAnalytics.deviceHealth.status === 'Healthy' ? '#34C759' : waterAnalytics.deviceHealth.status === 'Warning' ? '#FF9500' : '#FF3B30' }}>
                                                 {waterAnalytics.deviceHealth.status}

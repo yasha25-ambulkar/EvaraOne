@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { Save, Loader2, Smartphone, Shield, Zap, RefreshCcw, Clock, Save as SaveIcon } from 'lucide-react';
+import { Save, Loader2, Smartphone, Shield, RefreshCcw, Clock, Save as SaveIcon } from 'lucide-react';
 import { z } from 'zod';
 
 import { adminService } from '../../../services/admin';
@@ -44,7 +44,6 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
         register,
         handleSubmit,
         reset,
-        watch,
         formState: { isSubmitting },
     } = useForm<ConfigInput>({
         resolver: zodResolver(configSchema) as any,
@@ -64,14 +63,13 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
         }
     });
 
-    const isBatterySaver = watch('batterySaverMode');
 
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
                 const config = await adminService.getSystemConfig();
                 reset(config);
-                
+
                 setLoadingNodes(true);
                 const fetchedNodes = await adminService.getNodes();
                 setNodes(fetchedNodes);
@@ -95,17 +93,17 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
     };
 
     const inputClass = (error?: any) => `
-        w-full px-4 py-2.5 rounded-xl border transition-all duration-300 outline-none text-sm text-[var(--text-primary)]
+        w-full px-4 py-2.5 rounded-xl border transition-all duration-300 outline-none text-sm
         ${error
-            ? 'border-red-300 bg-red-50 dark:bg-red-900/10 dark:border-red-800/50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
-            : 'border-slate-200 apple-glass-inner dark:border-slate-700/50 dark:bg-slate-800/20 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 focus:apple-glass-card'}
+            ? 'border-red-300 bg-red-50 text-gray-900 dark:bg-red-900/10 dark:border-red-800/50 dark:text-gray-100 focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
+            : 'border-slate-200 bg-white text-gray-900 dark:bg-slate-800/20 dark:text-gray-100 dark:border-slate-700/50 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10'}
     `;
 
     const tabClass = (tab: string) => `
         flex-1 py-2 text-xs font-bold rounded-lg transition-all
-        ${activeTab === tab 
-            ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 dark:shadow-amber-900/40' 
-            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-300/50 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10'}
+        ${activeTab === tab
+            ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 dark:shadow-amber-900/40'
+            : 'text-gray-800 hover:text-gray-900 hover:bg-slate-300/50 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10'}
     `;
 
     return (
@@ -131,31 +129,18 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
             >
                 {activeTab === 'sampling' && (
                     <div className="space-y-4">
-                        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 flex items-center justify-between">
-                            <div>
-                                <h4 className="text-sm font-bold text-[var(--modal-text-color)] flex items-center gap-2">
-                                    <Zap size={16} className="text-amber-600 dark:text-amber-400" /> Battery Saver Mode
-                                </h4>
-                                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Overrides all intervals to conserve node battery (x2 interval)</p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" {...register('batterySaverMode')} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                            </label>
-                        </div>
-
                         <div className="grid grid-cols-2 gap-4">
                             <FormField label="EvaraTank (Min)" icon={Smartphone as any}>
-                                <input type="number" {...register('samplingIntervals.evaraTank')} className={inputClass()} disabled={isBatterySaver} />
+                                <input type="number" {...register('samplingIntervals.evaraTank')} className={inputClass()} />
                             </FormField>
                             <FormField label="EvaraDeep (Min)" icon={Smartphone as any}>
-                                <input type="number" {...register('samplingIntervals.evaraDeep')} className={inputClass()} disabled={isBatterySaver} />
+                                <input type="number" {...register('samplingIntervals.evaraDeep')} className={inputClass()} />
                             </FormField>
                             <FormField label="EvaraFlow (Sec)" icon={Smartphone as any}>
-                                <input type="number" {...register('samplingIntervals.evaraFlow')} className={inputClass()} disabled={isBatterySaver} />
+                                <input type="number" {...register('samplingIntervals.evaraFlow')} className={inputClass()} />
                             </FormField>
                             <FormField label="EvaraTDS (Min)" icon={Smartphone as any}>
-                                <input type="number" {...register('samplingIntervals.evaraTDS')} className={inputClass()} disabled={isBatterySaver} />
+                                <input type="number" {...register('samplingIntervals.evaraTDS')} className={inputClass()} />
                             </FormField>
                         </div>
                     </div>

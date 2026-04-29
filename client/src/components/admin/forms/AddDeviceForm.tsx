@@ -401,8 +401,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                           : "border-slate-100 dark:border-white/10 bg-[var(--bg-secondary)] hover:border-slate-200"
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <Droplets size={16} />
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.9)', border: '2px solid rgba(96,165,250,0.6)', boxShadow: '0 2px 8px rgba(59,130,246,0.15)' }}>
+                        <Droplets size={22} strokeWidth={2.5} style={{ color: '#3b82f6' }} />
                       </div>
                       <div>
                         <p className="text-[12px] font-[700] text-[var(--text-primary)]">
@@ -427,8 +427,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                           : "border-slate-100 dark:border-white/10 bg-[var(--bg-secondary)] hover:border-slate-200"
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <Waves size={16} />
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.9)', border: '2px solid rgba(52,211,153,0.6)', boxShadow: '0 2px 8px rgba(16,185,129,0.15)' }}>
+                        <Waves size={22} strokeWidth={2.5} style={{ color: '#0d9488' }} />
                       </div>
                       <div>
                         <p className="text-[12px] font-[700] text-[var(--text-primary)]">
@@ -556,9 +556,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                   }}
                 />
 
-                <div className="flex gap-2 items-start p-2.5 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border border-cyan-100 dark:border-cyan-800">
-                  <Info className="text-cyan-500 mt-0.5 shrink-0" size={12} />
-                  <p className="text-[10px] text-cyan-700 dark:text-cyan-200 leading-relaxed">
+                <div className="flex gap-2 items-start p-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800">
+                  <Info className="text-cyan-600 dark:text-cyan-400 mt-0.5 shrink-0" size={12} />
+                  <p className="text-[10px] text-cyan-800 dark:text-cyan-100 leading-relaxed">
                     Ensure the channel is <strong>Public</strong> or the{" "}
                     <strong>Read Key</strong> is correct. Select the fields that
                     match your sensor outputs.
@@ -722,9 +722,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/20">
-                    <MapPin size={14} className="text-emerald-300 dark:text-emerald-500 shrink-0" />
-                    <p className="text-[11px] text-emerald-500 dark:text-emerald-400">
+                  <div className="flex gap-2 items-start p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                    <span className="material-icons text-emerald-600 dark:text-emerald-400" style={{ fontSize: '12px', marginTop: '2px', flexShrink: 0 }}>location_on</span>
+                    <p className="text-[10px] text-emerald-800 dark:text-emerald-100 leading-relaxed">
                       Enter coordinates above or use the map picker below
                     </p>
                   </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import clsx from 'clsx';
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -241,8 +242,16 @@ const EvaraDeepAnalytics = () => {
                                     </button>
                                 )}
 
-                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isOffline ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#34C759]/30 text-[#1e7e34] border border-[#34C759]/60 shadow-md transition-all duration-300'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-red-500' : 'bg-[#34C759] animate-pulse shadow-[0_0_8px_rgba(52,199,89,0.6)]'}`} />
+                                <div className={clsx(
+                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                    isOffline
+                                        ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                        : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                                )}>
+                                    <div className={clsx(
+                                        "w-1.5 h-1.5 rounded-full",
+                                        isOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                    )} />
                                     {isOffline ? 'Offline' : 'Online'}
                                 </div>
                             </div>

@@ -314,6 +314,7 @@ html.dark input:-webkit-autofill,
 :root {
   --input-bg: var(--modal-input-bg);
 }
+
 .dark {
   --input-bg: var(--bg-secondary);
 }

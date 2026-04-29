@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import clsx from 'clsx';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -205,29 +206,12 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
         return [];
     }, [history, period, rangeStart, rangeEnd]);
 
-    const activeLabel = chartData[Math.floor(chartData.length / 2)]?.label || '--:--';
 
     const peakUsage = useMemo(() => {
         if (chartData.length === 0) return 0;
         return Math.max(...chartData.map(d => d.current || 0));
     }, [chartData]);
 
-    const CustomXAxisTick = ({ x, y, payload }: any) => {
-        const isActive = payload.value === activeLabel;
-        return (
-            <text x={x} y={y + 15} textAnchor="middle" fill={isActive ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={11} fontWeight={600}>
-                {payload.value}
-            </text>
-        );
-    };
-
-    const CustomYAxisTick = ({ x, y, payload }: any) => {
-        return (
-            <text x={x} y={y} dy={4} textAnchor="start" fill="var(--text-muted)" fontSize={10} fontWeight={500}>
-                {payload.value === 0 ? '0' : `${Math.round(payload.value)}L/m`}
-            </text>
-        );
-    };
 
     return (
         <div className="apple-glass-card rounded-[2rem] p-6 flex flex-col h-full relative overflow-hidden">
@@ -243,10 +227,10 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                         </svg>
                     </div>
                     <div className="flex flex-col">
-                        <h2 className="text-[22px] font-black text-[var(--text-primary)] tracking-tight m-0 leading-tight mb-0.5 uppercase">Consumption Pattern</h2>
+                        <h2 className="text-[20px] font-bold tracking-tight text-[var(--text-primary)] m-0 leading-tight mb-0.5 uppercase">Consumption Pattern</h2>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Peak Usage</span>
-                            <span className="text-[20px] font-black tracking-tight text-[var(--text-primary)]">{formatKPIValue(peakUsage, false)} L/min</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Peak Usage</span>
+                            <span className="text-[26px] font-black tracking-tight text-[var(--text-primary)]">{formatKPIValue(peakUsage, false)} L/min</span>
                         </div>
                     </div>
                 </div>
@@ -262,7 +246,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                                     <button
                                         key={p}
                                         onClick={() => setPeriod(p)}
-                                        className={`relative z-10 px-5 py-2 text-[10px] sm:text-[11px] font-black tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[#64748b] hover:text-[#334155]'
+                                        className={`relative z-10 px-5 py-2 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[#64748b] hover:text-[#334155]'
                                             }`}
                                         style={{
                                             border: 'none',
@@ -320,7 +304,8 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                             orientation="right"
                             axisLine={false}
                             tickLine={false}
-                            tick={<CustomYAxisTick />}
+                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
+                            tickFormatter={(v) => v === 0 ? '0' : `${Math.round(v)}L/m`}
                             domain={['auto', 'auto']}
                         />
 
@@ -329,7 +314,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                             minTickGap={40}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             tickLine={false}
-                            tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
+                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
                         />
 
                         <Tooltip
@@ -371,7 +356,7 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
             {/* Header: HYDROLOGICAL LENS / System Dynamics */}
             <div className="flex justify-between items-start mb-2 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">FLOW RATE</h2>
+                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>FLOW RATE</h2>
                 </div>
                 {/* Top Right Water Drop Icon */}
                 <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
@@ -390,12 +375,12 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
                     </svg>
                 </div>
                 <div className="flex flex-col min-w-0">
-                    <span className="text-[11px] font-black text-[var(--text-primary)] uppercase tracking-widest truncate">Avg Flow Rate</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Avg Flow Rate</span>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-2xl lg:text-3xl font-black tracking-tighter text-[#004F94] leading-tight">
+                        <span className="text-[26px] font-black tracking-tight text-[#004F94] leading-tight">
                             {formatMeterValue(Math.abs(avgFlow))}
                         </span>
-                        <span className="text-[0.8rem] font-black tracking-tight text-[var(--text-muted)]">L/min</span>
+                        <span className="text-[13px] font-bold tracking-tight text-[var(--text-muted)]">L/min</span>
                     </div>
                 </div>
             </div>
@@ -410,7 +395,7 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
             {/* Header: ALERT MONITOR / Alerts */}
             <div className="flex justify-between items-start mb-2 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">ALERTS</h2>
+                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>ALERTS</h2>
                 </div>
                 {/* Top Right Red Exclamation Icon */}
                 <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-slate-50 dark:border-white/10">
@@ -426,8 +411,8 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
             <div className="mt-auto flex items-center justify-between">
                 {/* Active Alerts Count */}
                 <div className="flex items-baseline gap-1.5">
-                    <span className="text-[36px] font-black text-[var(--text-primary)] leading-none">0</span>
-                    <span className="text-[16px] font-black text-[var(--text-muted)] uppercase tracking-widest">Active</span>
+                    <span className="text-[26px] font-black text-[var(--text-primary)] leading-none">0</span>
+                    <span className="text-[13px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Active</span>
                 </div>
             </div>
         </div>
@@ -487,7 +472,7 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
         <div className={`apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden h-full ${className}`}>
             <div className="flex justify-between items-start mb-1 h-11">
                 <div className="flex flex-col justify-center h-full">
-                    <h2 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] m-0 uppercase leading-tight">Total Flow Rate</h2>
+                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1.25 }}>TOTAL FLOW RATE</h2>
                 </div>
                 <div className="w-8 h-8 rounded-[10px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -503,10 +488,10 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
             </div>
 
             <div className="flex items-baseline gap-1 mt-auto">
-                <span className="text-2xl font-black tracking-tighter text-[#6366f1] leading-none tabular-nums truncate">
+                <span className="text-[26px] font-black tracking-tight text-[#6366f1] leading-none tabular-nums truncate">
                     {formatMeterValue(totalValue)}
                 </span>
-                <span className="text-[0.7rem] font-black tracking-tight text-[var(--text-muted)]">L</span>
+                <span className="text-[13px] font-bold tracking-tight text-[var(--text-muted)]">L</span>
             </div>
 
             <div className="mt-3 flex bg-[#f8fafc]/50 p-0.5 rounded-lg border border-slate-100/30 w-fit">
@@ -992,15 +977,23 @@ const EvaraFlowAnalytics = () => {
                                 <span className="font-bold" style={{ color: "var(--text-primary)", fontWeight: '700' }}>{deviceName}</span>
                             </nav>
                             <div className="flex items-center gap-2">
-                                <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all duration-300 ${effectiveIsOffline ? 'bg-[#fee2e2] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30]' : 'bg-[#dcfce7] text-[#166534] border border-[#166534]/30 dark:bg-transparent dark:text-[#34C759] dark:border dark:border-[#34C759]'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${effectiveIsOffline ? 'bg-[#991b1b]' : 'bg-[#166534]'}`} />
+                                <div className={clsx(
+                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                    effectiveIsOffline
+                                        ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                        : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                                )}>
+                                    <div className={clsx(
+                                        "w-1.5 h-1.5 rounded-full",
+                                        effectiveIsOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                    )} />
                                     {effectiveIsOffline ? 'Offline' : 'Online'}
                                 </div>
 
                                 <button
                                     onClick={() => refetch()}
                                     disabled={analyticsFetching}
-                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
+                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
                                 >
                                     <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
                                         {analyticsFetching ? 'sync' : 'refresh'}
@@ -1010,7 +1003,7 @@ const EvaraFlowAnalytics = () => {
 
                                 <button
                                     onClick={() => setShowNodeInfo(true)}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <Info size={12} className="stroke-[2.5px]" />
                                     Node Info
@@ -1018,7 +1011,7 @@ const EvaraFlowAnalytics = () => {
 
                                 <button
                                     onClick={() => setShowParams(true)}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
                                 >
                                     <Settings size={12} className="stroke-[2.5px]" />
                                     Parameters
@@ -1028,7 +1021,7 @@ const EvaraFlowAnalytics = () => {
                                 {user?.role === 'superadmin' && (
                                     <button
                                         onClick={() => setShowDeleteConfirm(true)}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
                                     >
                                         <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
                                         Delete Node
@@ -1037,7 +1030,7 @@ const EvaraFlowAnalytics = () => {
                             </div>
                         </div>
                         <div className="flex flex-col gap-1">
-                            <h1 className="text-3xl font-black m-0" style={{ color: "var(--text-primary)", letterSpacing: '-0.5px' }}>
+                            <h1 className="text-[20px] font-bold tracking-tight m-0" style={{ color: "var(--text-primary)" }}>
                                 {deviceName} Flow Analytics
                             </h1>
                             {effectiveIsOffline && tsDurationLabel && (
@@ -1240,9 +1233,20 @@ const EvaraFlowAnalytics = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-6">
 
                         {/* LEFT COLUMN: Analog Brass Meter */}
-                        <div className="lg:col-span-1 apple-glass-card rounded-[2rem] p-10 flex flex-col items-center justify-center gap-6 min-h-[460px] h-full relative overflow-hidden">
+                        <div className="lg:col-span-1 apple-glass-card rounded-[2.5rem] p-3 flex flex-col relative overflow-hidden h-full">
+                            <div className="flex justify-between items-center mb-2 z-10 w-full px-2 mt-2">
+                                <div>
+                                    <h3 className="text-xl font-semibold m-0 leading-tight" style={{ color: 'var(--text-primary)' }}>{deviceName}</h3>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="flex items-center gap-1 text-xs font-semibold rounded-md px-2 py-1"
+                                        style={{ color: '#0A84FF', background: 'rgba(10,132,255,0.1)' }}>
+                                        <span className="material-symbols-rounded" style={{ fontSize: 14 }}>sync</span> Live
+                                    </span>
+                                </div>
+                            </div>
 
-                            <div className="mt-2 mb-4" />
+                            <div className="flex-grow flex flex-col items-center justify-center gap-6 py-4">
 
                             <div className="relative w-72 h-72 drop-shadow-2xl flex-shrink-0">
                                 <svg viewBox="0 0 200 200" className="w-full h-full">
@@ -1320,6 +1324,7 @@ const EvaraFlowAnalytics = () => {
                                 </p>
                             </div>
                         </div>
+                    </div>
 
                         {/* RIGHT COLUMN: 4-col grid top row + 1-col full bottom row */}
                         <div className="lg:col-span-2 flex flex-col gap-6 h-full">
@@ -1349,7 +1354,7 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 min-w-0">
                                                 <div className="flex items-center gap-1">
                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">USAGE</span>
+                                                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>USAGE</span>
                                                 </div>
                                                 <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums truncate">
                                                     {formatMeterValue(deltaVolumeLitres > 0 ? deltaVolumeLitres : totalRaw)}
@@ -1361,7 +1366,7 @@ const EvaraFlowAnalytics = () => {
                                             <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-primary)]">FLOW</span>
+                                                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>FLOW</span>
                                                 </div>
                                             </div>
                                         </div>
