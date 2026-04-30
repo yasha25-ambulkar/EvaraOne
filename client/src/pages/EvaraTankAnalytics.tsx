@@ -178,7 +178,6 @@ function localToApiBody(lc: LocalTankConfig) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const EvaraTankAnalytics = () => {
-
     const { hardwareId } = useParams<{ hardwareId: string }>();
 
     const { user } = useAuth();
@@ -805,7 +804,7 @@ const EvaraTankAnalytics = () => {
 
     // Main component return
     return (
-        <div className="min-h-screen font-sans relative overflow-x-hidden bg-transparent" style={{
+        <div data-tour="analytics-content" className="min-h-screen font-sans relative overflow-x-hidden bg-transparent" style={{
             color: 'var(--text-primary)'
         }}>
 

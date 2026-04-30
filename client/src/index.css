@@ -1571,3 +1571,46 @@ a:active {
     transform: translateX(-50%) scaleX(1) scaleY(1);
   }
 }
+
+/* ── Driver.js Onboarding Tour — EvaraOne Theme ── */
+.driver-popover {
+    border-radius: 16px !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid rgba(58, 122, 254, 0.15) !important;
+}
+
+.driver-popover-title {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #1e3a8a !important;
+}
+
+.driver-popover-description {
+    font-size: 13px !important;
+    color: #475569 !important;
+    line-height: 1.6 !important;
+}
+
+.driver-popover-next-btn {
+    background: #3A7AFE !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-weight: 700 !important;
+    padding: 6px 14px !important;
+}
+
+.driver-popover-prev-btn {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+
+.driver-popover-close-btn {
+    font-size: 18px !important;
+    opacity: 0.5 !important;
+}
+
+.driver-popover-progress-text {
+    font-size: 12px !important;
+    color: #94a3b8 !important;
+}

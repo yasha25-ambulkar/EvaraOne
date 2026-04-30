@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Server, Shield, MapPin, LogOut, Sun, Moon } from 'lucide-react';
+import { LayoutGrid, Server, Shield, MapPin, LogOut, Sun, Moon, HelpCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import { useTenancy } from '../context/TenancyContext';
+import { startOnboardingTour } from '../utils/onboardingTour';
 
 const Navbar = () => {
     const location = useLocation();
@@ -69,10 +70,18 @@ const Navbar = () => {
                             ? location.pathname === '/dashboard'
                             : location.pathname.startsWith(item.path);
 
+                        // Map paths to tour data attributes
+                        const tourMap: Record<string, string> = {
+                            '/map': 'map',
+                            '/dashboard': 'dashboard',
+                            '/nodes': 'nodes'
+                        };
+
                         return (
                             <Link
                                 key={item.path}
                                 to={item.path}
+                                data-tour={tourMap[item.path]}
                                 className={clsx(
                                     "flex items-center gap-2 font-bold tracking-tight text-[13px] md:text-[14px] transition-all cursor-pointer whitespace-nowrap",
                                     isActive ? "navbar-active" : "px-4 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 navbar-text"
@@ -90,6 +99,19 @@ const Navbar = () => {
                 </div>
 
                 <div className="flex items-center gap-4 flex-shrink-0">
+                    {/* Help Button */}
+                    <button
+                        data-tour="help-button"
+                        onClick={() => {
+                            localStorage.removeItem('evara_tour_done');
+                            startOnboardingTour();
+                        }}
+                        className="w-[36px] h-[36px] flex items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 navbar-text"
+                        title="Restart Tour"
+                    >
+                        <HelpCircle size={20} strokeWidth={2} />
+                    </button>
+
                     {/* Theme Toggle Button */}
                     <button
                         onClick={toggleTheme}

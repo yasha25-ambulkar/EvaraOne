@@ -68,6 +68,7 @@ export const MapLegend = ({
     <div className="absolute bottom-6 left-6 z-[1000] flex flex-col items-start pointer-events-none">
       {/* Toggle Button */}
       <button
+        data-tour="map-legend"
         onClick={() => setShowIndex(!showIndex)}
         className="p-2.5 mb-2 pointer-events-auto transition-all hover:scale-105 active:scale-95 group rounded-2xl border"
         style={{ 

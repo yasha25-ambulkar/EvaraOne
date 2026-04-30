@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -9,6 +9,8 @@ import { AuthProvider } from './context/AuthContext';
 import { TenancyProvider } from './context/TenancyContext';
 import { ToastProvider } from './components/ToastProvider';
 import SplashScreen from './components/ui/SplashScreen';
+import { setTourNavigate } from './utils/tourNavigate';
+import { startOnboardingTour } from './utils/onboardingTour';
 
 // ── Lazy-loaded page components (code splitting) ──────────────────────
 const Login = React.lazy(() => import('./pages/Login'));
@@ -70,9 +72,28 @@ const GlobalBackground = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
+// Component to register navigate function for tour
+const TourNavigateRegistrar = () => {
+    const navigate = useNavigate();
+    React.useEffect(() => {
+        setTourNavigate(navigate);
+    }, [navigate]);
+    return null;
+};
+
+// Component to trigger onboarding tour once on app load
+const TourTrigger = () => {
+    React.useEffect(() => {
+        const tourDone = localStorage.getItem('evara_tour_done');
+        if (!tourDone) {
+            setTimeout(() => startOnboardingTour(), 2000);
+        }
+    }, []);
+    return null;
+};
+
 function App() {
     const [splashDone, setSplashDone] = useState(false);
-
 
     return (
         <QueryClientProvider client={queryClient}>
@@ -82,6 +103,8 @@ function App() {
                     <TenancyProvider>
                         <ToastProvider>
                             <Router>
+                                <TourNavigateRegistrar />
+                                <TourTrigger />
                                 <GlobalBackground>
                                     <Suspense fallback={<PageLoader />}>
                                         <Routes>

@@ -689,7 +689,7 @@ const AllNodes = () => {
             </p>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full max-w-7xl">
+          <div data-tour="nodes-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full max-w-7xl">
             {filtered.map((node) => (
               <NodeCardItem key={node.node_key || node.id} node={node} realtimeStatuses={realtimeStatuses} />
             ))}

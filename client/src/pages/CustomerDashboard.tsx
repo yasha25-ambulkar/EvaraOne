@@ -129,7 +129,7 @@ export default function CustomerDashboard() {
       </div>
 
       {/* ── KPI Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6 mb-5 relative z-10">
+      <div data-tour="kpi-cards" className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6 mb-5 relative z-10">
         <StatCard
           label="Total Devices"
           value={isLoading ? '—' : totalDevices}
@@ -186,9 +186,11 @@ export default function CustomerDashboard() {
             className="grid gap-3"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}
           >
-            {(nodes as any[]).map((node: any) => (
+            {(nodes as any[]).map((node: any, index: number) => (
               <ErrorBoundary key={node.id || node.hardwareId}>
-                <DeviceCard device={node} />
+                <div data-tour={index === 0 ? 'device-card' : undefined} className="contents">
+                  <DeviceCard device={node} />
+                </div>
               </ErrorBoundary>
             ))}
           </div>
