@@ -124,7 +124,8 @@ export const startOnboardingTour = () => {
                     description: 'Each card represents one of your IoT devices — status, location and live readings at a glance.',
                     side: 'top' as const,
                     onNextClick: async () => {
-                        await navigateTo('/evaratank', '[data-tour="analytics-content"]');
+                        tourNavigate('/evaratank/EV-TNK-003');
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                         driverObj?.moveNext();
                     }
                 }
