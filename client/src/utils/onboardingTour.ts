@@ -114,20 +114,6 @@ export const startOnboardingTour = () => {
                 popover: {
                     title: '📡 Your Devices',
                     description: 'Each card represents one of your IoT devices — status, location and live readings at a glance.',
-                    side: 'top' as const,
-                    onNextClick: async () => {
-                        tourNavigate('/evaratank/EV-TNK-003');
-                        await waitForElement('[data-tour="analytics-content"]', 5000);
-                        driverObj?.moveNext();
-                    }
-                }
-            },
-            // STEP 8 — Analytics page
-            {
-                element: '[data-tour="analytics-content"]',
-                popover: {
-                    title: '📈 Device Analytics',
-                    description: 'Detailed charts and trends for each device — tank levels, flow rates, TDS and more over time.',
                     side: 'top' as const
                 }
             },

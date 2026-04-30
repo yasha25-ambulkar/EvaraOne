@@ -122,7 +122,7 @@ class NodeService {
     else if (categoryRaw.includes('flow') || categoryRaw.includes('pump')) category = 'flow';
     else if (categoryRaw.includes('sump')) category = 'sump';
     else if (categoryRaw.includes('tds')) category = 'tds';
-    else category = 'tank'; // Default
+    else category = 'unknown';
 
     const displayName = data.displayName || data.display_name || data.label || hardwareId;
 
@@ -164,8 +164,20 @@ class NodeService {
       assetType: categoryRaw,
       category: category as any,
       device_type: data.device_type || categoryRaw,
-      analytics_template: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : category === 'deep' ? 'EvaraDeep' : category === 'tds' ? 'EvaraTDS' : 'EvaraTank'),
-      analyticsTemplate: data.analyticsTemplate || data.analytics_template || (category === 'tank' ? 'EvaraTank' : category === 'flow' ? 'EvaraFlow' : category === 'deep' ? 'EvaraDeep' : category === 'tds' ? 'EvaraTDS' : 'EvaraTank'),
+      analytics_template: data.analyticsTemplate || data.analytics_template || (
+          category === 'tank' || category === 'sump' ? 'EvaraTank' :
+          category === 'flow' ? 'EvaraFlow' :
+          category === 'deep' ? 'EvaraDeep' :
+          category === 'tds' ? 'EvaraTDS' :
+          null  // unknown devices get null, not EvaraTank
+      ),
+      analyticsTemplate: data.analyticsTemplate || data.analytics_template || (
+          category === 'tank' || category === 'sump' ? 'EvaraTank' :
+          category === 'flow' ? 'EvaraFlow' :
+          category === 'deep' ? 'EvaraDeep' :
+          category === 'tds' ? 'EvaraTDS' :
+          null
+      ),
       last_seen: safeIso(lastSeenTime),
       last_online_at: safeIso(lastSeenTime),
       updatedAt: safeIso(lastSeenTime) || new Date().toISOString(),

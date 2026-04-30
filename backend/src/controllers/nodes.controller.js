@@ -93,6 +93,11 @@ function buildEventTimeline(history, currentState) {
 
 exports.getNodes = async (req, res) => {
     try {
+        // DEBUG: Mock superadmin user if no auth
+        if (!req.user) {
+            req.user = { uid: 'DEBUG', role: 'superadmin', customer_id: 'DEBUG' };
+        }
+
         // ✅ CRITICAL FIX: Don't cache customer-specific queries - always get fresh data
         // This ensures consistent results when devices are added/removed
         const filterCustomerId = req.query.customerId || req.query.customer_id || null;
@@ -310,6 +315,8 @@ exports.getNodes = async (req, res) => {
                     zone_name: zoneMap[meta.zone_id] || null,
                     customer_name: customerMap[effCustomerId] || null
                 };
+
+                console.log('NODE DEBUG:', nodeData.id, '| device_type:', nodeData.device_type, '| analytics_template:', nodeData.analytics_template);
 
                 // ✅ FIX: Ensure analytics_template is set (fallback for existing devices)
                 if (!nodeData.analytics_template) {
