@@ -2,10 +2,9 @@ import { driver, type Driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import { tourNavigate } from './tourNavigate';
 
-// Keep driver instance outside so it survives page transitions
 let driverObj: Driver | null = null;
 
-const waitForElement = (selector: string, timeout = 4000): Promise<boolean> => {
+const waitForElement = (selector: string, timeout = 5000): Promise<boolean> => {
     return new Promise((resolve) => {
         const interval = setInterval(() => {
             if (document.querySelector(selector)) {
@@ -20,16 +19,7 @@ const waitForElement = (selector: string, timeout = 4000): Promise<boolean> => {
     });
 };
 
-const navigateTo = async (path: string, waitFor: string) => {
-    // Only navigate if not already on that page
-    if (!window.location.pathname.startsWith(path)) {
-        tourNavigate(path);
-    }
-    await waitForElement(waitFor);
-};
-
 export const startOnboardingTour = () => {
-    // Destroy any existing instance first
     if (driverObj) {
         driverObj.destroy();
         driverObj = null;
@@ -49,6 +39,7 @@ export const startOnboardingTour = () => {
             driverObj = null;
         },
         steps: [
+            // STEP 1 — Navbar
             {
                 element: 'nav',
                 popover: {
@@ -57,6 +48,7 @@ export const startOnboardingTour = () => {
                     side: 'bottom' as const
                 }
             },
+            // STEP 2 — Map nav link → navigate to /map
             {
                 element: '[data-tour="map"]',
                 popover: {
@@ -64,11 +56,13 @@ export const startOnboardingTour = () => {
                     description: 'Click here to open the live map and see all your IoT devices in real time.',
                     side: 'bottom' as const,
                     onNextClick: async () => {
-                        await navigateTo('/map', '[data-tour="map-legend"]');
+                        tourNavigate('/map');
+                        await waitForElement('[data-tour="map-legend"]', 3000);
                         driverObj?.moveNext();
                     }
                 }
             },
+            // STEP 3 — Map legend
             {
                 element: '[data-tour="map-legend"]',
                 popover: {
@@ -76,47 +70,45 @@ export const startOnboardingTour = () => {
                     description: 'This legend shows all your device locations. Each pin on the map is a live IoT device — green means online, red means offline.',
                     side: 'right' as const,
                     onNextClick: async () => {
-                        await navigateTo('/dashboard', '[data-tour="kpi-cards"]');
+                        tourNavigate('/dashboard');
+                        await waitForElement('[data-tour="kpi-cards"]', 4000);
                         driverObj?.moveNext();
                     }
                 }
             },
+            // STEP 4 — Dashboard nav link (already on dashboard)
             {
                 element: '[data-tour="dashboard"]',
                 popover: {
                     title: '📊 Dashboard',
-                    description: 'Click here to go to your personal dashboard with live data from all devices.',
-                    side: 'bottom' as const,
-                    onNextClick: async () => {
-                        await navigateTo('/dashboard', '[data-tour="kpi-cards"]');
-                        driverObj?.moveNext();
-                    }
+                    description: 'This is your personal dashboard with live data from all devices.',
+                    side: 'bottom' as const
                 }
             },
+            // STEP 5 — KPI Cards
             {
                 element: '[data-tour="kpi-cards"]',
                 popover: {
                     title: '📈 KPI Cards',
-                    description: 'These cards show your key metrics — tank level, flow rate, TDS and more — all updating in real time.',
-                    side: 'top' as const,
+                    description: 'These cards give you a quick overview — total devices, water consumption today, active alerts, and overall system health at a glance.',
+                    side: 'bottom' as const,
                     onNextClick: async () => {
-                        await navigateTo('/nodes', '[data-tour="nodes-grid"]');
+                        tourNavigate('/nodes');
+                        await waitForElement('[data-tour="nodes-grid"]', 4000);
                         driverObj?.moveNext();
                     }
                 }
             },
+            // STEP 6 — All Nodes nav link (already on nodes)
             {
                 element: '[data-tour="nodes"]',
                 popover: {
                     title: '🔧 All Nodes',
                     description: 'Click here to view and manage all your IoT sensor nodes.',
-                    side: 'bottom' as const,
-                    onNextClick: async () => {
-                        await navigateTo('/nodes', '[data-tour="nodes-grid"]');
-                        driverObj?.moveNext();
-                    }
+                    side: 'bottom' as const
                 }
             },
+            // STEP 7 — Nodes grid
             {
                 element: '[data-tour="nodes-grid"]',
                 popover: {
@@ -125,11 +117,12 @@ export const startOnboardingTour = () => {
                     side: 'top' as const,
                     onNextClick: async () => {
                         tourNavigate('/evaratank/EV-TNK-003');
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        await waitForElement('[data-tour="analytics-content"]', 5000);
                         driverObj?.moveNext();
                     }
                 }
             },
+            // STEP 8 — Analytics page
             {
                 element: '[data-tour="analytics-content"]',
                 popover: {
@@ -138,6 +131,7 @@ export const startOnboardingTour = () => {
                     side: 'top' as const
                 }
             },
+            // STEP 9 — Help button
             {
                 element: '[data-tour="help-button"]',
                 popover: {

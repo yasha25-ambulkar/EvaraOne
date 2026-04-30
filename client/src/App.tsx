@@ -5,7 +5,7 @@ import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './layouts/AdminLayout';
 import ErrorBoundary from './components/ErrorBoundary';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { TenancyProvider } from './context/TenancyContext';
 import { ToastProvider } from './components/ToastProvider';
 import SplashScreen from './components/ui/SplashScreen';
@@ -81,14 +81,17 @@ const TourNavigateRegistrar = () => {
     return null;
 };
 
-// Component to trigger onboarding tour once on app load
 const TourTrigger = () => {
+    const { user } = useAuth();
+    
     React.useEffect(() => {
+        if (!user) return;
         const tourDone = localStorage.getItem('evara_tour_done');
-        if (!tourDone) {
+        if (!tourDone && user.role === 'customer') {
             setTimeout(() => startOnboardingTour(), 2000);
         }
-    }, []);
+    }, [user]);
+    
     return null;
 };
 
