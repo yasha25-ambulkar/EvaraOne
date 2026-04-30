@@ -1572,45 +1572,56 @@ a:active {
   }
 }
 
-/* ── Driver.js Onboarding Tour — EvaraOne Theme ── */
+/* ── Driver.js Onboarding Tour — EvaraOne Glassmorphic Theme ── */
 .driver-popover {
-    border-radius: 16px !important;
+    border-radius: 20px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
-    border: 1px solid rgba(58, 122, 254, 0.15) !important;
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
 }
 
 .driver-popover-title {
-    font-size: 15px !important;
+    font-size: 16px !important;
     font-weight: 800 !important;
     color: #1e3a8a !important;
 }
 
 .driver-popover-description {
     font-size: 13px !important;
-    color: #475569 !important;
+    color: #334155 !important;
     line-height: 1.6 !important;
 }
 
+.driver-popover-footer {
+    background: transparent !important;
+}
+
 .driver-popover-next-btn {
-    background: #3A7AFE !important;
-    border-radius: 8px !important;
+    background: rgba(58, 122, 254, 0.9) !important;
+    backdrop-filter: blur(10px) !important;
+    border-radius: 10px !important;
     border: none !important;
     font-weight: 700 !important;
-    padding: 6px 14px !important;
+    color: white !important;
 }
 
 .driver-popover-prev-btn {
-    border-radius: 8px !important;
-    font-weight: 600 !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    background: rgba(255,255,255,0.3) !important;
+    border: 1px solid rgba(255,255,255,0.5) !important;
+    backdrop-filter: blur(10px) !important;
 }
 
 .driver-popover-close-btn {
+    color: #1e3a8a !important;
     font-size: 18px !important;
-    opacity: 0.5 !important;
 }
 
 .driver-popover-progress-text {
-    font-size: 12px !important;
-    color: #94a3b8 !important;
+    color: #64748b !important;
+    font-weight: 600 !important;
 }
