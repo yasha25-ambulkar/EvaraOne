@@ -745,7 +745,7 @@ exports.getNodeTelemetry = async (req, res) => {
                 Object.keys(fieldMapping).find(k =>
                     fieldMapping[k] === "water_level_raw_sensor_reading" ||
                     fieldMapping[k] === "water_level_in_cm"
-                ) || metadata.water_level_field || metadata.fieldKey || "field1";
+                ) || metadata.water_level_field || metadata.fieldKey || "field2";
 
             const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
             logger.debug(`[ThingSpeak] Fetching: ${url}`);
@@ -1120,7 +1120,7 @@ exports.getNodeAnalytics = async (req, res) => {
     const fieldKey =
       fieldMapping.levelField || definedField ||
       Object.keys(fieldMapping).find(k => fieldMapping[k] && fieldMapping[k].includes("water_level")) ||
-      (sampleFeed.field1 !== undefined ? "field1" : "field2");
+      (sampleFeed.field2 !== undefined ? "field2" : "field1");
 
     // â”€â”€ FLOW METER path (unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (["evaraflow", "flow", "flow_meter"].includes(type)) {

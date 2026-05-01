@@ -48,15 +48,8 @@ const calculateDeviceStatus = (lastUpdatedAt) => {
     // Calculate difference in minutes
     const timeDiffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
     
-    // 1. Check if same day
-    const isSameDay = lastDataDate === currentDate;
-    
-    if (isSameDay) {
-      if (timeDiffMinutes <= 20) {
-        return DEVICE_STATUS.ONLINE;
-      } else {
-        return DEVICE_STATUS.OFFLINE_RECENT;
-      }
+    if (timeDiffMinutes <= 20) {
+      return DEVICE_STATUS.ONLINE;
     } else {
       return DEVICE_STATUS.OFFLINE;
     }
