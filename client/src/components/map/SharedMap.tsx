@@ -562,7 +562,7 @@ const SharedMap = ({
     null,
   );
   const [hoverPanel, setHoverPanel] = useState<HoverPanel | null>(null);
-  const [realtimeStatuses, setRealtimeStatuses] = useState<Record<string, "Online" | "Offline">>({});
+  const [realtimeStatuses, setRealtimeStatuses] = useState<Record<string, any>>({});
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
@@ -587,8 +587,7 @@ const SharedMap = ({
     const handleUpdate = (data: any) => {
       const id = data.device_id || data.node_id;
       if (!id) return;
-      const status = computeDeviceStatus(data.timestamp || data.created_at || data.last_seen);
-      setRealtimeStatuses(prev => ({ ...prev, [id]: status }));
+      setRealtimeStatuses(prev => ({ ...prev, [id]: data }));
     };
     socket.on("telemetry_update", handleUpdate);
     socket.on("telemetry_broadcast", handleUpdate);
@@ -626,7 +625,9 @@ const SharedMap = ({
 
       // FIX: Use computeDeviceStatus on the latest available timestamp to ensure the marker dot
       // matches the real-time status seen in the hover panel.
-      const latestTs = realtimeStatuses[d.id] || d.last_telemetry?.timestamp || d.last_seen || d.status;
+      const snap = realtimeStatuses[d.id];
+      const base = snap || d.last_telemetry || {};
+      const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || d.last_seen || d.last_online_at || null;
       const s = computeDeviceStatus(latestTs);
 
       const key = `${t}_${s}`;
@@ -689,7 +690,9 @@ const SharedMap = ({
               (device as any).analytics_template || device.asset_type || "";
 
             // FIX: Ensure marker status is computed correctly here too
-            const latestTs = realtimeStatuses[device.id] || device.last_telemetry?.timestamp || device.last_seen || device.status;
+            const snap = realtimeStatuses[device.id];
+            const base = snap || device.last_telemetry || {};
+            const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || device.last_seen || device.last_online_at || null;
             const s = computeDeviceStatus(latestTs);
 
             const key = `${t}_${s}`;
