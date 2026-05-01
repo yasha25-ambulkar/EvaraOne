@@ -103,7 +103,7 @@ const EvaraTDSAnalytics = () => {
         if (chartRange === '24H') {
             filtered = filtered.slice(-30);
         }
-        
+
         const chartData = filtered.map((h: any) => {
             const date = h.timestamp?._seconds
                 ? new Date(h.timestamp._seconds * 1000)
@@ -121,7 +121,7 @@ const EvaraTDSAnalytics = () => {
         return { chartData, chartTicks };
     }, [device?.tdsHistory, chartRange]);
 
-    const isOffline = !device; 
+    const isOffline = !device;
     if (!id) return <Navigate to="/nodes" replace />;
 
     if (isLoading) {
@@ -204,7 +204,7 @@ const EvaraTDSAnalytics = () => {
 
                     {/* ── Main Layout ── */}
                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.8fr)] gap-4 items-stretch">
-                        
+
                         {/* Left: Device Visual Card */}
                         <div className="rounded-[2.5rem] p-3 flex flex-col relative overflow-hidden h-full" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
                             <div className="flex justify-between items-center mb-2 z-10 w-full px-2 mt-2">

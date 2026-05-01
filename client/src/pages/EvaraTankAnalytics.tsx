@@ -410,14 +410,14 @@ const EvaraTankAnalytics = () => {
 
     const metrics = useMemo(() => {
         const backendPct = activeTelemetry?.level_percentage ?? 0;
-        const capacityLitres = computeCapacityLitres({ 
-            tankShape: localCfg.tankShape, 
-            heightM: localCfg.heightM, 
-            lengthM: localCfg.lengthM, 
-            breadthM: localCfg.breadthM, 
-            radiusM: localCfg.radiusM, 
-            deadBandM: localCfg.deadBandM, 
-            capacityOverrideLitres: localCfg.capacityOverrideLitres 
+        const capacityLitres = computeCapacityLitres({
+            tankShape: localCfg.tankShape,
+            heightM: localCfg.heightM,
+            lengthM: localCfg.lengthM,
+            breadthM: localCfg.breadthM,
+            radiusM: localCfg.radiusM,
+            deadBandM: localCfg.deadBandM,
+            capacityOverrideLitres: localCfg.capacityOverrideLitres
         });
 
         return {
@@ -475,7 +475,7 @@ const EvaraTankAnalytics = () => {
             const now = Date.now();
             const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
             const startBoundary = latestBoundary - (4 * 60 * 60000); // 4 hours
-            
+
             let sorted = [...chartData].map((d: any) => ({
                 ...d,
                 timestampMs: new Date(d.timestamp || d.created_at).getTime(),
@@ -486,42 +486,42 @@ const EvaraTankAnalytics = () => {
             if (sorted.length === 0) return [];
 
             const interpolated = [];
-            
-            for (let t = startBoundary; t <= latestBoundary; t += 60000) { 
-                 let dataIdx = 0;
-                 while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                     dataIdx++;
-                 }
-                 
-                 let point: any = { timestampMs: t, time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), fullTime: new Date(t).toLocaleString() };
-                 
-                 if (dataIdx >= sorted.length - 1) {
-                     point.level = sorted[sorted.length-1].level;
-                     point.volume = sorted[sorted.length-1].volume;
-                 } else if (sorted[dataIdx].timestampMs > t) {
-                     point.level = sorted[0].level;
-                     point.volume = sorted[0].volume;
-                 } else {
-                     const p1 = sorted[dataIdx];
-                     const p2 = sorted[dataIdx + 1];
-                     const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
-                     point.level = p1.level + (p2.level - p1.level) * ratio;
-                     point.volume = p1.volume + (p2.volume - p1.volume) * ratio;
-                 }
-                 point.levelCm = (point.level / 100) * (localCfg.heightM * 100);
-                 interpolated.push(point);
+
+            for (let t = startBoundary; t <= latestBoundary; t += 60000) {
+                let dataIdx = 0;
+                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                    dataIdx++;
+                }
+
+                let point: any = { timestampMs: t, time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), fullTime: new Date(t).toLocaleString() };
+
+                if (dataIdx >= sorted.length - 1) {
+                    point.level = sorted[sorted.length - 1].level;
+                    point.volume = sorted[sorted.length - 1].volume;
+                } else if (sorted[dataIdx].timestampMs > t) {
+                    point.level = sorted[0].level;
+                    point.volume = sorted[0].volume;
+                } else {
+                    const p1 = sorted[dataIdx];
+                    const p2 = sorted[dataIdx + 1];
+                    const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
+                    point.level = p1.level + (p2.level - p1.level) * ratio;
+                    point.volume = p1.volume + (p2.volume - p1.volume) * ratio;
+                }
+                point.levelCm = (point.level / 100) * (localCfg.heightM * 100);
+                interpolated.push(point);
             }
-            
+
             // XAxis edge padding point (null values so it doesn't draw but creates whitespace)
             interpolated.push({
-                timestampMs: latestBoundary + (5 * 60000), 
+                timestampMs: latestBoundary + (5 * 60000),
                 time: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
                 level: null,
                 volume: null,
                 levelCm: null
             });
-            
+
             return interpolated;
         } else if (tankChartRange === '1W') {
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1687,7 +1687,7 @@ const EvaraTankAnalytics = () => {
                                             {user?.role === 'superadmin' && customerConfig.showFillRate === false && (
                                                 <span className="text-[10px] font-bold bg-gray-200 text-black px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
                                             )}
-                                            
+
                                             <div className="flex items-center gap-2">
                                                 <button onClick={() => setActiveInfoPopup('fillRate')} className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
                                                     <Info size={14} color="#1C1C1E" />
@@ -1738,9 +1738,9 @@ const EvaraTankAnalytics = () => {
 
                                             {/* CHANGE 3: Show today's consumption total */}
                                             {waterAnalytics.todaysConsumptionLiters > 0 && (
-                                              <p className="text-[10px] font-bold mt-1.5 m-0 opacity-60" style={{ color: "var(--text-primary)" }}>
-                                                {waterAnalytics.todaysConsumptionLiters.toFixed(0)} L processed today
-                                              </p>
+                                                <p className="text-[10px] font-bold mt-1.5 m-0 opacity-60" style={{ color: "var(--text-primary)" }}>
+                                                    {waterAnalytics.todaysConsumptionLiters.toFixed(0)} L processed today
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -1797,19 +1797,19 @@ const EvaraTankAnalytics = () => {
 
                             {/* COMBINED HISTORY CHART */}
 
-                        <div className="apple-glass-card flex flex-col items-stretch justify-between relative overflow-hidden flex-grow" style={{
-                            background: "var(--card-bg)",
-                            backdropFilter: "var(--card-blur)",
-                            WebkitBackdropFilter: "var(--card-blur)",
-                            borderRadius: '2.5rem',
-                            border: '1px solid var(--card-border)',
-                            boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
-                            padding: '24px',
-                            minHeight: '350px'
-                        }}>
+                            <div className="apple-glass-card flex flex-col items-stretch justify-between relative overflow-hidden flex-grow" style={{
+                                background: "var(--card-bg)",
+                                backdropFilter: "var(--card-blur)",
+                                WebkitBackdropFilter: "var(--card-blur)",
+                                borderRadius: '2.5rem',
+                                border: '1px solid var(--card-border)',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+                                padding: '24px',
+                                minHeight: '350px'
+                            }}>
                                 <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
                                     <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight m-0 leading-tight">TANK LEVEL AND VOLUME</h2>
-                                    
+
                                     <div className="flex flex-col items-end gap-2.5">
                                         <div className="flex items-center gap-3">
                                             {/* Time Range Pills */}
@@ -1820,9 +1820,8 @@ const EvaraTankAnalytics = () => {
                                                         <button
                                                             key={r}
                                                             onClick={() => setTankChartRange(r as any)}
-                                                            className={`relative z-10 px-4 py-1.5 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${
-                                                                active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                                                            }`}
+                                                            className={`relative z-10 px-4 py-1.5 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                                                }`}
                                                             style={{
                                                                 border: 'none',
                                                                 background: active ? '#004F94' : 'transparent',
@@ -1837,16 +1836,16 @@ const EvaraTankAnalytics = () => {
 
                                             {tankChartRange === 'RANGE' && (
                                                 <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-300">
-                                                    <input 
-                                                        type="date" 
+                                                    <input
+                                                        type="date"
                                                         value={rangeStart}
                                                         onChange={(e) => setRangeStart(e.target.value)}
                                                         className="border rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-[var(--text-primary)] focus:ring-1 focus:ring-blue-500 outline-none"
                                                         style={{ background: 'var(--bg-primary)', borderColor: 'var(--card-border)' }}
                                                     />
                                                     <span className="text-[10px] text-[var(--text-muted)] font-bold">TO</span>
-                                                    <input 
-                                                        type="date" 
+                                                    <input
+                                                        type="date"
                                                         value={rangeEnd}
                                                         onChange={(e) => setRangeEnd(e.target.value)}
                                                         className="border rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-[var(--text-primary)] focus:ring-1 focus:ring-blue-500 outline-none"
@@ -1916,7 +1915,7 @@ const EvaraTankAnalytics = () => {
 
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
 
-                                                <XAxis 
+                                                <XAxis
                                                     dataKey={tankChartRange === '24H' ? 'time' : 'time'}
                                                     ticks={chartTimeTicks}
                                                     interval={tankChartRange === '24H' ? 0 : 'preserveStartEnd'}

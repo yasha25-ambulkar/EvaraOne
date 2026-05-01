@@ -51,43 +51,43 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
         }
 
         if (period === '1H') {
-              const now = new Date();
-              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-              let sorted = [...history].map((d) => ({
-                  ...d,
-                  timestampMs: new Date(d.date!).getTime(),
-                  current: d.value || 0
-              })).sort((a, b) => a.timestampMs - b.timestampMs)
-              .filter(d => d.timestampMs >= oneHourAgo.getTime());
+            const now = new Date();
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            let sorted = [...history].map((d) => ({
+                ...d,
+                timestampMs: new Date(d.date!).getTime(),
+                current: d.value || 0
+            })).sort((a, b) => a.timestampMs - b.timestampMs)
+                .filter(d => d.timestampMs >= oneHourAgo.getTime());
 
-              if (sorted.length === 0) return [];
+            if (sorted.length === 0) return [];
 
-              const interpolated = [];
-              const startBoundary = Math.floor(oneHourAgo.getTime() / 60000) * 60000;
-              const endBoundary = Math.floor(now.getTime() / 60000) * 60000;
+            const interpolated = [];
+            const startBoundary = Math.floor(oneHourAgo.getTime() / 60000) * 60000;
+            const endBoundary = Math.floor(now.getTime() / 60000) * 60000;
 
-              for (let t = startBoundary; t <= endBoundary; t += 60000) {
-                  let dataIdx = 0;
-                  while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                      dataIdx++;
-                  }
-                  const point = sorted[dataIdx];
-                  const nextPoint = sorted[dataIdx + 1];
-                  let value = point?.current || 0;
-                  if (nextPoint && point && nextPoint.timestampMs !== point.timestampMs) {
-                      const progress = (t - point.timestampMs) / (nextPoint.timestampMs - point.timestampMs);
-                      value = point.current + (nextPoint.current - point.current) * progress;
-                  }
-                  interpolated.push({
-                      timestampMs: t,
-                      time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                      fullTime: new Date(t).toLocaleString(),
-                      label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                      current: value
-                  });
-              }
-              return interpolated;
-          } else if (period === '24H') {
+            for (let t = startBoundary; t <= endBoundary; t += 60000) {
+                let dataIdx = 0;
+                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                    dataIdx++;
+                }
+                const point = sorted[dataIdx];
+                const nextPoint = sorted[dataIdx + 1];
+                let value = point?.current || 0;
+                if (nextPoint && point && nextPoint.timestampMs !== point.timestampMs) {
+                    const progress = (t - point.timestampMs) / (nextPoint.timestampMs - point.timestampMs);
+                    value = point.current + (nextPoint.current - point.current) * progress;
+                }
+                interpolated.push({
+                    timestampMs: t,
+                    time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    fullTime: new Date(t).toLocaleString(),
+                    label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    current: value
+                });
+            }
+            return interpolated;
+        } else if (period === '24H') {
             let sorted = [...history].map((d) => ({
                 ...d,
                 timestampMs: new Date(d.date!).getTime(),
@@ -101,39 +101,39 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
             const startBoundary = latestBoundary - (3 * 60 * 60000);
 
             const interpolated = [];
-            for (let t = startBoundary; t <= latestBoundary; t += 60000) { 
-                 let dataIdx = 0;
-                 while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                     dataIdx++;
-                 }
-                 
-                 let point = { 
-                     timestampMs: t, 
-                     label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-                     fullTime: new Date(t).toLocaleString(),
-                     current: 0
-                 };
-                 
-                 if (dataIdx >= sorted.length - 1) {
-                     point.current = sorted[sorted.length-1].current;
-                 } else if (sorted[dataIdx].timestampMs > t) {
-                     point.current = sorted[0].current;
-                 } else {
-                     const p1 = sorted[dataIdx];
-                     const p2 = sorted[dataIdx + 1];
-                     const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
-                     point.current = p1.current + (p2.current - p1.current) * ratio;
-                 }
-                 interpolated.push(point);
+            for (let t = startBoundary; t <= latestBoundary; t += 60000) {
+                let dataIdx = 0;
+                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
+                    dataIdx++;
+                }
+
+                let point = {
+                    timestampMs: t,
+                    label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    fullTime: new Date(t).toLocaleString(),
+                    current: 0
+                };
+
+                if (dataIdx >= sorted.length - 1) {
+                    point.current = sorted[sorted.length - 1].current;
+                } else if (sorted[dataIdx].timestampMs > t) {
+                    point.current = sorted[0].current;
+                } else {
+                    const p1 = sorted[dataIdx];
+                    const p2 = sorted[dataIdx + 1];
+                    const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
+                    point.current = p1.current + (p2.current - p1.current) * ratio;
+                }
+                interpolated.push(point);
             }
-            
+
             interpolated.push({
-                timestampMs: latestBoundary + (5 * 60000), 
+                timestampMs: latestBoundary + (5 * 60000),
                 label: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
                 current: null // Buffer element
             });
-            
+
             return interpolated;
         } else if (period === '1W') {
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -240,7 +240,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                     <div className="flex items-center gap-3">
                         {/* Time Range Selector */}
                         <div className="flex bg-[#f8fafc] dark:bg-white/5 p-1 rounded-full border border-slate-100/50 dark:border-white/10 relative overflow-hidden shrink-0 shadow-inner backdrop-blur-md">
-                            {([ '1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => {
+                            {(['1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => {
                                 const active = period === p;
                                 return (
                                     <button
@@ -448,10 +448,10 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
         let filtered = history;
 
         if (period === '1H') {
-              const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-              filtered = history.filter(h => h.date && h.date >= oneHourAgo);
-          } else if (period === '24H') {
-              const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            filtered = history.filter(h => h.date && h.date >= oneHourAgo);
+        } else if (period === '24H') {
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             filtered = history.filter(h => h.date && h.date >= yesterday);
         } else if (period === '1W') {
             const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -495,13 +495,12 @@ const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: {
             </div>
 
             <div className="mt-3 flex bg-[#f8fafc]/50 p-0.5 rounded-lg border border-slate-100/30 w-fit">
-                {([ '1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => (
+                {(['1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => (
                     <button
                         key={p}
                         onClick={() => setPeriod(p)}
-                        className={`px-2 py-0.5 text-[8px] font-black tracking-tight uppercase rounded-md transition-all duration-200 ${
-                            period === p ? 'bg-[#6366f1] text-white shadow-sm' : 'text-[#64748b] hover:text-[#334155]'
-                        }`}
+                        className={`px-2 py-0.5 text-[8px] font-black tracking-tight uppercase rounded-md transition-all duration-200 ${period === p ? 'bg-[#6366f1] text-white shadow-sm' : 'text-[#64748b] hover:text-[#334155]'
+                            }`}
                         style={{ border: 'none' }}
                     >
                         {p}
@@ -617,9 +616,9 @@ const EvaraFlowAnalytics = () => {
     const customerConfig = (deviceInfo as any)?.customer_config || {};
     const isSuperAdmin = user?.role === 'superadmin';
 
-    const showWaterSecurityParam    = isSuperAdmin || customerConfig.showWaterSecurity    !== false;
-    const showSystemDynamicsParam   = isSuperAdmin || customerConfig.showSystemDynamics   !== false;
-    const showAlertsParam           = isSuperAdmin || customerConfig.showAlerts           !== false;
+    const showWaterSecurityParam = isSuperAdmin || customerConfig.showWaterSecurity !== false;
+    const showSystemDynamicsParam = isSuperAdmin || customerConfig.showSystemDynamics !== false;
+    const showAlertsParam = isSuperAdmin || customerConfig.showAlerts !== false;
     const showConsumptionPatternParam = isSuperAdmin || customerConfig.showConsumptionPattern !== false;
 
     const historyFeeds = (unifiedData?.history as any)?.feeds || [];
@@ -1248,83 +1247,83 @@ const EvaraFlowAnalytics = () => {
 
                             <div className="flex-grow flex flex-col items-center justify-center gap-6 py-4">
 
-                            <div className="relative w-72 h-72 drop-shadow-2xl flex-shrink-0">
-                                <svg viewBox="0 0 200 200" className="w-full h-full">
-                                    <defs>
-                                        <linearGradient id="brassBezelEF" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#dfbd69" />
-                                            <stop offset="25%" stopColor="#926d25" />
-                                            <stop offset="50%" stopColor="#fcf6ba" />
-                                            <stop offset="75%" stopColor="#aa8431" />
-                                            <stop offset="100%" stopColor="#654321" />
-                                        </linearGradient>
-                                        <radialGradient id="faceShadeEF" cx="50%" cy="50%" r="50%">
-                                            <stop offset="85%" stopColor="#fdfaf2" />
-                                            <stop offset="100%" stopColor="#d1d5db" />
-                                        </radialGradient>
-                                    </defs>
-                                    <circle cx="100" cy="100" r="98" fill="url(#brassBezelEF)" stroke="#5d4037" strokeWidth="0.5" />
-                                    <circle cx="100" cy="100" r="90" fill="#8d6e63" />
-                                    <circle cx="100" cy="100" r="88" fill="url(#brassBezelEF)" />
-                                    <circle cx="100" cy="100" r="84" fill="url(#faceShadeEF)" />
+                                <div className="relative w-72 h-72 drop-shadow-2xl flex-shrink-0">
+                                    <svg viewBox="0 0 200 200" className="w-full h-full">
+                                        <defs>
+                                            <linearGradient id="brassBezelEF" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stopColor="#dfbd69" />
+                                                <stop offset="25%" stopColor="#926d25" />
+                                                <stop offset="50%" stopColor="#fcf6ba" />
+                                                <stop offset="75%" stopColor="#aa8431" />
+                                                <stop offset="100%" stopColor="#654321" />
+                                            </linearGradient>
+                                            <radialGradient id="faceShadeEF" cx="50%" cy="50%" r="50%">
+                                                <stop offset="85%" stopColor="#fdfaf2" />
+                                                <stop offset="100%" stopColor="#d1d5db" />
+                                            </radialGradient>
+                                        </defs>
+                                        <circle cx="100" cy="100" r="98" fill="url(#brassBezelEF)" stroke="#5d4037" strokeWidth="0.5" />
+                                        <circle cx="100" cy="100" r="90" fill="#8d6e63" />
+                                        <circle cx="100" cy="100" r="88" fill="url(#brassBezelEF)" />
+                                        <circle cx="100" cy="100" r="84" fill="url(#faceShadeEF)" />
 
-                                    {Array.from({ length: 28 }).map((_, i) => {
-                                        const angle = -135 + i * (270 / 27);
-                                        const rad = (angle * Math.PI) / 180;
-                                        const isMajor = i % 3 === 0;
-                                        const r1 = isMajor ? 66 : 70;
-                                        return (
-                                            <line key={i}
-                                                x1={100 + r1 * Math.sin(rad)} y1={100 - r1 * Math.cos(rad)}
-                                                x2={100 + 74 * Math.sin(rad)} y2={100 - 74 * Math.cos(rad)}
-                                                stroke={isMajor ? '#94a3b8' : '#cbd5e1'} strokeWidth={isMajor ? 1.5 : 0.8} />
-                                        );
-                                    })}
+                                        {Array.from({ length: 28 }).map((_, i) => {
+                                            const angle = -135 + i * (270 / 27);
+                                            const rad = (angle * Math.PI) / 180;
+                                            const isMajor = i % 3 === 0;
+                                            const r1 = isMajor ? 66 : 70;
+                                            return (
+                                                <line key={i}
+                                                    x1={100 + r1 * Math.sin(rad)} y1={100 - r1 * Math.cos(rad)}
+                                                    x2={100 + 74 * Math.sin(rad)} y2={100 - 74 * Math.cos(rad)}
+                                                    stroke={isMajor ? '#94a3b8' : '#cbd5e1'} strokeWidth={isMajor ? 1.5 : 0.8} />
+                                            );
+                                        })}
 
-                                    <g transform="translate(37, 78)">
-                                        <rect x="0" y="0" width="126" height="22" rx="1" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="0.5" />
-                                        {(totalRaw === 0 && tsMeterReading == null && !telemetryData) ? (
-                                            <text x="63" y="15" textAnchor="middle" fill="#64748b" fontSize="8" fontWeight="bold">No data available</text>
-                                        ) : (
-                                            <>
-                                                {odometer.black.map((digit, i) => (
-                                                    <g key={i} transform={`translate(${4 + i * 15}, 3)`}>
-                                                        <rect x="0" y="0" width="13" height="16" rx="1" fill="#1a1a1a" />
-                                                        <text x="6.5" y="12.5" textAnchor="middle" fill="white" fontFamily="monospace" fontSize="10" fontWeight="bold">{digit}</text>
-                                                    </g>
-                                                ))}
-                                                {odometer.red.map((digit, i) => (
-                                                    <g key={`red-${i}`} transform={`translate(${4 + (6 + i) * 15}, 3)`}>
-                                                        <rect x="0" y="0" width="13" height="16" rx="1" fill="#ef4444" />
-                                                        <text x="6.5" y="12.5" textAnchor="middle" fill="white" fontFamily="monospace" fontSize="10" fontWeight="bold">{digit}</text>
-                                                    </g>
-                                                ))}
-                                            </>
-                                        )}
-                                    </g>
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 pointer-events-none">
-                                    <div className="text-[2.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums">
-                                        {totalRaw >= 1000 ? (totalRaw / 1000).toFixed(1) : formatKPI(totalRaw)}
-                                    </div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
-                                        {totalRaw >= 1000 ? 'KL' : 'Liters'}
+                                        <g transform="translate(37, 78)">
+                                            <rect x="0" y="0" width="126" height="22" rx="1" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="0.5" />
+                                            {(totalRaw === 0 && tsMeterReading == null && !telemetryData) ? (
+                                                <text x="63" y="15" textAnchor="middle" fill="#64748b" fontSize="8" fontWeight="bold">No data available</text>
+                                            ) : (
+                                                <>
+                                                    {odometer.black.map((digit, i) => (
+                                                        <g key={i} transform={`translate(${4 + i * 15}, 3)`}>
+                                                            <rect x="0" y="0" width="13" height="16" rx="1" fill="#1a1a1a" />
+                                                            <text x="6.5" y="12.5" textAnchor="middle" fill="white" fontFamily="monospace" fontSize="10" fontWeight="bold">{digit}</text>
+                                                        </g>
+                                                    ))}
+                                                    {odometer.red.map((digit, i) => (
+                                                        <g key={`red-${i}`} transform={`translate(${4 + (6 + i) * 15}, 3)`}>
+                                                            <rect x="0" y="0" width="13" height="16" rx="1" fill="#ef4444" />
+                                                            <text x="6.5" y="12.5" textAnchor="middle" fill="white" fontFamily="monospace" fontSize="10" fontWeight="bold">{digit}</text>
+                                                        </g>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </g>
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 pointer-events-none">
+                                        <div className="text-[2.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums">
+                                            {totalRaw >= 1000 ? (totalRaw / 1000).toFixed(1) : formatKPI(totalRaw)}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
+                                            {totalRaw >= 1000 ? 'KL' : 'Liters'}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="text-center mt-2 mb-4">
-                                <p className="text-xs font-bold uppercase tracking-widest m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
-                                <h3 className="text-[2.5rem] font-black text-[var(--text-primary)] m-0 mt-1 tabular-nums leading-none">
-                                    {formatMeterValue(flowRate)}
-                                    <span className="text-2xl font-medium text-slate-400 ml-1">L/min</span>
-                                </h3>
-                                <p className="text-xs font-medium m-0 mt-2" style={{ color: '#8E8E93' }}>
-                                    {effectiveIsOffline && tsIstLabel ? `Offline (${tsIstLabel})` : staleLabel}
-                                </p>
+                                <div className="text-center mt-2 mb-4">
+                                    <p className="text-xs font-bold uppercase tracking-widest m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
+                                    <h3 className="text-[2.5rem] font-black text-[var(--text-primary)] m-0 mt-1 tabular-nums leading-none">
+                                        {formatMeterValue(flowRate)}
+                                        <span className="text-2xl font-medium text-slate-400 ml-1">L/min</span>
+                                    </h3>
+                                    <p className="text-xs font-medium m-0 mt-2" style={{ color: '#8E8E93' }}>
+                                        {effectiveIsOffline && tsIstLabel ? `Offline (${tsIstLabel})` : staleLabel}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
                         {/* RIGHT COLUMN: 4-col grid top row + 1-col full bottom row */}
                         <div className="lg:col-span-2 flex flex-col gap-6 h-full">

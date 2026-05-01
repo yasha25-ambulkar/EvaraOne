@@ -45,86 +45,25 @@ async function getActiveDevices() {
         const snapshot = await db.collection("devices")
             .where("status", "not-in", ["OFFLINE_STOPPED", "DECOMMISSIONED"])
             .get();
-        const typedGroups = {};
-        const registryDataMap = {};
+        const devices = [];
 
         for (const doc of snapshot.docs) {
             const data = doc.data();
-            const type = data.device_type;
-            if (!type) continue;
             
-            if (!typedGroups[type]) typedGroups[type] = [];
-            typedGroups[type].push(doc.id);
-            registryDataMap[doc.id] = data;
-        }
-
-        const devices = [];
-        const typeBatches = await Promise.all(
-            Object.keys(typedGroups).map(async (type) => {
-                const ids = typedGroups[type];
-                const typeLower = type.toLowerCase();
-                
-                // Strategy 1: Try direct document lookup by Registry ID (Modern/Standard)
-                const primaryRefs = ids.map(id => db.collection(typeLower).doc(id));
-                const primaryMetas = await db.getAll(...primaryRefs);
-                
-                const results = [];
-                const missingIds = [];
-                
-                primaryMetas.forEach((m, idx) => {
-                    if (m.exists) {
-                        results.push({ id: ids[idx], meta: m.data() });
-                    } else {
-                        missingIds.push(ids[idx]);
-                    }
+            // Only poll devices that have ThingSpeak credentials configured
+            if (data.thingspeak_channel_id && data.thingspeak_read_api_key) {
+                devices.push({
+                    ...data,
+                    id: doc.id,
+                    type: data.device_type || 'Generic',
+                    channel: String(data.thingspeak_channel_id).trim(),
+                    key: String(data.thingspeak_read_api_key).trim(),
+                    mapping: data.sensor_field_mapping || {},
+                    depth: data.configuration?.depth || data.configuration?.total_depth || data.tank_size || 1.2,
+                    capacity: data.tank_size || 0,
+                    lastUpdatedAt: data.lastUpdatedAt || data.last_updated_at || data.last_seen || null,
+                    status: data.status || "OFFLINE"
                 });
-                
-                // Strategy 2: Fallback to Hardware/Node ID for legacy or manually provisioned devices
-                if (missingIds.length > 0) {
-                    const secondaryRefs = [];
-                    const secondaryIdMap = [];
-                    
-                    missingIds.forEach(id => {
-                        const registry = registryDataMap[id];
-                        const hId = registry.hardware_id || registry.node_id || registry.device_id;
-                        if (hId && hId !== id) {
-                            secondaryRefs.push(db.collection(typeLower).doc(hId));
-                            secondaryIdMap.push(id);
-                        }
-                    });
-                    
-                    if (secondaryRefs.length > 0) {
-                        const secondaryMetas = await db.getAll(...secondaryRefs);
-                        secondaryMetas.forEach((m, idx) => {
-                            if (m.exists) {
-                                results.push({ id: secondaryIdMap[idx], meta: m.data() });
-                            }
-                        });
-                    }
-                }
-                
-                return results;
-            })
-        );
-
-        for (const batch of typeBatches) {
-            for (const item of batch) {
-                const { id, meta } = item;
-                if (meta.thingspeak_channel_id && meta.thingspeak_read_api_key) {
-                    devices.push({
-                        ...registryDataMap[id],
-                        ...meta,
-                        id: id,
-                        type: registryDataMap[id].device_type,
-                        channel: meta.thingspeak_channel_id.trim(),
-                        key: meta.thingspeak_read_api_key.trim(),
-                        mapping: meta.sensor_field_mapping || {},
-                        depth: meta.configuration?.depth || meta.configuration?.total_depth || meta.tank_size || 1.2,
-                        capacity: meta.tank_size || 0,
-                        lastUpdatedAt: meta.lastUpdatedAt || meta.last_updated_at || meta.last_seen || null,
-                        status: meta.status || "OFFLINE"
-                    });
-                }
             }
         }
         
@@ -164,9 +103,11 @@ async function processDevice(device) {
 
         // ✅ CRITICAL: Also update registry with latest last_seen so status is consistent everywhere
         const now = new Date().toISOString();
+        const { admin } = require("../config/firebase.js");
         await db.collection("devices").doc(device.id).update({
-            last_seen: now,
-            last_updated_at: now,
+            last_seen: admin.firestore.FieldValue.serverTimestamp(),
+            last_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            isOnline: telemetryData.status === 'Online',
             status: telemetryData.status,
             updated_at: now
         }).catch(err => {

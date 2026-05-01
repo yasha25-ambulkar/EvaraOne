@@ -50,8 +50,9 @@ async function syncNodeStatus(id, type, lastSeen, additionalData = {}) {
 
         const updatePayload = {
             status,
-            last_seen: lastSeen,
-            last_updated_at: lastSeen,
+            isOnline: status === 'Online',
+            last_seen: admin.firestore.FieldValue.serverTimestamp(),
+            last_updated_at: admin.firestore.FieldValue.serverTimestamp(),
             last_online_at: admin.firestore.FieldValue.serverTimestamp(),
             last_telemetry_fetch: new Date().toISOString(),
             telemetry_snapshot: {
