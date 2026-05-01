@@ -237,7 +237,7 @@ const EvaraTDSAnalytics = () => {
                         <div className="flex flex-col gap-4">
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
                                 <MiniStatCard title="TDS Monitor" value={device.tdsValue || 0} unit="ppm" icon={Droplets} accentColor="#3b82f6" iconBg="rgba(59,130,246,0.1)" />
-                                <MiniStatCard title="Thermal Sense" value={device.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
+                                <MiniStatCard title="Temperature" value={device.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
                                 <MiniStatCard title="Purity Index" value={quality.toUpperCase()} icon={qualityConfig.icon} accentColor={qualityConfig.color} iconBg={`${qualityConfig.color}1a`} />
                                 <MiniStatCard title="Notifications" value={device.alertsCount || 0} icon={Bell} accentColor="#ef4444" iconBg="rgba(239,68,68,0.1)" />
                             </div>
