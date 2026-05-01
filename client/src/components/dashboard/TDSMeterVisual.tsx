@@ -13,9 +13,8 @@ Good: { lcd: '#4ade80', glow: 'rgba(74,222,128,0.55)', badge: '#16a34a', label: 
 
 const TDSMeterVisual: React.FC<TDSMeterVisualProps> = ({ tdsValue, quality }) => {
     const cfg = QUALITY_CFG[quality] || QUALITY_CFG.Good;
-// Scale number so it always fits inside the 68px-wide screen (viewBox 0 0 140 400)
-    const rounded = Math.round(tdsValue);
-    const digits = String(Math.abs(rounded)).length;
+    const displayValue = (tdsValue > 0 && tdsValue < 10) ? Number(tdsValue.toFixed(2)) : Math.round(tdsValue);
+    const digits = String(Math.abs(displayValue)).length;
     const valueFontSize = digits >= 4 ? 24 : digits === 3 ? 33 : digits === 2 ? 44 : 52;
     const valueY        = digits >= 4 ? 118 : digits === 3 ? 119 : digits === 2 ? 121 : 122;
 return (
@@ -88,7 +87,7 @@ return (
                         <text x="70" y={valueY} textAnchor="middle" fontSize={valueFontSize} fontWeight="400"
                             fontFamily="'Share Tech Mono', monospace" fill={cfg.lcd} style={{ filter: 'url(#lcdGlowEffect)' }}
                             letterSpacing="-1">
-                            {rounded}
+                            {displayValue}
                         </text>
                         <text x="70" y="152" textAnchor="middle" fontSize="13" fontWeight="400"
                             fontFamily="'Share Tech Mono', monospace" fill={cfg.lcd} opacity="0.8" letterSpacing="3">ppm</text>
