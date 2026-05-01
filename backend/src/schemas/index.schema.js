@@ -152,9 +152,16 @@ exports.createZoneSchema = z.object({
 exports.createCustomerSchema = z.object({
     body: z.object({
         display_name: z.string().min(1),
+        full_name: z.string().optional(),
         email: z.string().email().optional(),
-        phone: z.string().optional()
-    }).strict() // ✅ ISSUE #6: Reject unknown fields
+        phone: z.string().optional(),
+        phone_number: z.string().optional(),
+        password: z.string().min(8).optional(),
+        role: z.enum(["customer", "distributor", "operator", "viewer"]).optional(),
+        status: z.enum(["active", "pending", "suspended", "inactive"]).optional(),
+        regionFilter: z.string().optional(),
+    })
+    // REMOVED .strict() — allows extra fields without rejection
 });
 
 // ─── #10 FIX: Query parameter validation schema ────────────────────────────────

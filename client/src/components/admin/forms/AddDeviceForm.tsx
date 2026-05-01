@@ -145,9 +145,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
   const watchLat = watch("latitude");
   const watchLng = watch("longitude");
   const { data: availableClients = [], isLoading: loadingClients } = useQuery({
-    queryKey: ["clients_by_zone", watchZoneId],
-    queryFn: () => adminService.getClients(undefined, watchZoneId as string),
-    enabled: !!watchZoneId,
+    queryKey: ["all_customers"],
+    queryFn: () => adminService.getClients(),
+    enabled: true,
   });
 
   useEffect(() => {
@@ -503,8 +503,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                     >
                       <option value="">Select client...</option>
                       {availableClients?.map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.display_name || c.full_name || "Unnamed Client"}
+                        <option key={c.uid || c.id} value={c.uid || c.id}>
+                          {c.display_name || c.full_name || c.email || "Unnamed Client"}
                         </option>
                       ))}
                     </select>

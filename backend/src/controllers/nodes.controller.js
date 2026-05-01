@@ -46,7 +46,6 @@ const resolveDevice = require("../utils/resolveDevice.js");
 async function syncNodeStatus(id, type, lastSeen, additionalData = {}) {
     if (!lastSeen) return;
     try {
-        const typeLower = type.toLowerCase();
         const status = deviceState.calculateDeviceStatus(lastSeen);
 
         const updatePayload = {
@@ -62,7 +61,8 @@ async function syncNodeStatus(id, type, lastSeen, additionalData = {}) {
             }
         };
 
-        await db.collection(typeLower).doc(id).update(updatePayload);
+        // ✅ SINGLE COLLECTION: All device metadata lives in 'devices'
+        await db.collection("devices").doc(id).update(updatePayload);
     } catch (err) {
         logger.error(`Status sync failed for ${id}:`, err);
     }
@@ -93,10 +93,6 @@ function buildEventTimeline(history, currentState) {
 
 exports.getNodes = async (req, res) => {
     try {
-        // DEBUG: Mock superadmin user if no auth
-        if (!req.user) {
-            req.user = { uid: 'DEBUG', role: 'superadmin', customer_id: 'DEBUG' };
-        }
 
         // ✅ CRITICAL FIX: Don't cache customer-specific queries - always get fresh data
         // This ensures consistent results when devices are added/removed
@@ -166,11 +162,23 @@ exports.getNodes = async (req, res) => {
         const uniqueCustomerIds = new Set();
         for (const doc of snapshot.docs) {
             const registry = doc.data();
-            const type = registry.device_type;
-            if (!type) continue;
+            
+            // ✅ FIX: Support both device_type and asset_type/assetType fields
+            let rawType = registry.device_type || registry.asset_type || registry.assetType || "";
+            let type = rawType.toLowerCase();
+            
+            // Map to correct collection names
+            const typeMap = {
+              "evaratank": "evaratank", "tank": "evaratank",
+              "evaradeep": "evaradeep", "deep": "evaradeep",
+              "evaraflow": "evaraflow", "flow": "evaraflow",
+              "evaratds": "evaratds", "tds": "evaratds"
+            };
+            const collectionName = typeMap[type] || type;
+            if (!collectionName) continue;
 
-            if (!typedGroups[type]) typedGroups[type] = [];
-            typedGroups[type].push(doc.id);
+            if (!typedGroups[collectionName]) typedGroups[collectionName] = [];
+            typedGroups[collectionName].push(doc.id);
             registryDataMap[doc.id] = registry;
             
             // Collect unique zone IDs (DO NOT query zones in loop)
@@ -239,11 +247,13 @@ exports.getNodes = async (req, res) => {
             return results;
         };
 
+        // ✅ SINGLE COLLECTION: All metadata is on the devices document itself — no sub-collection reads needed.
+        // Re-shape typedGroups into a flat batch using the devices collection.
         const typeBatches = await Promise.all(
             Object.keys(typedGroups).map(async (type) => {
                 const ids = typedGroups[type];
-                logger.debug(`[NodesController] Fetching ${ids.length} ${type} metadata documents for IDs:`, ids);
-                const refs = ids.map(id => db.collection(type.toLowerCase()).doc(id));
+                logger.debug(`[NodesController] Fetching ${ids.length} ${type} device documents for IDs:`, ids);
+                const refs = ids.map(id => db.collection("devices").doc(id));
                 const metas = await chunkGetAll(refs);
                 logger.debug(`[NodesController] Successfully loaded ${metas.filter(m => m.exists).length} metadata from ${ids.length} refs for type ${type}`);
                 return metas.map(m => m.exists ? { id: m.id, meta: m.data(), type } : null).filter(Boolean);
@@ -425,7 +435,9 @@ exports.getNodeById = async (req, res) => {
             }
         }
 
-        const metaDoc = await db.collection(registry.device_type.toLowerCase()).doc(doc.id).get();
+        // ✅ SINGLE COLLECTION: All metadata lives directly on the devices document
+        // No sub-collection lookup needed — registry IS the metadata
+        const metaDoc = await db.collection("devices").doc(doc.id).get();
         if (!metaDoc.exists) return res.status(404).json({ error: "Metadata missing" });
 
         const metadata = metaDoc.data();
@@ -441,15 +453,14 @@ exports.getNodeById = async (req, res) => {
             }
         }
         
-        // SIMPLE: Return all metadata fields from the typed collection
-        // Exclude API key for security
-        delete metadata.thingspeak_read_api_key;
+        // ✅ FIX: Use destructure to exclude API key — Firestore objects are not mutable with delete
+        const { thingspeak_read_api_key: _stripped, ...safeMetadata } = metadata;
         
-        // MERGE: registry + metadata into single response
+        // MERGE: registry + safeMetadata into single response
         const result = { 
             id: doc.id, 
             ...registry,
-            ...metadata,
+            ...safeMetadata,
             customer_name: customerName
         };
         
@@ -458,8 +469,8 @@ exports.getNodeById = async (req, res) => {
         await cache.set(`device:${doc.id}:metadata`, result, 3600);
         res.status(200).json(result);
     } catch (error) {
-        logger.error('[getNodeById] ERROR:', error.message);
-        res.status(500).json({ error: "Failed to fetch node" });
+        logger.error('[getNodeById] ERROR:', error.message || String(error), error.stack || '');
+        res.status(500).json({ error: "Failed to fetch node", detail: error.message });
     }
 };
 
@@ -469,10 +480,13 @@ exports.getNodeTelemetry = async (req, res) => {
         if (!deviceDoc || !deviceDoc.exists) return res.status(404).json({ error: "Device not found" });
 
         const registry = deviceDoc.data();
-        const type = (registry.device_type || "").toLowerCase();
-        if (!type) return res.status(400).json({ error: "Device type not specified" });
 
-        const metaDoc = await db.collection(type).doc(deviceDoc.id).get();
+        // type is still used for device-path branching (flow / tds / tank) but NOT for collection lookup
+        let rawType = registry.device_type || registry.asset_type || registry.assetType || "";
+        let type = rawType.toLowerCase();
+
+        // ✅ SINGLE COLLECTION: All metadata lives on the devices document itself
+        const metaDoc = await db.collection("devices").doc(deviceDoc.id).get();
         if (!metaDoc.exists) return res.status(404).json({ error: "Metadata not found" });
 
         if (req.user.role !== "superadmin") {
@@ -556,8 +570,8 @@ exports.getNodeTelemetry = async (req, res) => {
                 const feedTimestamp = latestFeed.created_at;
                 const status = deviceState.calculateDeviceStatus(feedTimestamp);
 
-                // Persist to DB async (non-blocking)
-                db.collection(type).doc(deviceDoc.id).update({
+                // ✅ SINGLE COLLECTION: Persist to devices (non-blocking)
+                db.collection("devices").doc(deviceDoc.id).update({
                     last_updated_at: feedTimestamp,
                     status,
                     last_telemetry_fetch: new Date().toISOString()
@@ -648,8 +662,8 @@ exports.getNodeTelemetry = async (req, res) => {
                 if (tdsValue > 1000) quality = "Critical";
                 else if (tdsValue > 500) quality = "Acceptable";
 
-                // Persist to DB async (non-blocking)
-                db.collection(type).doc(deviceDoc.id).update({
+                // ✅ SINGLE COLLECTION: Persist to devices (non-blocking)
+                db.collection("devices").doc(deviceDoc.id).update({
                     tdsValue,
                     temperature,
                     waterQualityRating: quality,
@@ -766,7 +780,8 @@ exports.getNodeTelemetry = async (req, res) => {
                 level_percentage: result.level_percentage // Include calculated percentage
             };
 
-            await db.collection(type).doc(deviceDoc.id).update(updatePayload).catch(() => null);
+            // ✅ SINGLE COLLECTION: Persist to devices
+            await db.collection("devices").doc(deviceDoc.id).update(updatePayload).catch(() => null);
 
             // Sync status with level_percentage in telemetry_snapshot
             syncNodeStatus(deviceDoc.id, type, feedTimestamp, {
@@ -792,10 +807,9 @@ exports.getNodeGraphData = async (req, res) => {
         if (!deviceDoc || !deviceDoc.exists) return res.status(404).json({ error: "Device not found" });
 
         const registry = deviceDoc.data();
-        const type = (registry.device_type || "").toLowerCase();
-        if (!type) return res.status(400).json({ error: "Device type not specified" });
 
-        const metaDoc = await db.collection(type).doc(deviceDoc.id).get();
+        // ✅ SINGLE COLLECTION: All metadata lives on the devices document itself
+        const metaDoc = await db.collection("devices").doc(deviceDoc.id).get();
         if (!metaDoc.exists) return res.status(404).json({ error: "Metadata not found" });
 
         if (req.user.role !== "superadmin") {
@@ -906,10 +920,9 @@ exports.getNodeGraphDataHybrid = async (req, res) => {
         }
 
         const registry = deviceDoc.data();
-        const type = (registry.device_type || "").toLowerCase();
-        if (!type) return res.status(400).json({ error: "Device type not specified" });
 
-        const metaDoc = await db.collection(type).doc(deviceDoc.id).get();
+        // ✅ SINGLE COLLECTION: All metadata lives on the devices document itself
+        const metaDoc = await db.collection("devices").doc(deviceDoc.id).get();
         if (!metaDoc.exists) return res.status(404).json({ error: "Metadata not found" });
 
         // ✅ Authorization check
@@ -1025,12 +1038,17 @@ exports.getNodeAnalytics = async (req, res) => {
     if (!deviceDoc || !deviceDoc.exists)
       return res.status(404).json({ error: "Device not found" });
 
+    // ✅ FIX: All metadata is stored directly on the device document in 'devices' collection
     const registry = deviceDoc.data();
-    const type = (registry.device_type || "").toLowerCase();
-    if (!type) return res.status(400).json({ error: "Device type not specified" });
-
-    const metaDoc = await db.collection(type).doc(deviceDoc.id).get();
-    if (!metaDoc.exists) return res.status(404).json({ error: "Metadata not found" });
+    
+    // Determine device type
+    let rawType = registry.device_type || registry.asset_type || registry.assetType || "";
+    let type = rawType.toLowerCase();
+    
+    if (!type) {
+      logger.error(`[getNodeAnalytics] Device ${req.params.id} has no valid device_type. Registry fields:`, Object.keys(registry));
+      return res.status(400).json({ error: "Device type not specified", availableFields: Object.keys(registry) });
+    }
 
     if (req.user.role !== "superadmin") {
       const isOwner = await checkOwnership(
@@ -1041,18 +1059,18 @@ exports.getNodeAnalytics = async (req, res) => {
       );
       if (!isOwner) return res.status(403).json({ error: "Unauthorized" });
 
-      // âœ… CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
+      // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
       if (!checkDeviceVisibilityWithAudit(registry, deviceDoc.id, req.user.uid, req.user.role)) {
         return res.status(403).json({ error: "Device not visible to your account" });
       }
     }
 
-    const metadata = metaDoc.data();
-    const channelId = metadata.thingspeak_channel_id?.trim();
-    const apiKey = metadata.thingspeak_read_api_key?.trim();
-    const fieldMapping = metadata.sensor_field_mapping || {};
-    const depth = metadata.configuration?.depth || metadata.configuration?.total_depth || metadata.tank_size || 1.2;
-    const capacity = metadata.tank_size || 1000;
+    // ✅ FIX: Read all metadata directly from registry (device document)
+    const channelId = (registry.thingspeak_channel_id || registry.thingspeakChannelId)?.trim();
+    const apiKey = (registry.thingspeak_read_api_key || registry.thingspeak_api_key || registry.thingspeakApiKey)?.trim();
+    const fieldMapping = registry.sensor_field_mapping || registry.sensorFieldMapping || {};
+    const depth = registry.configuration?.depth || registry.configuration?.total_depth || registry.total_depth || registry.depth || registry.tank_size || 1.2;
+    const capacity = registry.tank_size || registry.total_capacity || registry.capacity || 1000;
 
     const { range, startDate, endDate } = req.query;
 
@@ -1095,9 +1113,9 @@ exports.getNodeAnalytics = async (req, res) => {
     // â”€â”€ Resolve field key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const sampleFeed = feeds[0] || {};
     const definedField =
-      metadata.secondary_field || metadata.water_level_field ||
-      metadata.fieldKey || metadata.configuration?.water_level_field ||
-      metadata.configuration?.fieldKey;
+      registry.secondary_field || registry.water_level_field ||
+      registry.fieldKey || registry.configuration?.water_level_field ||
+      registry.configuration?.fieldKey;
     const fieldKey =
       fieldMapping.levelField || definedField ||
       Object.keys(fieldMapping).find(k => fieldMapping[k] && fieldMapping[k].includes("water_level")) ||
@@ -1179,15 +1197,15 @@ exports.getNodeAnalytics = async (req, res) => {
       let tdsFieldKey = Object.keys(fieldMapping).find(k => tdsKeys.includes(fieldMapping[k])) || "field2";
       let tempFieldKey = Object.keys(fieldMapping).find(k => tempKeys.includes(fieldMapping[k])) || "field3";
 
-      if (metadata.tdsField) tdsFieldKey = metadata.tdsField;
-      if (metadata.tempField || metadata.temperature_field) tempFieldKey = metadata.tempField || metadata.temperature_field;
+      if (registry.tdsField) tdsFieldKey = registry.tdsField;
+      if (registry.tempField || registry.temperature_field) tempFieldKey = registry.tempField || registry.temperature_field;
 
       logger.debug(`[TDS-Analytics] Device ${req.params.id}:`);
       logger.debug(`[TDS-Analytics]   tdsField: ${tdsFieldKey}, temperatureField: ${tempFieldKey}`);
       logger.debug(`[TDS-Analytics]   Total feeds: ${feeds.length}`);
 
       // CRITICAL: Lookup customer name for the Node Info modal
-      const effCustomerId = registry?.customer_id || registry?.customerId || metadata.customer_id || metadata.customerId;
+      const effCustomerId = registry?.customer_id || registry?.customerId;
       let customerName = null;
       if (effCustomerId) {
           const customerDoc = await db.collection("customers").doc(effCustomerId).get();
@@ -1218,7 +1236,7 @@ exports.getNodeAnalytics = async (req, res) => {
           tdsValue,
           temperature,
           waterQualityRating: quality,
-          location_name: registry?.location_name || metadata?.location_name || "Not specified",
+          location_name: registry?.location_name || "Not specified",
           customer_name: customerName,
           tdsHistory: feeds.map(f => ({
             value: parseFloat(f[tdsFieldKey]) || 0,
@@ -1239,16 +1257,7 @@ exports.getNodeAnalytics = async (req, res) => {
 
         logger.debug(`[TDS-Analytics] Latest TDS: ${tdsResult.tds_value}, Temp: ${tdsResult.temperature}, Customer: ${customerName}`);
 
-        // Sync status back to device doc (metadata collection)
-        await db.collection(type).doc(deviceDoc.id).update({
-          tdsValue,
-          temperature,
-          waterQualityRating: quality,
-          lastUpdatedAt: normalizeThingSpeakTimestamp(lastUpdatedAt),
-          status
-        }).catch(err => logger.error("Metadata sync error:", err));
-
-        // Sync back to registry (devices collection)
+        // ✅ FIX: Only update devices collection - metadata is stored on device document
         await db.collection("devices").doc(deviceDoc.id).update({
           status,
           lastUpdatedAt: normalizeThingSpeakTimestamp(lastUpdatedAt),
@@ -1343,12 +1352,12 @@ exports.getNodeAnalytics = async (req, res) => {
       tankBehavior,
     };
 
-    // Update Firebase
-    await db.collection(type).doc(deviceDoc.id).update({
+    // ✅ FIX: Update devices collection directly - metadata is stored on device document
+    await db.collection("devices").doc(deviceDoc.id).update({
       level_percentage: latestPoint.level,
       currentVolume: latestPoint.volume,
       waterState: analytics.state,
-    }).catch(err => logger.error("Metadata update error:", err));
+    }).catch(err => logger.error("Device update error:", err));
 
     await cache.set(analyticsCacheKey, tankResult, 300);
     return res.status(200).json(tankResult);

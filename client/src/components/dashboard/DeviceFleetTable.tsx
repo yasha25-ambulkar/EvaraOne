@@ -56,7 +56,7 @@ export const DeviceFleetTable = ({ devices }: Props) => {
                             const sc = statusColor(dev.status);
                             const hc = healthColor(dev.health);
                             return (
-                                <tr key={dev.id} className="hover:bg-white/30/60 transition-colors cursor-pointer" onClick={() => navigate(`/devices/${dev.id}`)}>
+                                <tr key={dev.id} className="hover:bg-white/30/60 transition-colors cursor-pointer" style={{ cursor: 'pointer' }} onClick={() => navigate(`/devices/${dev.id}`)}>
                                     <td className="px-5 py-4">
                                         <div className="font-bold text-slate-700 text-base">{dev.name}</div>
                                         <div className="text-xs text-blue-400 font-mono">{dev.type}</div>

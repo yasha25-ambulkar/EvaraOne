@@ -28,6 +28,8 @@ const CustomerDetails = () => {
   const [nodesLoading, setNodesLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDevice, setEditingDevice] = useState<any | null>(null);
+  const [showDeleteCustomerConfirm, setShowDeleteCustomerConfirm] = useState(false);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
 
   // KEY CHANGE: deviceToggles now tracks isVisibleToCustomer from Firestore
@@ -168,6 +170,20 @@ const CustomerDetails = () => {
     );
   }
 
+  const handleDeleteCustomer = async () => {
+    if (!customerId) return;
+    setIsDeletingCustomer(true);
+    try {
+        await adminService.deleteCustomer(customerId);
+        showToast('Customer removed successfully', 'success');
+        navigate('/superadmin/customers');
+    } catch (err: any) {
+        showToast(err.message || 'Failed to delete customer', 'error');
+        setIsDeletingCustomer(false);
+        setShowDeleteCustomerConfirm(false);
+    }
+};
+
   const shadowCommunity = client?.communities;
   const zone = shadowCommunity?.zones;
 
@@ -194,13 +210,21 @@ const CustomerDetails = () => {
           </h2>
           <p style={{ color: 'var(--text-muted)' }}>Customer Profile & Device Management</p>
         </div>
-        <button
-          onClick={() => navigate("/superadmin/customers")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium border"
-          style={{ color: 'var(--text-secondary)', borderColor: 'var(--card-border)' }}
-        >
-          <ArrowLeft size={16} /> Back to Customers
-        </button>
+        <div className="flex items-center gap-3">
+    <button
+        onClick={() => setShowDeleteCustomerConfirm(true)}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium border border-red-200 transition-all"
+    >
+        <Trash2 size={16} /> Remove Customer
+    </button>
+    <button
+        onClick={() => navigate("/superadmin/customers")}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium border"
+        style={{ color: 'var(--text-secondary)', borderColor: 'var(--card-border)' }}
+    >
+        <ArrowLeft size={16} /> Back to Customers
+    </button>
+</div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -469,6 +493,42 @@ const CustomerDetails = () => {
           }
         />
       </Modal>
+
+      {/* Delete Customer Confirmation */}
+{showDeleteCustomerConfirm && (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
+        onClick={() => !isDeletingCustomer && setShowDeleteCustomerConfirm(false)}>
+        <div className="rounded-3xl p-8 flex flex-col w-full max-w-sm text-center"
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Remove Customer?</h3>
+            <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
+                This will permanently remove <strong>{client?.display_name || client?.full_name}</strong> and all their data. This cannot be undone.
+            </p>
+            <div className="flex flex-col gap-3">
+                <button
+                    onClick={handleDeleteCustomer}
+                    disabled={isDeletingCustomer}
+                    className={`w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all ${isDeletingCustomer ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white active:scale-95'}`}
+                >
+                    {isDeletingCustomer ? 'Removing...' : 'Yes, Remove Customer'}
+                </button>
+                <button
+                    onClick={() => setShowDeleteCustomerConfirm(false)}
+                    disabled={isDeletingCustomer}
+                    className="w-full py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+)}
     </div>
   );
 };

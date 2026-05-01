@@ -1,4 +1,4 @@
-const { db } = require("../config/firebase.js");
+const { db, admin } = require("../config/firebase.js");
 const { Filter } = require("firebase-admin/firestore");
 const cache = require("../config/cache.js");
 const telemetryCache = require("../services/cacheService.js");
@@ -248,21 +248,65 @@ exports.deleteZone = async (req, res) => {
 // Customers
 exports.createCustomer = async (req, res) => {
     try {
-        const { confirmPassword, ...customerData } = req.body;
-        const customer = { ...customerData, created_at: new Date() };
+        const { confirmPassword, password, ...customerData } = req.body;
+        
+        // Create Firebase Auth user
+        let firebaseUser = null;
+        console.log('CREATE CUSTOMER DEBUG:', JSON.stringify({
+            email: customerData.email,
+            display_name: customerData.display_name,
+            role: customerData.role,
+            password_length: password?.length
+        }));
+        try {
+            firebaseUser = await admin.auth().createUser({
+                email: customerData.email,
+                password: password,
+                displayName: customerData.display_name || customerData.full_name,
+            });
+        } catch (authError) {
+            // If auth user already exists, get them
+            if (authError.code === 'auth/email-already-exists') {
+                firebaseUser = await admin.auth().getUserByEmail(customerData.email);
+            } else {
+                throw new AppError(authError.message, 400);
+            }
+        }
+
+        // Save to customers collection with Firebase UID
+        const customer = {
+            ...customerData,
+            uid: firebaseUser.uid,
+            firebase_uid: firebaseUser.uid,
+            created_at: new Date()
+        };
+
+        // Also save to users collection so login works
+        await db.collection("users").doc(firebaseUser.uid).set({
+            uid: firebaseUser.uid,
+            email: customerData.email,
+            display_name: customerData.display_name,
+            full_name: customerData.full_name,
+            role: customerData.role || 'customer',
+            status: customerData.status || 'active',
+            phone_number: customerData.phone_number,
+            created_at: new Date()
+        });
+
         const doc = await db.collection("customers").add(customer);
-        // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
+
         await incrementCacheVersion("customers");
         await incrementCacheVersion("default");
-        // ✅ PHASE 2: Task #12 - Log audit trail
-        logAudit(req.user.uid, 'CREATE', 'customers', doc.id, customerData);
+        // logAudit(req.user.uid, 'CREATE', 'customers', doc.id, customerData);
+
         res.status(201).json({ success: true, id: doc.id });
     } catch (error) {
+        console.log('CREATE CUSTOMER FULL ERROR:', error.code, error.message, error.statusCode);
         if (error instanceof AppError) {
             return res.status(error.statusCode).json(error.toJSON());
         }
         req.log?.error({ error: error.message }, '[AdminController] Create customer error');
-        res.status(500).json({ error: "Failed to create customer" });
+        res.status(500).json({ error: error.message || "Failed to create customer" });
     }
 };
 
@@ -294,13 +338,14 @@ exports.getCustomers = async (req, res) => {
             // REMOVED orderBy("created_at") to avoid complex index requirements that cause silent failures
 
             if (zone_id && zone_id.trim() !== '') {
-                // Primary Filter
+                // NOTE: Query by zone_id only - we'll fetch regionFilter matches separately and merge
                 query = query.where("zone_id", "==", zone_id.trim());
             } else if (regionFilter && regionFilter.trim() !== '') {
                 query = query.where("regionFilter", "==", regionFilter.trim());
             } else if (community_id && community_id.trim() !== '') {
                 query = query.where("community_id", "==", community_id.trim());
             }
+            // NOTE: If no filters provided, query returns ALL customers (limited by limitStr)
         }
 
         query = query.limit(limitStr);
@@ -315,18 +360,26 @@ exports.getCustomers = async (req, res) => {
         const snapshot = await query.get();
         let customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // COMPREHENSIVE FALLBACK: Check alternative field names (zoneId, regionFilter) if no results for zone_id
-        if (req.user.role === "superadmin" && zone_id && customers.length === 0) {
-            logger.debug(`[AdminController] No customers found for zone_id: ${zone_id}, trying fallbacks...`);
+        // COMPREHENSIVE FALLBACK: For superadmins, also check regionFilter when zone_id is queried
+        // This handles customers created with AddCustomerForm which uses regionFilter instead of zone_id
+        if (req.user.role === "superadmin" && zone_id) {
+            logger.debug(`[AdminController] Checking regionFilter fallback for zone_id: ${zone_id}`);
 
             // Try zoneId (camelCase)
             const zoneIdSnapshot = await db.collection("customers").where("zoneId", "==", zone_id.trim()).limit(limitStr).get();
             if (!zoneIdSnapshot.empty) {
                 logger.debug(`[AdminController] Found ${zoneIdSnapshot.size} customers via zoneId fallback`);
-                customers = [...customers, ...zoneIdSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))];
+                // Deduplicate and merge
+                const existingIds = new Set(customers.map(c => c.id));
+                zoneIdSnapshot.docs.forEach(doc => {
+                    if (!existingIds.has(doc.id)) {
+                        customers.push({ id: doc.id, ...doc.data() });
+                        existingIds.add(doc.id);
+                    }
+                });
             }
 
-            // Try regionFilter (legacy)
+            // Try regionFilter (legacy - customers created via AddCustomerForm use this field)
             const regionSnapshot = await db.collection("customers").where("regionFilter", "==", zone_id.trim()).limit(limitStr).get();
             if (!regionSnapshot.empty) {
                 logger.debug(`[AdminController] Found ${regionSnapshot.size} customers via regionFilter fallback`);
@@ -392,16 +445,50 @@ exports.updateCustomer = async (req, res) => {
 
 exports.deleteCustomer = async (req, res) => {
     try {
-        // ─── #2 FIX: Tenant Isolation Check ─────────────────────────────────
         if (req.user.role !== "superadmin") {
             throw new AppError("Access denied", 403);
         }
-        
-        await db.collection("customers").doc(req.params.id).delete();
-        // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
+
+        const customerId = req.params.id;
+
+        // Get customer data first to find their Firebase Auth UID
+        const customerDoc = await db.collection("customers").doc(customerId).get();
+        const userData = customerDoc.data();
+
+        // Delete from customers collection
+        await db.collection("customers").doc(customerId).delete();
+
+        // Also delete from users collection if exists
+        await db.collection("users").doc(customerId).delete().catch(() => {});
+
+        // Also delete Firebase Auth user if UID exists
+        if (userData?.uid || userData?.firebase_uid) {
+            const uid = userData?.uid || userData?.firebase_uid;
+            await admin.auth().deleteUser(uid).catch(() => {});
+        }
+
+        // Try deleting by email from users collection
+        if (userData?.email) {
+            const userQuery = await db.collection("users").where("email", "==", userData.email).get();
+            userQuery.forEach(doc => doc.ref.delete());
+        }
+
         await incrementCacheVersion("customers");
-        // ✅ PHASE 2: Task #12 - Log audit trail
-        logAudit(req.user.uid, 'DELETE', 'customers', req.params.id);
+        await incrementCacheVersion("users");
+
+        // Clear all customer list cache keys directly
+        const cacheKeysToDelete = [
+            `user:admin:customers:superadmin:all:all:all:50:none`,
+            `user:admin:customers:superadmin:all:all:all:50:none`,
+        ];
+        for (const key of cacheKeysToDelete) {
+            await cache.del(key).catch(() => {});
+        }
+
+        // Nuclear option - flush all customer-related cache
+        await cache.flushPattern?.('*customers*').catch(() => {});
+        logAudit(req.user.uid, 'DELETE', 'customers', customerId);
+
         res.status(200).json({ success: true });
     } catch (error) {
         if (error instanceof AppError) {
@@ -412,20 +499,18 @@ exports.deleteCustomer = async (req, res) => {
     }
 };
 
-// Nodes (Registry + Metadata Architecture)
+// Nodes (Single Document Architecture)
 exports.createNode = async (req, res) => {
     try {
-        // Log complete request body immediately
         logger.debug(`\n[createNode] 📨 RECEIVED REQUEST BODY:`);
         logger.debug(`[createNode]   Complete body:`, JSON.stringify(req.body, null, 2));
-        logger.debug(`[createNode]   Body keys:`, Object.keys(req.body));
         
         const {
             displayName,
             deviceName,
             assetType,
-            assetSubType, // Existing
-            subType,      // ✅ Added to match frontend
+            assetSubType,
+            subType,
             zoneId,
             customerId,
             thingspeakChannelId,
@@ -445,24 +530,14 @@ exports.createNode = async (req, res) => {
             rechargeThreshold,
             latitude,
             longitude,
-            hardwareId,
-            id: fallbackId
+            hardwareId
         } = req.body;
-
-        // 🔍 DEBUG: Log immediately after destructuring
-        logger.debug(`\n[createNode] 📥 DESTRUCTURED FROM req.body:`);
-        logger.debug(`[createNode]   hardwareId: "${hardwareId}"`);
-        logger.debug(`[createNode]   thingspeakChannelId: "${thingspeakChannelId}"`);
-        logger.debug(`[createNode]   thingspeakReadKey: "${thingspeakReadKey}"`);
-        logger.debug(`[createNode]   assetType: "${assetType}"`);
-        logger.debug(`[createNode]   Full req.body keys:`, Object.keys(req.body));
 
         const timestamp = new Date();
         const idForDevice = hardwareId || `DEV-${Date.now()}`;
         
         // ⚠️ CRITICAL: For TDS devices, hardwareId MUST be provided
         if ((assetType === "EvaraTDS" || assetType === "evaratds" || assetType === "tds") && !hardwareId) {
-            logger.error(`[createNode] ❌ CRITICAL: TDS device created without hardwareId!`);
             return res.status(400).json({
                 error: "TDS devices require a hardware ID (node_key)",
                 receivedAssetType: assetType,
@@ -470,54 +545,31 @@ exports.createNode = async (req, res) => {
             });
         }
         
-        logger.debug(`[createNode] Generated idForDevice: "${idForDevice}"`);
         const typeNormalized = (assetType || "evaratank").toLowerCase();
 
-        // ============================================================================
-        // ✅ TASK #6 — Validate device type BEFORE creating batch
-        // Errors before batch creation = no database writes at all
-        // ============================================================================
-        let targetCol = "";
-        if (typeNormalized === "evaratank" || typeNormalized === "tank" || assetType === "EvaraTank") {
-            targetCol = "evaratank";
-        } else if (typeNormalized === "evaradeep" || typeNormalized === "deep" || assetType === "EvaraDeep") {
-            targetCol = "evaradeep";
-        } else if (typeNormalized === "evaraflow" || typeNormalized === "flow" || assetType === "EvaraFlow") {
-            targetCol = "evaraflow";
-        } else if (typeNormalized === "evaratds" || typeNormalized === "tds" || assetType === "EvaraTDS") {
-            targetCol = "evaratds";
-        } else {
-            // Unknown device type — reject BEFORE touching database
+        // Validate device type
+        const validTypes = ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'tank', 'deep', 'flow', 'tds'];
+        if (!validTypes.includes(typeNormalized)) {
             return res.status(400).json({
                 error: `Unknown asset type: "${assetType}"`,
-                validTypes: ['evaratank', 'evaradeep', 'evaraflow', 'evaratds'],
+                validTypes: ['evaratank', 'evaradeep', 'evaraflow', 'evaratds']
             });
         }
-
-        // ============================================================================
-        // ✅ TASK #6 — Create a batch (shopping cart)
-        // Nothing is written until batch.commit() is called
-        // ============================================================================
-        const batch = db.batch();
 
         // ✅ FIX #5: Generate API key for MQTT authentication
         const crypto = require('crypto');
         const apiKey = crypto.randomBytes(32).toString('hex');
-        const apiKeyHash = crypto
-          .createHash('sha256')
-          .update(apiKey)
-          .digest('hex');
+        const apiKeyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
-        // 1. Prepare REGISTRY entry (Minimal + Ownership for efficient filtering)
-        const registryData = {
+        // ✅ SINGLE DOCUMENT: Merge registry and metadata into one document
+        const deviceData = {
+            // Registry fields
             device_id: idForDevice,
             device_type: typeNormalized,
             node_id: idForDevice,
             customer_id: customerId || "",
-            api_key_hash: apiKeyHash, // ✅ FIX #5: Store hash only (never the key itself)
-            // Default visibility: true so device shows to customer when first created
+            api_key_hash: apiKeyHash,
             isVisibleToCustomer: true,
-            // Default customer_config: all parameters ON
             customer_config: {
                 showAlerts: true,
                 showConsumption: true,
@@ -528,254 +580,89 @@ exports.createNode = async (req, res) => {
                 showTankLevel: true,
                 showVolume: true
             },
-            // ✅ FIX: Set analytics_template so frontend can filter by device type
             analytics_template: assetType || "EvaraTank",
-            subType: subType || assetSubType || "", // ✅ Added for registry consistency
-            created_at: timestamp
-        };
-
-        // Reserve a spot in devices collection
-        const deviceDocRef = db.collection("devices").doc();
-        const deviceDocId = deviceDocRef.id;
-        
-        logger.debug(`[createNode] 📌 CRITICAL: Generating document IDs`);
-        logger.debug(`[createNode]   Generated Firestore ID: ${deviceDocId}`);
-        logger.debug(`[createNode]   Hardware ID (device_id/node_id): ${idForDevice}`);
-        logger.debug(`[createNode]   Target collection: ${targetCol}`);
-        logger.debug(`[createNode] 🔍 REGISTRY DATA TO BE WRITTEN:`);
-        logger.debug(`[createNode]   device_type: "${registryData.device_type}"`);
-        logger.debug(`[createNode]   device_id: "${registryData.device_id}"`);
-        logger.debug(`[createNode]   node_id: "${registryData.node_id}"`);
-        logger.debug(`[createNode]   All keys:`, Object.keys(registryData));
-        
-        batch.set(deviceDocRef, registryData); // Queue but don't write yet
-        logger.debug(`[createNode] ✅ Registry batch.set() queued for devices/${deviceDocId}`);
-
-        // 🔍 DEBUG: Log what we received from frontend
-        logger.debug(`\n[createNode] 🎯 RECEIVED FROM FRONTEND:`);
-        logger.debug(`[createNode]   thingspeakChannelId value: "${thingspeakChannelId}"`);
-        logger.debug(`[createNode]   thingspeakReadKey value: "${thingspeakReadKey}"`);
-        logger.debug(`[createNode]   assetType: "${assetType}"`);
-
-        // 2. Prepare METADATA entry (Detailed)
-        let metadata = {
-            device_id: idForDevice,
-            node_id: idForDevice,
+            subType: subType || assetSubType || "",
+            created_at: timestamp,
+            // Metadata fields (merged)
             label: displayName || deviceName || "Unnamed",
             device_name: deviceName || displayName || "Unknown Device",
-            thingspeak_read_api_key: thingspeakReadKey || "",
             thingspeak_channel_id: thingspeakChannelId || "",
-            customer_id: customerId || "",
+            thingspeak_read_api_key: thingspeakReadKey || "",
             zone_id: zoneId || "",
             latitude: parseNumberSafely(latitude),
             longitude: parseNumberSafely(longitude),
-            subType: subType || assetSubType || "", // ✅ Added for metadata consistency
-            created_at: timestamp,
             updated_at: timestamp
         };
 
-        // 🔍 DEBUG: Log metadata BEFORE adding device type specific data
-        logger.debug(`[createNode] 📝 METADATA BASE CREATED:`);
-        logger.debug(`[createNode]   thingspeak_channel_id will be: "${metadata.thingspeak_channel_id}"`);
-        logger.debug(`[createNode]   thingspeak_read_api_key will be: "${metadata.thingspeak_read_api_key}"`);
-
-        // ✅ FIX #7: Add PROPER FIELD MAPPING SCHEMA (Semantic names → ThingSpeak fields)
-        // BEFORE: sensor_field_mapping had backwards mapping [field] → "semantic_name"
-        // AFTER: New "fields" object maps semantic names → actual field numbers
-        // This lets backend do: device.fields.tds instead of hardcoded field1/field2
-        
-        if (targetCol === "evaratank") {
-            metadata.tank_size = capacity || 0;
-            metadata.configuration = {
+        // Add device type specific fields
+        if (typeNormalized === "evaratank" || typeNormalized === "tank") {
+            deviceData.tank_size = capacity || 0;
+            deviceData.total_capacity = capacity || 0;
+            deviceData.configuration = {
+                depth: depth || 0,
                 tank_length: tankLength || 0,
-                tank_breadth: tankBreadth || 0,
-                depth: depth || 0
+                tank_breadth: tankBreadth || 0
             };
             const levelField = waterLevelField || "field2";
-            // NEW: Semantic field name → ThingSpeak field number
-            metadata.fields = {
-                water_level: levelField  // e.g., "field2"
-            };
-            metadata.sensor_field_mapping = { [levelField]: "water_level_raw_sensor_reading" };
-        } else if (targetCol === "evaradeep") {
-            metadata.configuration = {
+            deviceData.fields = { water_level: levelField };
+            deviceData.sensor_field_mapping = { [levelField]: "water_level_raw_sensor_reading" };
+        } else if (typeNormalized === "evaradeep" || typeNormalized === "deep") {
+            deviceData.configuration = {
                 total_depth: depth || 0,
                 static_water_level: staticDepth || 0,
                 dynamic_water_level: dynamicDepth || 0,
                 recharge_threshold: rechargeThreshold || 0
             };
             const depthField = borewellDepthField || "field2";
-            metadata.fields = {
-                water_level: depthField
-            };
-            metadata.sensor_field_mapping = { [depthField]: "water_level_in_cm" };
-        } else if (targetCol === "evaraflow") {
-            metadata.configuration = {};
+            deviceData.fields = { water_level: depthField };
+            deviceData.sensor_field_mapping = { [depthField]: "water_level_in_cm" };
+        } else if (typeNormalized === "evaraflow" || typeNormalized === "flow") {
+            deviceData.configuration = {};
             const rateField = flowRateField || "field2";
             const readingField = meterReadingField || "field1";
-            metadata.fields = {
-                flow_rate: rateField,
-                total_liters: readingField
-            };
-            metadata.sensor_field_mapping = {
+            deviceData.fields = { flow_rate: rateField, total_liters: readingField };
+            deviceData.sensor_field_mapping = {
                 [rateField]: "flow_rate",
                 [readingField]: "current_reading"
             };
-            logger.debug(`[createNode-FLOW] 📝 Storing Flow metadata:`);
-            logger.debug(`[createNode-FLOW]   Channel ID: "${metadata.thingspeak_channel_id}"`);
-            logger.debug(`[createNode-FLOW]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'EMPTY'}"`);
-        } else if (targetCol === "evaratds") {
-            metadata.configuration = {
+        } else if (typeNormalized === "evaratds" || typeNormalized === "tds") {
+            deviceData.configuration = {
                 type: "TDS",
                 unit: "ppm",
                 min_threshold: 0,
                 max_threshold: 2000
             };
-            // NEW: Use user-provided TDS/Temperature field mapping from frontend
-            const userTdsField = req.body.tdsField || req.body.tds_field || "field2";
-            const userTempField = req.body.temperatureField || req.body.temperature_field || "field3";
-            metadata.fields = {
-                tds: userTdsField,
-                temperature: userTempField
-            };
-            metadata.sensor_field_mapping = {
+            const userTdsField = tdsField || "field2";
+            const userTempField = temperatureField || "field3";
+            deviceData.fields = { tds: userTdsField, temperature: userTempField };
+            deviceData.sensor_field_mapping = {
                 [userTdsField]: "tdsValue",
                 [userTempField]: "temperature"
             };
-            metadata.tdsValue = req.body.tdsValue || 0;
-            metadata.temperature = req.body.temperature || 0;
-            metadata.waterQualityRating = req.body.waterQualityRating || "Good";
-            metadata.location = req.body.location || "";
-            metadata.status = req.body.status || "online";
-            metadata.lastUpdated = timestamp;
-            metadata.tdsHistory = [];
-            metadata.tempHistory = [];
-            
-            logger.debug(`[createNode-TDS] 📝 Storing TDS metadata:`);
-            logger.debug(`[createNode-TDS]   Channel ID: "${metadata.thingspeak_channel_id}"`);
-            logger.debug(`[createNode-TDS]   API Key: "${metadata.thingspeak_read_api_key ? '***' : 'MISSING'}"`);
-            logger.debug(`[createNode-TDS]   TDS Field: "${userTdsField}"`);
-            logger.debug(`[createNode-TDS]   Temperature Field: "${userTempField}"`);
-            logger.debug(`[createNode-TDS]   device_id: "${metadata.device_id}"`);
-            logger.debug(`[createNode-TDS]   node_id: "${metadata.node_id}"`);
-            logger.debug(`[createNode-TDS]   Fields mapping:`, metadata.fields);
+            deviceData.tdsValue = req.body.tdsValue || 0;
+            deviceData.temperature = req.body.temperature || 0;
+            deviceData.waterQualityRating = req.body.waterQualityRating || "Good";
+            deviceData.location = req.body.location || "";
+            deviceData.status = req.body.status || "online";
+            deviceData.lastUpdated = timestamp;
         }
 
-        // Critical Fix: Use SAME document ID for metadata as registry
-        // This ensures fetch can find metadata using the registry document ID
-        logger.debug(`[createNode] � QUEUING METADATA BATCH OPERATION`);
-        logger.debug(`[createNode]   Target collection: ${targetCol}`);
-        logger.debug(`[createNode]   Document ID: ${deviceDocId}`);
-        logger.debug(`[createNode]   Metadata object keys:`, Object.keys(metadata));
-        logger.debug(`[createNode]   device_id in metadata: "${metadata.device_id}"`);
-        logger.debug(`[createNode]   node_id in metadata: "${metadata.node_id}"`);
-        
-        const metadataRef = db.collection(targetCol).doc(deviceDocId);
-        batch.set(metadataRef, metadata);
-        logger.debug(`[createNode] ✅ Metadata batch.set() queued for ${targetCol}/${deviceDocId}`);
+        logger.debug(`[createNode] 📝 Creating single document in devices/${idForDevice}`);
+        logger.debug(`[createNode]   Device type: ${typeNormalized}`);
+        logger.debug(`[createNode]   Keys:`, Object.keys(deviceData));
 
-        logger.debug(`\n[createNode-ALL] 🎯 STORING in ${targetCol} collection:`);
-        logger.debug(`[createNode-ALL] Document ID: ${deviceDocId}`);
-        logger.debug(`[createNode-ALL] hardware ID (device_id/node_id): ${idForDevice}`);
-        logger.debug(`[createNode-ALL] device_type: ${typeNormalized}`);
-        logger.debug(`[createNode-ALL] Full registry keys:`, Object.keys(registryData));
-        logger.debug(`[createNode-ALL] Full metadata keys:`, Object.keys(metadata));
-        logger.debug(`[createNode-ALL] Registry device_id: ${registryData.device_id}`);
-        logger.debug(`[createNode-ALL] Registry node_id: ${registryData.node_id}`);
-        logger.debug(`[createNode-ALL] Metadata device_id: ${metadata.device_id}`);
-        logger.debug(`[createNode-ALL] Metadata node_id: ${metadata.node_id}`);
-        logger.debug(`[createNode-ALL] thingspeak_channel_id VALUE:`, metadata.thingspeak_channel_id);
-        logger.debug(`[createNode-ALL] thingspeak_read_api_key VALUE:`, metadata.thingspeak_read_api_key);
-        
-        // ⚠️ VALIDATION: Ensure required fields are present
-        if (!metadata.device_id) {
-            throw new Error(`[VALIDATION FAILED] Metadata device_id is empty or missing!`);
-        }
-        if (!metadata.node_id) {
-            throw new Error(`[VALIDATION FAILED] Metadata node_id is empty or missing!`);
-        }
-        if (!metadata.thingspeak_channel_id || !metadata.thingspeak_read_api_key) {
-            logger.warn(`[VALIDATION WARNING] ThingSpeak credentials missing for TDS device - will not be able to fetch telemetry`);
-        }
-        
-        logger.debug(`[createNode-ALL] 📋 COMPLETE METADATA OBJECT:`, JSON.stringify(metadata, null, 2));
-        logger.debug(`[createNode-ALL] 📋 COMPLETE REGISTRY OBJECT:`, JSON.stringify(registryData, null, 2));
+        // ✅ SINGLE DOCUMENT WRITE: Use hardware ID as document ID for direct lookup
+        const deviceDocRef = db.collection("devices").doc(idForDevice);
+        await deviceDocRef.set(deviceData);
 
-        // Write BOTH documents at once with matching IDs
-        // If batch.commit() fails, NEITHER document is written
-        logger.debug(`[createNode-ALL] ⏳ READY TO COMMIT BATCH`);
-        logger.debug(`[createNode-ALL] Batch will contain:`);
-        logger.debug(`[createNode-ALL]   1. Registry: devices/${deviceDocId}`);
-        logger.debug(`[createNode-ALL]   2. Metadata: ${targetCol}/${deviceDocId}`);
-        logger.debug(`[createNode-ALL] User: ${customerId}`);
-        logger.debug(`[createNode-ALL] Firestore batch object type: ${batch.constructor.name}`);
-        
-        // ✅ ISSUE #4 FIX: Atomic batch commit — NO fallback
-        // If batch.commit() fails, the entire operation fails cleanly with 500.
-        // No sequential set() calls = no orphaned records ever.
-        // Central error handler will catch this and return 500 to client.
-        logger.debug(`[createNode-ALL] ⏳ NOW COMMITTING BATCH...`);
-        await batch.commit();
-        logger.debug(`[createNode-ALL] ✅ Batch.commit() SUCCEEDED!`);
-        logger.debug(`[createNode-ALL] ✅ Should have written to:`);
-        logger.debug(`[createNode-ALL]    - devices/${deviceDocId}`);
-        logger.debug(`[createNode-ALL]    - ${targetCol}/${deviceDocId}`);
+        logger.debug(`[createNode] ✅ Document created successfully in devices/${idForDevice}`);
 
-        // VERIFICATION: Check that both documents were actually written
-        logger.debug(`[createNode-ALL] 🔍 VERIFYING writes...`);
-        let registryValid = false;
-        let metadataValid = false;
-        
-        try {
-            logger.debug(`[createNode-ALL] 🔍 Checking devices/${deviceDocId}...`);
-            const verifyRegistry = await db.collection("devices").doc(deviceDocId).get();
-            if (verifyRegistry.exists) {
-                logger.debug(`[createNode-ALL] ✅ VERIFIED: Registry document EXISTS in devices/${deviceDocId}`);
-                const regData = verifyRegistry.data();
-                logger.debug(`[createNode-ALL]    device_id: "${regData.device_id}"`);
-                logger.debug(`[createNode-ALL]    node_id: "${regData.node_id}"`);
-                logger.debug(`[createNode-ALL]    device_type: "${regData.device_type}"`);
-                logger.debug(`[createNode-ALL]    assetType: "${regData.assetType}"`);
-                logger.debug(`[createNode-ALL]    displayName: "${regData.displayName}"`);
-                logger.debug(`[createNode-ALL]    All registry keys:`, Object.keys(regData).join(", "));
-                
-                if (regData.device_id && regData.node_id) {
-                    registryValid = true;
-                    logger.debug(`[createNode-ALL] ✅ Registry has required fields (device_id, node_id)`);
-                } else {
-                    logger.error(`[createNode-ALL] ❌ WARNING: Registry missing device_id or node_id!`);
-                }
-            } else {
-                logger.error(`[createNode-ALL] ❌ CRITICAL: Registry document NOT found in devices/${deviceDocId}`);
-            }
-
-            logger.debug(`[createNode-ALL] 🔍 Checking ${targetCol}/${deviceDocId}...`);
-            const verifyMetadata = await db.collection(targetCol).doc(deviceDocId).get();
-            if (verifyMetadata.exists) {
-                logger.debug(`[createNode-ALL] ✅ VERIFIED: Metadata document EXISTS in ${targetCol}/${deviceDocId}`);
-                metadataValid = true;
-                const metaData = verifyMetadata.data();
-                logger.debug(`[createNode-ALL]    device_id: "${metaData.device_id}"`);
-                logger.debug(`[createNode-ALL]    node_id: "${metaData.node_id}"`);
-                logger.debug(`[createNode-ALL]    thingspeak_channel_id: "${metaData.thingspeak_channel_id}"`);
-                logger.debug(`[createNode-ALL]    thingspeak_read_api_key: ${metaData.thingspeak_read_api_key ? '✅ SET' : '❌ MISSING'}`);
-                logger.debug(`[createNode-ALL]    All metadata keys:`, Object.keys(metaData).join(", "));
-            } else {
-                logger.error(`[createNode-ALL] ❌ CRITICAL: Metadata document NOT found in ${targetCol}/${deviceDocId}`);
-                logger.error(`[createNode-ALL]    This means batch.set() for metadata DID NOT WORK!`);
-                logger.error(`[createNode-ALL]    Collection: ${targetCol}`);
-                logger.error(`[createNode-ALL]    Expected to see collection in Firestore, but it's empty or doesn't exist!`);
-            }
-        } catch (verifyErr) {
-            logger.error(`[createNode-ALL] ❌ Verification check threw exception:`, verifyErr.message);
-            logger.error(`[createNode-ALL]    Stack:`, verifyErr.stack);
-        }
-        
-        logger.debug(`[createNode-ALL] ─── VERIFICATION SUMMARY ───`);
-        logger.debug(`[createNode-ALL]    Registry written: ${registryValid ? '✅' : '❌'}`);
-        logger.debug(`[createNode-ALL]    Metadata written: ${metadataValid ? '✅' : '❌'}`);
-        if (!metadataValid) {
-            logger.error(`[createNode-ALL] ⚠️  CRITICAL ISSUE: Metadata not written! Device will be unfetchable!`);
+        // Verification
+        const verifyDoc = await db.collection("devices").doc(idForDevice).get();
+        if (verifyDoc.exists) {
+            logger.debug(`[createNode] ✅ VERIFIED: Document exists in devices/${idForDevice}`);
+        } else {
+            logger.error(`[createNode] ❌ CRITICAL: Document not found after write!`);
         }
 
         // SaaS Invalidation: Flush all user-specific and aggregate dashboard caches
@@ -792,15 +679,12 @@ exports.createNode = async (req, res) => {
         }
 
         // ✅ FIX #8: EMIT REAL-TIME SOCKET EVENT (CRITICAL)
-        // BEFORE: Only cache invalidated, frontend waited 12s for polling or refresh
-        // AFTER: Socket event pushes new device to all connected clients immediately
-        // ✅ NEW: Fetch and save channel metadata for stable anchor architecture
         if (thingspeakChannelId && thingspeakReadKey) {
-            logger.debug(`[createNode] 🔄 Fetching and saving channel metadata for device ${deviceDocId}`);
+            logger.debug(`[createNode] 🔄 Fetching and saving channel metadata for device ${idForDevice}`);
             try {
                 const { fetchAndSaveChannelMetadata } = require("../services/channelMetadataService.js");
                 const channelMeta = await fetchAndSaveChannelMetadata(
-                    deviceDocId,
+                    idForDevice,
                     thingspeakChannelId,
                     thingspeakReadKey
                 );
@@ -818,10 +702,9 @@ exports.createNode = async (req, res) => {
         try {
             if (global.io) {
                 const fullDevice = {
-                    id: deviceDocId,
-                    node_key: deviceDocId,
-                    ...registryData,
-                    ...metadata
+                    id: idForDevice,
+                    node_key: idForDevice,
+                    ...deviceData
                 };
                 
                 // Broadcast to all connected clients of this customer
@@ -837,26 +720,16 @@ exports.createNode = async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            deviceId: deviceDocId,
+            deviceId: idForDevice,
             device_id: idForDevice,
             device_type: typeNormalized,
-            target_collection: targetCol,
             api_key: apiKey, // ✅ FIX #5: Return the API key to client (ONE TIME ONLY)
             message: "Device created successfully",
             verification: {
-                registry_stored: {
-                    deviceId: deviceDocId,
-                    device_id: idForDevice,
-                    device_type: typeNormalized,
-                    node_id: idForDevice,
-                    customer_id: customerId
-                },
-                metadata_stored: {
-                    target_collection: targetCol,
-                    documentId: deviceDocId,
-                    has_channel_id: !!thingspeakChannelId,
-                    has_api_key: !!thingspeakReadKey
-                }
+                document_id: idForDevice,
+                device_type: typeNormalized,
+                has_channel_id: !!thingspeakChannelId,
+                has_api_key: !!thingspeakReadKey
             }
         });
     } catch (error) {

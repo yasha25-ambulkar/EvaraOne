@@ -1625,3 +1625,21 @@ a:active {
     color: #64748b !important;
     font-weight: 600 !important;
 }
+
+button,
+a,
+[role="button"],
+[onClick],
+.btn,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+label[for],
+nav *,
+[class*="btn"],
+[class*="button"],
+[class*="clickable"],
+[class*="cursor-pointer"] {
+  cursor: pointer !important;
+}

@@ -325,8 +325,8 @@ const AdminNodes = () => {
                     >
                       <option value="">Select Customer</option>
                       {customersList?.map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.display_name || c.full_name}
+                        <option key={c.uid || c.id} value={c.uid || c.id}>
+                          {c.display_name || c.full_name || c.email || "Unnamed"}
                         </option>
                       ))}
                     </select>

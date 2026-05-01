@@ -1,3 +1,4 @@
+const logger = require("../utils/logger.js");
 const { db, admin } = require("../config/firebase.js");
 const { Filter } = require("firebase-admin/firestore");
 const { createNode, updateNode, deleteNode } = require("./admin.controller.js");

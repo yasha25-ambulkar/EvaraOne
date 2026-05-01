@@ -29,6 +29,7 @@
  *   await incrementCacheVersion('nodes'); // Invalidates all zones_list_v* keys
  */
 
+const logger = require("./logger.js");
 const { db } = require("../config/firebase.js");
 
 /**

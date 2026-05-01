@@ -197,21 +197,88 @@ export default function CustomerDashboard() {
         )}
       </div>
 
-      {/* ── Charts Row ── */}
-      <div className="px-4 lg:px-6 mb-5 relative z-10">
-        <div style={{ minHeight: '320px' }}>
-          <ErrorBoundary>
-            <ConsumptionTrendChart isLoading={isLoading} data={[]} />
-          </ErrorBoundary>
-        </div>
-      </div>
-
-      {/* ── Reports Row ── */}
+      {/* ── Bottom Row ── */}
       <div className="px-4 lg:px-6 mb-8 relative z-10">
-        <div style={{ minHeight: '260px' }}>
-          <ErrorBoundary>
-            <ReportsDownloader nodes={nodes as any[]} isLoading={isLoading} />
-          </ErrorBoundary>
+        <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 3fr 2fr' }}>
+          <div style={{ minHeight: '320px' }}>
+            <ErrorBoundary>
+              <ConsumptionTrendChart isLoading={isLoading} data={[]} />
+            </ErrorBoundary>
+          </div>
+          <div className="apple-glass-card rounded-[20px] p-5 flex flex-col" style={{ minHeight: '320px' }}>
+            <h3 className="text-[11px] font-[800] uppercase tracking-[0.15em] mb-4" style={{ color: 'var(--text-muted)' }}>
+              Product Distribution
+            </h3>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              {isLoading ? (
+                <div className="w-32 h-32 rounded-full border-4 border-gray-200 animate-pulse" />
+              ) : (
+                <>
+                  {(() => {
+                    const deviceTypes = (nodes as any[]).reduce((acc: any, node: any) => {
+                      const type = node.asset_type || node.deviceType || node.device_type || 'Unknown';
+                      acc[type] = (acc[type] || 0) + 1;
+                      return acc;
+                    }, {});
+                    const total = (nodes as any[]).length || 1;
+                    const colors = ['#5eead4', '#0d9488', '#818cf8', '#93c5fd', '#f59e0b'];
+                    const entries = Object.entries(deviceTypes);
+                    
+                    let cumAngle = -90;
+                    const slices = entries.map(([type, count]: any, i) => {
+                      const pct = count / total;
+                      const angle = pct * 360;
+                      const startAngle = cumAngle;
+                      cumAngle += angle;
+                      const r = 60;
+                      const cx = 80, cy = 80;
+                      const start = {
+                        x: cx + r * Math.cos((startAngle * Math.PI) / 180),
+                        y: cy + r * Math.sin((startAngle * Math.PI) / 180),
+                      };
+                      const end = {
+                        x: cx + r * Math.cos(((startAngle + angle) * Math.PI) / 180),
+                        y: cy + r * Math.sin(((startAngle + angle) * Math.PI) / 180),
+                      };
+                      const largeArc = angle > 180 ? 1 : 0;
+                      return { type, count, pct, color: colors[i % colors.length], start, end, cx, cy, r, largeArc };
+                    });
+
+                    return (
+                      <>
+                        <svg width="200" height="200" viewBox="0 0 160 160">
+                          {slices.map((s, i) => (
+                            <path
+                              key={i}
+                              d={`M ${s.cx} ${s.cy} L ${s.start.x} ${s.start.y} A ${s.r} ${s.r} 0 ${s.largeArc} 1 ${s.end.x} ${s.end.y} Z`}
+                              fill={s.color}
+                              stroke="white"
+                              strokeWidth="3"
+                              opacity="0.9"
+                            />
+                          ))}
+                          <circle cx="80" cy="80" r="15" fill="var(--card-bg)" />
+                        </svg>
+                        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                          {slices.map((s, i) => (
+                            <div key={i} className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                              <span className="text-[9px] font-[700] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{s.type}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          </div>
+          <div style={{ minHeight: '320px' }}>
+            <ErrorBoundary>
+              <ReportsDownloader nodes={nodes as any[]} isLoading={isLoading} />
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
     </div>

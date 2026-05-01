@@ -82,6 +82,7 @@ const Navbar = () => {
                                 key={item.path}
                                 to={item.path}
                                 data-tour={tourMap[item.path]}
+                                style={{ cursor: 'pointer' }}
                                 className={clsx(
                                     "flex items-center gap-2 font-bold tracking-tight text-[13px] md:text-[14px] transition-all cursor-pointer whitespace-nowrap",
                                     isActive ? "navbar-active" : "px-4 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 navbar-text"
@@ -106,7 +107,7 @@ const Navbar = () => {
                             localStorage.removeItem('evara_tour_done');
                             startOnboardingTour();
                         }}
-                        className="w-[36px] h-[36px] flex items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 navbar-text"
+                        className="w-[36px] h-[36px] flex items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 navbar-text cursor-pointer"
                         title="Restart Tour"
                     >
                         <HelpCircle size={20} strokeWidth={2} />
@@ -115,7 +116,7 @@ const Navbar = () => {
                     {/* Theme Toggle Button */}
                     <button
                         onClick={toggleTheme}
-                        className="w-[36px] h-[36px] flex items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 navbar-text"
+                        className="w-[36px] h-[36px] flex items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 navbar-text cursor-pointer"
                         title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
                     >
                         {theme === 'light' ? <Moon size={20} strokeWidth={2} /> : <Sun size={20} strokeWidth={2} />}
@@ -142,7 +143,7 @@ const Navbar = () => {
 
                             <button
                                 onClick={handleLogout}
-                                className="w-[36px] h-[36px] flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all duration-200 navbar-text"
+                                className="w-[36px] h-[36px] flex items-center justify-center opacity-40 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all duration-200 navbar-text cursor-pointer"
                                 title="Logout"
                             >
                                 <LogOut size={20} strokeWidth={2.5} />
@@ -151,7 +152,7 @@ const Navbar = () => {
                     ) : (
                         <Link
                             to="/login"
-                            className="px-6 py-2.5 rounded-full text-[14px] font-bold tracking-tight transition-all bg-gradient-to-b from-[#3A7AFE] to-[#2563EB] text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                            className="px-6 py-2.5 rounded-full text-[14px] font-bold tracking-tight transition-all bg-gradient-to-b from-[#3A7AFE] to-[#2563EB] text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                         >
                             Login
                         </Link>

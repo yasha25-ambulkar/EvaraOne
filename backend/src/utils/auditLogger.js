@@ -1,3 +1,5 @@
+const logger = require("./logger.js");
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * TASK #12: Comprehensive Audit Logging

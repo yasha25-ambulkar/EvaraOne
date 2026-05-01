@@ -300,8 +300,8 @@ const EvaraTDSAnalytics = () => {
 const DeleteConfirmModal = ({ show, onClose, onConfirm, isDeleting, deviceName }: any) => {
     if (!show) return null;
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
-            <div className="rounded-[32px] p-8 w-full max-w-sm text-center relative overflow-hidden bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm cursor-pointer" onClick={onClose}>
+            <div className="rounded-[32px] p-8 w-full max-w-sm text-center relative overflow-hidden bg-white shadow-2xl cursor-pointer" onClick={e => e.stopPropagation()}>
                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Trash2 size={32} />
                 </div>
@@ -341,8 +341,8 @@ const NodeInfoModal = ({ show, onClose, device, deviceName, id }: any) => {
                     ))}
                 </div>
                 <div className="mt-6 flex gap-3">
-                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white bg-[#3A7AFE] text-sm hover:scale-[1.02] transition-transform" onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
-                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm hover:scale-[1.02] transition-transform">Close</button>
+                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white bg-[#3A7AFE] text-sm hover:scale-[1.02] transition-transform cursor-pointer" onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
+                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm hover:scale-[1.02] transition-transform cursor-pointer">Close</button>
                 </div>
             </div>
         </div>

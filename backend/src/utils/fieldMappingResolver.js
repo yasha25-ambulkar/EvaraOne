@@ -8,6 +8,8 @@
  * This ensures data routes correctly even if ThingSpeak field positions change.
  */
 
+const logger = require("./logger.js");
+
 module.exports = {
   /**
    * STABLE ANCHOR: Resolve field position using channel metadata
