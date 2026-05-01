@@ -98,7 +98,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
 
             const now = Date.now();
             const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-            const startBoundary = latestBoundary - (3 * 60 * 60000);
+            const startBoundary = latestBoundary - (24 * 60 * 60000); // 24 hours window
 
             const interpolated = [];
             for (let t = startBoundary; t <= latestBoundary; t += 60000) {
@@ -322,18 +322,26 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                                 const { active, payload } = props;
                                 if (!active || !payload || payload.length === 0) return null;
                                 const dataPoint = payload[0]?.payload;
-                                const label = dataPoint?.label || '--';
                                 return (
-                                    <div style={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', background: 'var(--bg-secondary)', padding: '10px 14px', minWidth: 180 }}>
-                                        <p style={{ margin: '0 0 2px 0', fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{label}</p>
-                                        {payload.map((entry: any, i: number) => (
-                                            <p key={i} style={{ margin: '4px 0 0', fontSize: 13, color: entry.color, fontWeight: 600 }}>
-                                                {`Flow Rate: ${Math.max(0, entry.value).toFixed(2)} L/min`}
-                                            </p>
-                                        ))}
+                                    <div style={{
+                                        borderRadius: '14px',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--card-border)',
+                                        padding: '12px 16px',
+                                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                        backdropFilter: 'blur(10px)'
+                                    }}>
+                                        <p style={{ margin: '0 0 4px 0', fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            {dataPoint.fullTime || dataPoint.label}
+                                        </p>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                            <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-primary)' }}>{Math.max(0, payload[0].value).toFixed(2)}</span>
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0ea5e9' }}>L/min</span>
+                                        </div>
                                     </div>
                                 );
                             }}
+                            cursor={{ stroke: '#0ea5e9', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }}
                         />
 
                         {chartData.some(d => d.current != null) && (

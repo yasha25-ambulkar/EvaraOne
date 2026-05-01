@@ -67,8 +67,8 @@ async function getActiveDevices() {
             }
         }
         
-        // Store in cache for 1 hour (auto-busted on update via prefix 'nodes_')
-        await cache.set("nodes:polling:list", devices, 3600);
+        // Store in cache for 2 minutes (frequent refresh to pick up latest lastUpdatedAt)
+        await cache.set("nodes:polling:list", devices, 120);
         return devices;
     } catch (err) {
         logger.error("Error fetching devices", err, { category: "telemetry" });
@@ -85,12 +85,38 @@ async function processDevice(device) {
         const feeds = await fetchSixHourData(device.channel, device.key);
         if (!feeds.length) return;
 
-        // Create a fingerprint of this data update to detect duplicates
-        const feedFingerprint = JSON.stringify(feeds.map(f => f.created_at));
+        // Extract the absolute latest data point timestamp
+        const latestFeed = feeds[feeds.length - 1];
+        const feedFingerprint = latestFeed ? latestFeed.created_at : null;
         
-        // If we processed the exact same timestamp sequence recently, skip it
+        // ─── ROBUST DEDUPLICATION ───
+        // 1. Check local cache (high performance, short term)
         if (lastProcessed === feedFingerprint) {
-            logger.info(`Skipping duplicate update for ${device.id}`, { category: "telemetry", deviceId: device.id });
+            logger.debug(`[TelemetryWorker] Local skip for ${device.id} (Same as last cycle)`, { category: "telemetry", deviceId: device.id });
+            return;
+        }
+
+        // 2. Check against Firestore lastUpdatedAt (source of truth, persistent)
+        let lastSeenTime = 0;
+        if (device.lastUpdatedAt) {
+            // Handle Firestore Timestamp object if present
+            if (typeof device.lastUpdatedAt.toMillis === 'function') {
+                lastSeenTime = device.lastUpdatedAt.toMillis();
+            } else if (device.lastUpdatedAt._seconds) {
+                lastSeenTime = device.lastUpdatedAt._seconds * 1000;
+            } else {
+                lastSeenTime = new Date(device.lastUpdatedAt).getTime();
+            }
+        }
+        
+        const feedTime = new Date(feedFingerprint).getTime();
+        
+        // Skip if ThingSpeak data is NOT newer than our last recorded update
+        // This solves the "stale polling" issue permanently.
+        if (feedTime <= lastSeenTime) {
+            logger.debug(`[TelemetryWorker] Skipping stale data for ${device.id}. Feed: ${feedFingerprint}, Registry: ${device.lastUpdatedAt}`, { category: "telemetry" });
+            // Sync cache to avoid re-checking Firestore until it actually changes
+            await cache.set(dedupKey, feedFingerprint, MQTT_DEDUP_TTL); 
             return;
         }
 
@@ -105,8 +131,8 @@ async function processDevice(device) {
         const now = new Date().toISOString();
         const { admin } = require("../config/firebase.js");
         await db.collection("devices").doc(device.id).update({
-            last_seen: admin.firestore.FieldValue.serverTimestamp(),
-            last_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            last_seen: telemetryData.lastUpdatedAt,
+            last_updated_at: telemetryData.lastUpdatedAt,
             isOnline: telemetryData.status === 'Online',
             status: telemetryData.status,
             updated_at: now
@@ -124,12 +150,15 @@ async function processDevice(device) {
         // CRITICAL FIX: Emit real-time update via Socket.IO
         const payload = {
             deviceId: device.id,
+            device_id: device.id, // For frontend AllNodes matcher
+            node_id: device.id,   // For frontend Analytics matcher
             percentage: telemetryData.percentage,
             level_percentage: telemetryData.percentage, // Include for consistency
             volume: telemetryData.volume,
             flow_rate: telemetryData.flow_rate,
             total_reading: telemetryData.total_reading,
             tds_value: telemetryData.tds_value,
+            tdsValue: telemetryData.tds_value, // For frontend backward compatibility
             temperature: telemetryData.temperature,
             water_quality: telemetryData.water_quality,
             lastUpdatedAt: telemetryData.lastUpdatedAt,

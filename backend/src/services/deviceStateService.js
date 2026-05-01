@@ -306,13 +306,16 @@ const processThingSpeakData = async (device, feeds) => {
     depthM: tankConfig.depthM,
     deadBandM: device.dead_band_m || device.deadBand || device.configuration?.dead_band_m || 0
   });
+  
+  // Recalculate volume using exact percentage to prevent mismatch with ML bounds
+  const exactVolume = (exactMath.percentage / 100) * tankConfig.capacityLitres;
 
   return {
     deviceId: device.id,
     rawDistance: analytics.currentDistanceCm,
     processedLevel: analytics.currentDistanceCm,
     percentage: exactMath.percentage,
-    volume: analytics.currentVolumeLitres,
+    volume: exactVolume,
     lastUpdatedAt,
     status,
     raw_data: latestFeed,
@@ -351,7 +354,8 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
     const updatePayload = cleanObject({
       // ✅ CRITICAL: Update last_seen when data comes in
       // This is what frontend uses to determine Online/Offline status
-      last_seen: now,
+      // We bind this to the ACTUAL ThingSpeak timestamp to ensure real-time accuracy
+      last_seen: telemetryData.lastUpdatedAt,
       last_updated_at: telemetryData.lastUpdatedAt,
       lastUpdatedAt: telemetryData.lastUpdatedAt,
       status: telemetryData.status,
@@ -373,7 +377,7 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
       tds_value: telemetryData.tds_value || 0,
       temperature: telemetryData.temperature || 0,
       water_quality: telemetryData.water_quality || "Good",
-      timestamp: now,  // Use current time when data arrives
+      timestamp: telemetryData.lastUpdatedAt,  // Plot exact time the data arrived on ThingSpeak
       status: telemetryData.status,
       waterState: telemetryData.waterState || 'STABLE',
       rateLitresPerMin: telemetryData.rateLitresPerMin || 0,
@@ -411,7 +415,7 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
     
     // Standardized registry update
     const registryUpdateObj = cleanObject({
-        last_seen: now,
+        last_seen: telemetryData.lastUpdatedAt,
         last_updated_at: telemetryData.lastUpdatedAt,
         lastUpdatedAt: telemetryData.lastUpdatedAt,
         status: telemetryData.status,
@@ -431,7 +435,7 @@ const updateFirestoreTelemetry = async (deviceType, deviceId, telemetryData, fee
             waterQualityRating: telemetryData.water_quality,
             tds_history: (updatePayload.tdsHistory || []).slice(0, 10), // Sync last 10 points for sparklines
             
-            timestamp: now
+            timestamp: telemetryData.lastUpdatedAt
         })
     });
 

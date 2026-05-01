@@ -628,7 +628,11 @@ const SharedMap = ({
       const snap = realtimeStatuses[d.id];
       const base = snap || d.last_telemetry || {};
       const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || d.last_seen || d.last_online_at || null;
-      const s = computeDeviceStatus(latestTs);
+      // OPTIMIZATION: Trust the passed status if it's already normalized, 
+      // otherwise fallback to computing it from the latest timestamp.
+      const s = (d.status === 'Online' || d.status === 'Offline') 
+        ? d.status 
+        : computeDeviceStatus(latestTs);
 
       const key = `${t}_${s}`;
       if (!m.has(key)) m.set(key, getDeviceIcon(t, s));
@@ -693,7 +697,10 @@ const SharedMap = ({
             const snap = realtimeStatuses[device.id];
             const base = snap || device.last_telemetry || {};
             const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || device.last_seen || device.last_online_at || null;
-            const s = computeDeviceStatus(latestTs);
+            // OPTIMIZATION: Trust the passed status if it's already normalized
+            const s = (device.status === 'Online' || device.status === 'Offline')
+              ? device.status
+              : computeDeviceStatus(latestTs);
 
             const key = `${t}_${s}`;
             const icon =

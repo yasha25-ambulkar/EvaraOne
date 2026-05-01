@@ -144,13 +144,11 @@ const EvaraDeepAnalytics = () => {
         const feeds: any[] = historyFeeds;
         return feeds.map((feed) => {
             const d = new Date(feed.created_at);
-            const label =
-                d.getHours().toString().padStart(2, '0') +
-                ':' +
-                d.getMinutes().toString().padStart(2, '0');
+            const label = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            const fullTime = d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const raw = parseFloat(feed[fieldDepth] as string) || 40;
             const measured = Math.min(120 + (raw % 40), totalBoreDepth - 5);
-            return { label, measured, waterCol: totalBoreDepth - measured };
+            return { label, fullTime, measured, waterCol: totalBoreDepth - measured };
         });
     }, [historyFeeds, fieldDepth, totalBoreDepth]);
 
@@ -674,7 +672,7 @@ const EvaraDeepAnalytics = () => {
                                         <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ background: 'rgba(58,122,254,0.1)', color: '#3A7AFE' }}>Avg: {avgWaterCol}</span>
                                     </div>
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={depthHistory.slice(-50)} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+                                        <AreaChart data={depthHistory.slice(-1000)} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="deepWaterGrad" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#3A7AFE" stopOpacity={0.25} />
@@ -685,17 +683,30 @@ const EvaraDeepAnalytics = () => {
                                             <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 600 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                                             <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} unit="m" width={45} />
                                             <RechartsTooltip
-                                                contentStyle={{
-                                                    background: 'var(--bg-secondary)',
-                                                    border: '1px solid var(--card-border)',
-                                                    borderRadius: 14,
-                                                    backdropFilter: 'blur(14px)',
-                                                    padding: '10px 16px',
-                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+                                                content={(props: any) => {
+                                                    const { active, payload } = props;
+                                                    if (!active || !payload || payload.length === 0) return null;
+                                                    const data = payload[0].payload;
+                                                    return (
+                                                        <div style={{
+                                                            borderRadius: '14px',
+                                                            background: 'var(--bg-secondary)',
+                                                            border: '1px solid var(--card-border)',
+                                                            padding: '12px 16px',
+                                                            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                                            backdropFilter: 'blur(10px)'
+                                                        }}>
+                                                            <p style={{ margin: '0 0 4px 0', fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                                {data.fullTime}
+                                                            </p>
+                                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                                                <span style={{ fontSize: 24, fontBlack: 900, color: 'var(--text-primary)', fontWeight: 900 }}>{parseFloat(data.waterCol || 0).toFixed(1)}</span>
+                                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#3A7AFE' }}>METER (Water Col)</span>
+                                                            </div>
+                                                        </div>
+                                                    );
                                                 }}
-                                                labelStyle={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                                                itemStyle={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700 }}
-                                                formatter={(v: any) => [`${parseFloat(v || 0).toFixed(1)} m`, 'Water Column']}
+                                                cursor={{ stroke: '#3A7AFE', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }}
                                             />
                                             <Area type="monotone" dataKey="waterCol" stroke="#3A7AFE" strokeWidth={2.5} fill="url(#deepWaterGrad)" dot={false} activeDot={{ r: 5, fill: '#3A7AFE', strokeWidth: 0 }} />
                                         </AreaChart>

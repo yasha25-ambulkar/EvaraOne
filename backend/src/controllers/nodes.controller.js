@@ -353,12 +353,14 @@ exports.getNodes = async (req, res) => {
                 }
 
                 if (type === 'evaratds') {
+                    const lt = meta.last_telemetry || {};
                     nodeData.last_telemetry = {
-                        tdsValue: meta.tdsValue || 0,
-                        tds_value: meta.tdsValue || 0,
-                        waterQualityRating: meta.waterQualityRating || 'Unknown',
-                        temperature: meta.temperature || 0,
-                        timestamp: meta.lastUpdated || meta.updated_at || null
+                        tdsValue: lt.tdsValue ?? lt.tds_value ?? meta.tdsValue ?? 0,
+                        tds_value: lt.tdsValue ?? lt.tds_value ?? meta.tdsValue ?? 0,
+                        waterQualityRating: lt.waterQualityRating ?? lt.water_quality ?? meta.waterQualityRating ?? 'Unknown',
+                        temperature: lt.temperature ?? meta.temperature ?? 0,
+                        tds_history: lt.tds_history ?? meta.tds_history ?? [],
+                        timestamp: lt.timestamp ?? meta.lastUpdated ?? meta.updated_at ?? null
                     };
                 }
 
@@ -1095,8 +1097,8 @@ exports.getNodeAnalytics = async (req, res) => {
     } else if (startDate && endDate) {
       thingspeakUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&start=${startDate}&end=${endDate}&results=8000`;
     } else {
-      // default 24H - fetching 480 points to cover the last 8 hours (at 1-min intervals)
-      thingspeakUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=480`;
+      // default 24H - fetching 1000 points to cover a full day (at 1-2 min intervals)
+      thingspeakUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1000`;
     }
 
     const response = await axios.get(thingspeakUrl);

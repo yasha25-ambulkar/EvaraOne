@@ -101,7 +101,7 @@ const EvaraTDSAnalytics = () => {
         });
 
         if (chartRange === '24H') {
-            filtered = filtered.slice(-30);
+            filtered = filtered.slice(-1000);
         }
 
         const chartData = filtered.map((h: any) => {
@@ -182,9 +182,17 @@ const EvaraTDSAnalytics = () => {
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
-                            <div className="flex items-center gap-2 px-4 py-1.5 bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
-                                Online
+                            <div className={clsx(
+                                "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                status === 'Online' 
+                                    ? "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border-[#10b981]/50 dark:border-emerald-500/40"
+                                    : "bg-[#fff1f2] dark:bg-red-500/10 text-[#e11d48] dark:text-red-400 border-[#fb7185]/50 dark:border-red-500/40"
+                            )}>
+                                <div className={clsx(
+                                    "w-1.5 h-1.5 rounded-full animate-pulse",
+                                    status === 'Online' ? "bg-[#10b981]" : "bg-[#e11d48]"
+                                )} />
+                                {status || 'Offline'}
                             </div>
                             <button onClick={handleRefresh} disabled={isRefreshing} className={clsx("flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95", isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10")}>
                                 <RefreshCw size={12} className={clsx('stroke-[2.5px]', isRefreshing && 'animate-spin')} />
@@ -397,9 +405,13 @@ const MiniStatCard = ({ title, value, unit, icon: Icon, accentColor, iconBg }: a
 
 const PremiumTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+        const date = new Date(payload[0].payload.timestampMs);
+        const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        
         return (
             <div className="rounded-2xl px-5 py-3 shadow-2xl" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">{payload[0].payload.fullTime}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">{dateStr} &nbsp; {timeStr}</p>
                 <div className="flex items-baseline gap-2">
                     <span className="text-[26px] font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>{payload[0].value}</span>
                     <span className="text-[13px] font-bold text-blue-500">PPM</span>

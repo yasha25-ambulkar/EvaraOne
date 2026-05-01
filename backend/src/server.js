@@ -540,8 +540,11 @@ if (pubSub) {
             const payload = JSON.parse(message);
             const deviceId = channel.split(":")[2];
             if (deviceId) {
-                // ✅ FIXED: Emit ONLY to room subscribers (those who passed checkOwnership)
-                io.to(`room:${deviceId}`).emit("device:update", payload);
+                // 1. Emit to specific room (Analytics pages)
+                io.to(`room:${deviceId}`).emit("telemetry_update", payload);
+                
+                // 2. Emit global broadcast (AllNodes page)
+                io.emit("telemetry_broadcast", payload);
             }
         } catch (err) {}
     });
@@ -551,8 +554,11 @@ if (pubSub) {
 // Node.js EventEmitter doesn't support regex patterns — use explicit wildcard
 telemetryEvents.on("device:update", (payload) => {
     if (payload && payload.deviceId) {
-        // ✅ FIXED: Emit ONLY to room subscribers (those who passed checkOwnership)
-        io.to(`room:${payload.deviceId}`).emit("device:update", payload);
+        // 1. Emit to specific room (Analytics pages)
+        io.to(`room:${payload.deviceId}`).emit("telemetry_update", payload);
+        
+        // 2. Emit global broadcast (AllNodes page)
+        io.emit("telemetry_broadcast", payload);
     }
 });
 

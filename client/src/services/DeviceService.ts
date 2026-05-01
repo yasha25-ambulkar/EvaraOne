@@ -57,9 +57,9 @@ export function computeDeviceStatus(lastTimestamp: any): "Online" | "Offline" {
 
     const ageMs = Date.now() - date.getTime();
     
-    // 30 minutes threshold (1,800,000 ms)
-    // Any negative ageMs (future timestamp) evaluates to < thresholdMs here, which is intended.
-    if (ageMs < 1800000) {
+    // 20 minutes threshold (1,200,000 ms)
+    // Matches backend calculation in deviceStateService.js
+    if (ageMs < 1200000) {
         return "Online";
     }
 
