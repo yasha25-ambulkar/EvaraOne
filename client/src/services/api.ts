@@ -8,10 +8,8 @@ import { auth } from "../lib/firebase";
 
 // In development: use relative path for Vite proxy to work
 // In production: use absolute URL from env
-const VITE_API_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? "/api/v1" : "http://localhost:8000/api/v1");
-const SOCKET_URL = import.meta.env.VITE_WS_URL || 
-  (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:8000');
+const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:8000');
 
 console.log('[API Config] VITE_API_URL:', VITE_API_URL);
 console.log('[API Config] SOCKET_URL:', SOCKET_URL);

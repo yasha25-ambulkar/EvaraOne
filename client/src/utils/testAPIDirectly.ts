@@ -3,7 +3,7 @@ import axios from 'axios';
 // Test the exact API call the frontend makes
 const testTDSHistoryAPI = async () => {
   try {
-    const baseURL = import.meta.env.DEV ? '/api/v1' : 'http://localhost:8000/api/v1';
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
     
     console.log('🧪 Testing TDS History API');
     console.log('Base URL:', baseURL);
