@@ -7,11 +7,13 @@ import { io } from 'socket.io-client';
 import { auth } from "../lib/firebase";
 
 // HARDCODED PRODUCTION URLS (Pick up where env vars failed)
-const API_BASE_URL = "https://evaraone-production-511c.up.railway.app";
-const VITE_API_URL = `${API_BASE_URL}/api/v1`;
+// API Configuration
+const VITE_API_URL = import.meta.env.VITE_API_URL || "https://evaraone-production-511c.up.railway.app/api/v1";
+const API_BASE_URL = VITE_API_URL.split('/api/v1')[0];
 const SOCKET_URL = API_BASE_URL;
 
-console.log('[API Config] Using Hardcoded Production URL:', API_BASE_URL);
+console.log('[API Config] Base URL:', API_BASE_URL);
+console.log('[API Config] API URL:', VITE_API_URL);
 
 export const socket = io(SOCKET_URL, {
   auth: async (cb) => {

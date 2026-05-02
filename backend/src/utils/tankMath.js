@@ -4,8 +4,7 @@
  * 
  * @param {number} distanceCm - Raw sensor distance reading (e.g. from ThingSpeak field)
  * @param {object} dimensions - Configuration of tank dimensions
- * @param {number} dimensions.depthM - Total physical depth of the tank in meters
- * @param {number} dimensions.deadBandM - Physical deadband at top in meters
+ * @param {number} dimensions.heightCm - Total physical depth of the tank in centimeters
  * @returns {object} Calculated telemetry containing precise geometry
  */
 function computeTankMetrics(distanceCm, dimensions) {
@@ -16,18 +15,17 @@ function computeTankMetrics(distanceCm, dimensions) {
         };
     }
 
-    const { depthM = 1.2, deadBandM = 0 } = dimensions;
-    const distanceM = parseFloat(distanceCm) / 100;
+    const { heightCm = 210.82 } = dimensions;
+    const distCm = parseFloat(distanceCm);
     
-    const usableHeightM = Math.max(0, depthM - deadBandM);
-    // Distance reading is measured from top-down
-    const waterHeightM = Math.min(usableHeightM, Math.max(0, depthM - distanceM));
+    // The formula: waterHeightCm = heightCm - distanceCm (clamped 0 to heightCm)
+    const waterHeightCm = Math.max(0, Math.min(heightCm, heightCm - distCm));
     
-    // Percentage relative to full internal depth
-    const percentage = depthM > 0 ? (waterHeightM / depthM) * 100 : 0;
+    // percentage = (waterHeightCm / heightCm) * 100
+    const percentage = heightCm > 0 ? (waterHeightCm / heightCm) * 100 : 0;
     
     return {
-        waterHeightCm: waterHeightM * 100,
+        waterHeightCm: waterHeightCm,
         percentage: Math.max(0, Math.min(100, percentage))
     };
 }

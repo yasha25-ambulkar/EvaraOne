@@ -286,8 +286,12 @@ const processThingSpeakData = async (device, feeds) => {
   if (readings.length === 0) return null;
 
   const tankConfig = {
-    depthM: device.depth || device.configuration?.depth || device.configuration?.total_depth || 1.2,
-    capacityLitres: device.capacity || device.tank_size || 1000,
+    heightCm: device.height_cm 
+      || device.configuration?.height_cm
+      || (device.configuration?.depth ? device.configuration.depth * 100 : null)
+      || (device.depth ? device.depth * 100 : null)
+      || 210.82,
+    capacityLitres: device.capacity || device.tank_size || 30600,
   };
 
   // Load saved thresholds (null = first run, will learn from data)
@@ -301,21 +305,10 @@ const processThingSpeakData = async (device, feeds) => {
     await saveThresholds(device.id, analytics.thresholds);
   }
 
-  // ✅ ENFORCED SOURCE OF TRUTH: Execute exact algebraic math (with deadband) rather than ML bounds
-  const exactMath = computeTankMetrics(analytics.currentDistanceCm, {
-    depthM: tankConfig.depthM,
-    deadBandM: device.dead_band_m || device.deadBand || device.configuration?.dead_band_m || 0
-  });
-  
-  // Recalculate volume using exact percentage to prevent mismatch with ML bounds
-  const exactVolume = (exactMath.percentage / 100) * tankConfig.capacityLitres;
-
   return {
     deviceId: device.id,
-    rawDistance: analytics.currentDistanceCm,
-    processedLevel: analytics.currentDistanceCm,
-    percentage: exactMath.percentage,
-    volume: exactVolume,
+    percentage: analytics.currentPercentage,
+    volume: analytics.currentVolumeLitres,
     lastUpdatedAt,
     status,
     raw_data: latestFeed,

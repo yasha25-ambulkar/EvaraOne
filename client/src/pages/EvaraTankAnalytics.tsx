@@ -132,9 +132,9 @@ function serverConfigToLocal(cfg: TankConfig): LocalTankConfig {
         thingspeakChannelId: cfg.thingspeak_channel_id ?? conf.thingspeak_channel_id ?? '',
         thingspeakReadKey: '',   // never returned by the server for security
         tankShape: (cfg.tank_shape as TankShape) ?? conf.tank_shape ?? 'rectangular',
-        heightM: cfg.height_m ?? conf.height_m ?? cfg.depth ?? conf.depth ?? cfg.tankHeight ?? conf.tank_height ?? 0,
-        lengthM: cfg.length_m ?? conf.length_m ?? cfg.tankLength ?? conf.tank_length ?? 0,
-        breadthM: cfg.breadth_m ?? conf.breadth_m ?? cfg.tankBreadth ?? conf.tank_breadth ?? 0,
+        heightM: cfg.height_m ?? conf.height_m ?? (conf.height_cm ? conf.height_cm / 100 : null) ?? cfg.depth ?? conf.depth ?? cfg.tankHeight ?? conf.tank_height ?? 2.1082,
+        lengthM: cfg.length_m ?? conf.length_m ?? (conf.length_cm ? conf.length_cm / 100 : null) ?? cfg.tankLength ?? conf.tank_length ?? 0,
+        breadthM: cfg.breadth_m ?? conf.breadth_m ?? (conf.breadth_cm ? conf.breadth_cm / 100 : null) ?? cfg.tankBreadth ?? conf.tank_breadth ?? 0,
         radiusM: cfg.radius_m ?? conf.radius_m ?? cfg.tankRadius ?? conf.tank_radius ?? 0,
         deadBandM: cfg.dead_band_m ?? conf.dead_band_m ?? cfg.deadBand ?? conf.dead_band ?? 0,
         capacityOverrideLitres: cfg.capacity_liters ?? conf.capacity_liters ?? cfg.capacity ?? conf.capacity ?? cfg.tank_size ?? conf.tank_size ?? null,

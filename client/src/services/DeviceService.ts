@@ -257,6 +257,9 @@ class NodeService {
     // Initial Fetch
     this.getMapNodes(communityId).then(nodes => {
       if (isSubscribed) updateAndNotify(nodes);
+    }).catch(err => {
+      console.error('[DeviceService] Failed initial map nodes fetch:', err);
+      if (isSubscribed) callback([]); // Notify with empty array to stop loading indicator
     });
 
     const onTelemetryUpdate = (payload: any) => {

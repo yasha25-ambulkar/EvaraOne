@@ -601,7 +601,10 @@ exports.createNode = async (req, res) => {
             deviceData.configuration = {
                 depth: depth || 0,
                 tank_length: tankLength || 0,
-                tank_breadth: tankBreadth || 0
+                tank_breadth: tankBreadth || 0,
+                height_cm: depth ? depth * 100 : 0,
+                length_cm: tankLength ? tankLength * 100 : 0,
+                breadth_cm: tankBreadth ? tankBreadth * 100 : 0
             };
             const levelField = waterLevelField || "field2";
             deviceData.fields = { water_level: levelField };
@@ -890,13 +893,25 @@ exports.updateNode = async (req, res) => {
 
             const config = {};
             const depthVal = body.depth || body.height_m || body.max_depth || body.tank_height;
-            if (depthVal !== undefined) config.depth = parseFloat(depthVal) || 0;
+            if (depthVal !== undefined) {
+                const d = parseFloat(depthVal) || 0;
+                config.depth = d;
+                config.height_cm = d * 100;
+            }
 
             const len = body.tankLength || body.length_m || body.tank_length;
-            if (len !== undefined) config.tank_length = parseFloat(len) || 0;
+            if (len !== undefined) {
+                const l = parseFloat(len) || 0;
+                config.tank_length = l;
+                config.length_cm = l * 100;
+            }
 
             const br = body.tankBreadth || body.breadth_m || body.tank_breadth;
-            if (br !== undefined) config.tank_breadth = parseFloat(br) || 0;
+            if (br !== undefined) {
+                const b = parseFloat(br) || 0;
+                config.tank_breadth = b;
+                config.breadth_cm = b * 100;
+            }
 
             const rad = body.radius || body.radius_m || body.tank_radius;
             if (rad !== undefined) config.tank_radius = parseFloat(rad) || 0;

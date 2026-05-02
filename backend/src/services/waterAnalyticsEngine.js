@@ -61,7 +61,7 @@ function medianFilter(data, windowSize = MEDIAN_WIN) {
 // Priority 1: DB saved thresholds (from previous session) → use immediately
 // Priority 2: >= 200 readings accumulated → compute from data
 // Priority 3: < 200 readings → fallback to DB depth, show LEARNING state
-function learnThresholds(filteredReadings, fallbackDepthM, savedThresholds) {
+function learnThresholds(filteredReadings, fallbackHeightCm, savedThresholds) {
   // Priority 1
   if (
     savedThresholds &&
@@ -93,7 +93,7 @@ function learnThresholds(filteredReadings, fallbackDepthM, savedThresholds) {
   // Priority 3: fallback
   return {
     lower: 0,
-    upper: fallbackDepthM * 100,
+    upper: fallbackHeightCm,
     learned: false,
     readingCount: valid.length,
   };
@@ -238,8 +238,10 @@ function countRefillsToday(stateHistory, timeHistoryMs) {
  * @returns {object} analytics result
  */
 function analyzeWaterTank(readings, tankConfig, savedThresholds = null) {
-  const { depthM, capacityLitres } = tankConfig;
-  const fallbackDepthM = depthM || 1.2;
+  const { heightCm, capacityLitres } = tankConfig;
+  const fallbackHeightCm = heightCm 
+    || (tankConfig.depthM ? tankConfig.depthM * 100 : null)
+    || 210.82;
   const cap = capacityLitres || 1000;
 
   // ── Step 1+2: Clean distances ──────────────────────────────────────────
@@ -248,13 +250,14 @@ function analyzeWaterTank(readings, tankConfig, savedThresholds = null) {
   const filtered   = medianFilter(spikeClean);
 
   // ── Step 3: Thresholds ─────────────────────────────────────────────────
-  const thresholds = learnThresholds(filtered, fallbackDepthM, savedThresholds);
+  const thresholds = learnThresholds(filtered, fallbackHeightCm, savedThresholds);
 
   // ── Not enough data yet ────────────────────────────────────────────────
   if (!thresholds.learned) {
     const currentDist = filtered[filtered.length - 1];
-    const currentVol  = distanceToVolume(currentDist, thresholds, cap);
-    const currentPct  = distanceToPercentage(currentDist, thresholds);
+    const waterHeightCm = Math.max(0, Math.min(fallbackHeightCm, fallbackHeightCm - currentDist));
+    const currentVol = (waterHeightCm / fallbackHeightCm) * cap;
+    const currentPct = (waterHeightCm / fallbackHeightCm) * 100;
 
     return {
       state: 'LEARNING',
@@ -277,8 +280,9 @@ function analyzeWaterTank(readings, tankConfig, savedThresholds = null) {
   const timeHistory = readings.map(r => r.timestampMs);
 
   const currentDist = filtered[filtered.length - 1];
-  const currentVol  = volHistory[volHistory.length - 1];
-  const currentPct  = distanceToPercentage(currentDist, thresholds);
+  const waterHeightCm = Math.max(0, Math.min(fallbackHeightCm, fallbackHeightCm - currentDist));
+  const currentVol = (waterHeightCm / fallbackHeightCm) * cap;
+  const currentPct = (waterHeightCm / fallbackHeightCm) * 100;
 
   // ── Step 5: CLASSIFY from last 200 readings FIRST ─────────────────────
   const { state, deltaCm, startMedian, endMedian } = classifyLast200(filtered);
@@ -287,12 +291,12 @@ function analyzeWaterTank(readings, tankConfig, savedThresholds = null) {
   const rate = state === 'STABLE' ? 0 : calcRateLpm(volHistory, timeHistory);
 
   // ── Estimations ────────────────────────────────────────────────────────
-  const estMinutesToEmpty = (state === 'CONSUMPTION' && rate > 0)
-    ? currentVol / rate
-    : null;
-  const estMinutesToFull = (state === 'REFILL' && rate > 0)
-    ? (cap - currentVol) / rate
-    : null;
+  const rawEmpty = (state === 'CONSUMPTION' && rate > 0) ? currentVol / rate : null;
+  const rawFull  = (state === 'REFILL' && rate > 0)      ? (cap - currentVol) / rate : null;
+
+  const validateEst = (val) => (val === null || isNaN(val) || !isFinite(val) || val > 99999) ? null : val;
+  const estMinutesToEmpty = validateEst(rawEmpty);
+  const estMinutesToFull  = validateEst(rawFull);
 
   // ── Step 7: Daily totals ────────────────────────────────────────────────
   const { consumedToday, refilledToday } = calcDailyTotals(volHistory, timeHistory);

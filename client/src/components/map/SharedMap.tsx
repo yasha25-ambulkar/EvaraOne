@@ -22,6 +22,7 @@ import { getDeviceAnalyticsRoute } from "../../utils/deviceRouting";
 import { useTelemetry } from "../../hooks/useTelemetry";
 import { type TelemetryData } from "../../services/TelemetryService";
 import { useFirestoreFlowData } from "../../hooks/useFirestoreFlowData";
+import { getDeviceIcon } from "../../utils/mapIcons";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -56,51 +57,7 @@ interface HoverPanel {
   y: number;
 }
 
-// ─── PNG Icon Factory with Status Dot ───────────────────────────────────────────────────────
-
-const FALLBACK_ICON = L.icon({
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  shadowSize: [41, 41],
-});
-
-function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon | L.DivIcon {
-  if (!template) return FALLBACK_ICON;
-  const t = template.toLowerCase();
-
-  let iconUrl = "";
-  if (t.includes("tank") || t.includes("sump") || t === "oht" || t === "evaratank") {
-    iconUrl = "/tank.png";
-  } else if (t.includes("deep") || t.includes("bore") || t.includes("govt") || t === "evaradeep") {
-    iconUrl = "/borewell.png";
-  } else if (t.includes("flow") || t.includes("meter") || t.includes("pump") || t === "evaraflow") {
-    iconUrl = "/meter.png";
-  } else if (t.includes("tds") || t === "evaratds") {
-    iconUrl = "/tds.png";
-  }
-
-  if (!iconUrl) return FALLBACK_ICON;
-
-  const dotColor = status === "Online" ? "#22c55e" : "#ef4444";
-  const dotShadow = status === "Online" ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)";
-
-  // We use L.divIcon to render custom HTML for the marker, allowing us to overlay the status dot.
-  return L.divIcon({
-    className: "custom-device-marker",
-    html: `
-      <div class="marker-container">
-        <img src="${iconUrl}" class="marker-image" />
-        <div class="marker-status-dot" style="background-color: ${dotColor}; box-shadow: 0 0 6px ${dotShadow};"></div>
-      </div>
-    `,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-    popupAnchor: [0, -24],
-  });
-}
+// ─── Local constants removed in favor of utils/mapIcons.ts ───
 
 // ─── Mini Telemetry Visualizer ────────────────────────────────────────────────
 const MiniTelemetryViz = ({ device, snap, firestoreFlow }: { device: MapDevice; snap: any; firestoreFlow?: any }) => {

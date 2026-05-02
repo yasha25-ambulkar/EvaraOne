@@ -67,6 +67,8 @@ async function getActiveDevices() {
             }
         }
         
+        console.log(`[WORKER DEBUG] Active devices to poll: ${devices.map(d => d.id).join(", ")}`);
+        
         // Store in cache for 2 minutes (frequent refresh to pick up latest lastUpdatedAt)
         await cache.set("nodes:polling:list", devices, 120);
         return devices;
