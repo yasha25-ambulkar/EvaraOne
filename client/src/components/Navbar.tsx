@@ -55,10 +55,10 @@ const Navbar = () => {
             <nav 
                 className="navbar-glass flex items-center justify-between w-full max-w-[1280px] h-[60px] md:h-[68px] transition-all duration-[220ms] pointer-events-auto"
                 style={{
-                    background: 'rgba(255, 255, 255, 0.65)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.4)',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '999px',
                     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)'
                 }}
