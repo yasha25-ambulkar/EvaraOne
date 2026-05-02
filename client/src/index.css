@@ -549,8 +549,8 @@ html.dark .leaflet-map-pane {
 
 /* Navbar Utility Classes */
 .navbar-glass {
-  background: var(--navbar-bg) !important;
-  border: 1px solid var(--navbar-border) !important;
+  background: var(--navbar-bg);
+  border: 1px solid var(--navbar-border);
   box-shadow: var(--navbar-shadow);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
