@@ -91,19 +91,9 @@ function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon |
   return L.divIcon({
     className: "custom-device-marker",
     html: `
-      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-        <img src="${iconUrl}" style="width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
-        <div style="
-          position: absolute;
-          bottom: 1px;
-          right: 1px;
-          width: 8px;
-          height: 8px;
-          background-color: ${dotColor};
-          border: 1.5px solid white;
-          border-radius: 50%;
-          box-shadow: 0 0 6px ${dotShadow};
-        "></div>
+      <div class="marker-container">
+        <img src="${iconUrl}" class="marker-image" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
+        <div class="marker-status-dot" style="background-color: ${dotColor}; box-shadow: 0 0 6px ${dotShadow};"></div>
       </div>
     `,
     iconSize: [32, 32],

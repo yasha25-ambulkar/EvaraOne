@@ -63,24 +63,13 @@ export const getDeviceIcon = (
   const dotColor = online ? "#22c55e" : "#ef4444";
   const dotShadow = online ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)";
 
-  // Standardize the icon wrapper size. 'full' size vs 'mini' depends on parameter if we wanted to support it, 
-  // but for consistency we use 44px
+  // Standardize the icon wrapper size.
   return L.divIcon({
     className: "custom-device-marker",
     html: `
-      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-        <img src="${iconUrl}" style="width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
-        <div style="
-          position: absolute;
-          bottom: 1px;
-          right: 1px;
-          width: 8px;
-          height: 8px;
-          background-color: ${dotColor};
-          border: 1.5px solid white;
-          border-radius: 50%;
-          box-shadow: 0 0 6px ${dotShadow};
-        "></div>
+      <div class="marker-container">
+        <img src="${iconUrl}" class="marker-image" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
+        <div class="marker-status-dot" style="background-color: ${dotColor}; box-shadow: 0 0 6px ${dotShadow};"></div>
       </div>
     `,
     iconSize: [32, 32],
