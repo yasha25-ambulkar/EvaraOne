@@ -1412,8 +1412,8 @@ button {
 /* ── Standard Map Markers ───────────────────────────────────────────── */
 .marker-container {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1421,8 +1421,8 @@ button {
 }
 
 .marker-image {
-  width: 28px;
-  height: 28px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
   display: block;
