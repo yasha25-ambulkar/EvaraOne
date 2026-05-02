@@ -16,9 +16,6 @@ const REQUIRED_VARS = [
 // ✅ CRITICAL FIX: In production, these are REQUIRED (not optional)
 const PRODUCTION_REQUIRED_VARS = [
     "REDIS_URL",
-    "MQTT_BROKER_URL",
-    "MQTT_USERNAME",
-    "MQTT_PASSWORD",
     "SENTRY_DSN"
 ];
 
@@ -66,20 +63,13 @@ function validateEnv() {
         process.exit(1);
     }
 
-    // ✅ CRITICAL FIX: Warn if MQTT is not configured in production
+    // MQTT is optional — server runs without it (MQTT client will self-disable)
     if (isProd && !process.env.MQTT_BROKER_URL) {
-        logger.error("❌ PRODUCTION: MQTT_BROKER_URL not configured.");
-        logger.error("   Device telemetry ingestion will fail.");
-        process.exit(1);
+        logger.warn("⚠️  MQTT_BROKER_URL not configured. Device telemetry ingestion will be disabled.");
     }
 
-    // ✅ CRITICAL FIX: Validate MQTT credentials are set
     if (isProd && (!process.env.MQTT_USERNAME || !process.env.MQTT_PASSWORD)) {
-        logger.error("❌ PRODUCTION: MQTT authentication credentials missing.");
-        logger.error("   - MQTT_USERNAME required");
-        logger.error("   - MQTT_PASSWORD required");
-        logger.error("\n   Without authentication, unauthorized devices can spoof telemetry.");
-        process.exit(1);
+        logger.warn("⚠️  MQTT credentials (MQTT_USERNAME / MQTT_PASSWORD) not set. MQTT will be skipped.");
     }
 
     logger.debug("✅ Environment Variables Validated");

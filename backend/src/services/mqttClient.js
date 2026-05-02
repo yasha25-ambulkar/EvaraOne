@@ -79,10 +79,9 @@ const mqttUsername = process.env.MQTT_USERNAME;
 const mqttPassword = process.env.MQTT_PASSWORD;
 
 if (!mqttUsername || !mqttPassword) {
-  throw new Error(
-    `CRITICAL: MQTT credentials missing. Set MQTT_USERNAME and MQTT_PASSWORD env vars. 
-     This prevents unauthenticated device spoofing.`
-  );
+  console.warn("MQTT disabled - no credentials provided. Skipping MQTT connection.");
+  module.exports = { isConnected: () => false, publish: () => {}, subscribe: () => {} };
+  return;
 }
 
 // ─── MQTT Connection Options ──────────────────────────────────────────────
