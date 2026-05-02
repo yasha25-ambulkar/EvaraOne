@@ -1,130 +1,144 @@
-const axios = require("axios");
+/**
+ * thingspeakService.js
+ *
+ * Fetches raw distance readings from ThingSpeak and returns
+ * a clean array after spike removal.
+ *
+ * Responsibilities:
+ *   1. Call ThingSpeak REST API
+ *   2. Extract the correct field (from sensor_field_mapping)
+ *   3. Parse timestamps → milliseconds
+ *   4. Run spike removal
+ *   5. Return clean readings array
+ */
 
-const fetchSixHourData = async (channelId, apiKey) => {
-  const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=300`;
-  const res = await axios.get(url, { timeout: 10000 });
-  const feeds = Array.isArray(res.data?.feeds) ? res.data.feeds : [];
-  
+'use strict';
+
+const { removeSpikes } = require('../utils/tankMath');
+
+const THINGSPEAK_BASE = 'https://api.thingspeak.com';
+
+// How many results to fetch per poll (last N readings)
+const FETCH_RESULTS = 100;
+
+// ─────────────────────────────────────────────────────────────
+// Main export: fetch + clean
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetches readings from ThingSpeak and returns a clean array.
+ *
+ * @param {object} device - Firestore device document
+ * @returns {Promise<Array<{distanceCm: number, timestampMs: number}>>}
+ */
+async function fetchCleanReadings(device) {
+  const { channelId, apiKey, fieldKey } = resolveThingSpeakConfig(device);
+
+  if (!channelId || !apiKey) {
+    throw new Error(`[thingspeakService] Missing channelId or apiKey for device ${device.id}`);
+  }
+
+  const url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds.json` +
+              `?api_key=${apiKey}&results=${FETCH_RESULTS}`;
+
+  let json;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`ThingSpeak returned HTTP ${res.status}`);
+    json = await res.json();
+  } catch (err) {
+    throw new Error(`[thingspeakService] Fetch failed: ${err.message}`);
+  }
+
+  const feeds = json?.feeds ?? [];
   if (feeds.length === 0) return [];
-  
-  // Return all feeds — no time-based filter so we keep >= 200 for analysis
-  // Only filter out entries with no timestamp
-  return feeds.filter(feed => {
-    const timestamp = new Date(feed.created_at);
-    return !isNaN(timestamp.getTime());
-  });
-};
 
-const fetchLatestData = async (channelId, apiKey, lastTimestamp) => {
-  const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
-  const res = await axios.get(url, { timeout: 8000 });
-  const feeds = Array.isArray(res.data?.feeds) ? res.data.feeds : [];
-  
-  if (!feeds || feeds.length === 0) return null;
-  
-  const latestFeed = feeds[0];
-  const feedTimestamp = latestFeed.created_at;
-  
-  if (lastTimestamp && feedTimestamp <= lastTimestamp) return null;
-  
-  // Return the whole feed so the caller can handle field mapping
-  return {
-    timestamp: feedTimestamp,
-    ...latestFeed
-  };
-};
+  // Parse raw feeds → { distanceCm, timestampMs }
+  const raw = feeds
+    .map(f => ({
+      distanceCm:  parseFloat(f[fieldKey]),
+      timestampMs: new Date(f.created_at).getTime(),
+    }))
+    .filter(r => !isNaN(r.distanceCm) && r.distanceCm > 0);
 
-const applyLightSmoothing = (data) => {
-  if (!data || data.length < 3) return data;
-  
-  return data.map((point, index) => {
-    if (index === 0 || index === data.length - 1) return point;
-    
-    const prev = data[index - 1];
-    const curr = point;
-    const next = data[index + 1];
-    
-    const avgValue = (prev.value + curr.value + next.value) / 3;
-    
+  // Apply spike removal — the only pre-processing step
+  const clean = removeSpikes(raw);
+
+  return clean;
+}
+
+/**
+ * Fetches only the single latest reading from ThingSpeak.
+ * Used by the polling worker for live updates.
+ *
+ * @param {object} device
+ * @returns {Promise<{distanceCm: number, timestampMs: number} | null>}
+ */
+async function fetchLatestReading(device) {
+  const { channelId, apiKey, fieldKey } = resolveThingSpeakConfig(device);
+
+  if (!channelId || !apiKey) return null;
+
+  const url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds/last.json` +
+              `?api_key=${apiKey}`;
+
+  try {
+    const res  = await fetch(url);
+    if (!res.ok) return null;
+    const feed = await res.json();
+
+    const distanceCm = parseFloat(feed[fieldKey]);
+    if (isNaN(distanceCm) || distanceCm <= 0) return null;
+
     return {
-      ...curr,
-      value: curr.value,
-      smoothedValue: Number(avgValue.toFixed(2))
+      distanceCm,
+      timestampMs: new Date(feed.created_at).getTime(),
     };
-  });
-};
-
-const calculateMetrics = (data, tankHeight = 1.2, tankDiameter = 1.0) => {
-  if (!data || data.length === 0) {
-    return {
-      currentLevel: null,
-      volume: null,
-      fillRate: null,
-      consumption: null,
-      status: 'OFFLINE'
-    };
+  } catch {
+    return null;
   }
-  
-  const latestPoint = data[data.length - 1];
-  const latestFeedTime = latestPoint.timestamp;
-  const distance = latestPoint.value / 100;
-  const waterLevel = Math.max(0, tankHeight - distance);
-  const percentage = Math.min(100, (waterLevel / tankHeight) * 100);
-  
-  const tankRadius = tankDiameter / 2;
-  const tankArea = Math.PI * tankRadius * tankRadius;
-  const volume = waterLevel * tankArea * 1000;
-  
-  let fillRate = 0;
-  let consumption = 0;
-  
-  if (data.length >= 2) {
-    const recent = data.slice(Math.max(0, data.length - 6));
-    for (let i = 1; i < recent.length; i++) {
-      const prevLevel = (tankHeight - (recent[i - 1].value / 100)) / tankHeight * 100;
-      const currLevel = (tankHeight - (recent[i].value / 100)) / tankHeight * 100;
-      const diff = currLevel - prevLevel;
-      
-      if (diff > 0) {
-        fillRate += diff;
-      } else {
-        consumption += Math.abs(diff);
-      }
-    }
-    
-    const timeWindowHours = (recent.length - 1) * 0.0167;
-    fillRate = (fillRate / timeWindowHours) * tankArea * 10;
-    consumption = (consumption / timeWindowHours) * tankArea * 10;
-  }
-  
-  const isOnline = data.length > 0;
-  
-  return {
-    currentLevel: percentage,
-    volume: volume,
-    fillRate: fillRate,
-    consumption: consumption,
-    status: isOnline ? 'ONLINE' : 'OFFLINE'
-  };
-};
+}
 
-const getLatestFeed = (feeds) => {
-  if (!feeds || feeds.length === 0) return null;
-  // ThingSpeak feeds are usually returned in chronological order
-  return feeds[feeds.length - 1];
-};
+// ─────────────────────────────────────────────────────────────
+// Internal: resolve ThingSpeak config from device document
+// ─────────────────────────────────────────────────────────────
 
-const fetchChannelFeeds = async (channelId, apiKey, results = 1) => {
-  const url = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=${results}`;
-  const res = await axios.get(url, { timeout: 8000 });
-  return Array.isArray(res.data?.feeds) ? res.data.feeds : [];
-};
+/**
+ * Extracts channelId, apiKey, fieldKey from Firestore device doc.
+ *
+ * Supports multiple storage patterns used across the project.
+ */
+function resolveThingSpeakConfig(device) {
+  const cfg = device.configuration ?? device.customer_config ?? device ?? {};
+
+  // Channel ID
+  const channelId =
+    cfg.thingspeak_channel_id ??
+    cfg.channel_id             ??
+    device.thingspeak_channel_id ??
+    device.channel_id          ??
+    null;
+
+  // Read API Key
+  const apiKey =
+    cfg.thingspeak_api_key ??
+    cfg.read_api_key        ??
+    device.thingspeak_api_key ??
+    device.read_api_key     ??
+    null;
+
+  // Field key — which ThingSpeak field has distance data
+  // Firestore sensor_field_mapping: { water_level: 'field2', temperature: 'field1' }
+  const fieldKey =
+    device.sensor_field_mapping?.water_level ??
+    cfg.sensor_field_mapping?.water_level    ??
+    'field2'; // safe default: distance is usually field2
+
+  return { channelId, apiKey, fieldKey };
+}
 
 module.exports = {
-  fetchSixHourData,
-  fetchLatestData,
-  fetchChannelFeeds,
-  getLatestFeed,
-  applyLightSmoothing,
-  calculateMetrics
+  fetchCleanReadings,
+  fetchLatestReading,
+  resolveThingSpeakConfig,
 };
