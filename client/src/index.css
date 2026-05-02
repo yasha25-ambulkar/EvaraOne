@@ -1389,35 +1389,6 @@ button {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.9), inset 0 2px 12px rgba(255, 255, 255, 0.4) !important;
 }
 
-/* Fix for oversized map markers */
-.marker-container {
-  position: relative !important;
-  width: 32px !important;
-  height: 32px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  overflow: hidden !important;
-}
-
-.marker-image {
-  width: 28px !important;
-  height: 28px !important;
-  object-fit: contain !important;
-  pointer-events: none !important;
-}
-
-.marker-status-dot {
-  position: absolute !important;
-  bottom: 1px !important;
-  right: 1px !important;
-  width: 8px !important;
-  height: 8px !important;
-  border: 1.5px solid white !important;
-  border-radius: 50% !important;
-  z-index: 2 !important;
-}
-
 /* ── Custom Map Tooltip ──────────────────────────────────────────────── */
 .custom-map-tooltip {
   background: transparent !important;
@@ -1436,6 +1407,35 @@ button {
 
 .custom-map-tooltip::before {
   display: none !important;
+}
+
+/* ── Standard Map Markers ───────────────────────────────────────────── */
+.marker-container {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.marker-image {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+  display: block;
+}
+
+.marker-status-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid white;
+  border-radius: 50%;
 }
 
 /* ── Liquid Glass Progress Bar ───────────────────────────────────────── */
@@ -1603,56 +1603,56 @@ a:active {
 
 /* ── Driver.js Onboarding Tour — EvaraOne Glassmorphic Theme ── */
 .driver-popover {
-    border-radius: 20px !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    background: rgba(255, 255, 255, 0.75) !important;
-    backdrop-filter: blur(20px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+  border-radius: 20px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
 }
 
 .driver-popover-title {
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    color: #1e3a8a !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #1e3a8a !important;
 }
 
 .driver-popover-description {
-    font-size: 13px !important;
-    color: #334155 !important;
-    line-height: 1.6 !important;
+  font-size: 13px !important;
+  color: #334155 !important;
+  line-height: 1.6 !important;
 }
 
 .driver-popover-footer {
-    background: transparent !important;
+  background: transparent !important;
 }
 
 .driver-popover-next-btn {
-    background: rgba(58, 122, 254, 0.9) !important;
-    backdrop-filter: blur(10px) !important;
-    border-radius: 10px !important;
-    border: none !important;
-    font-weight: 700 !important;
-    color: white !important;
+  background: rgba(58, 122, 254, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 10px !important;
+  border: none !important;
+  font-weight: 700 !important;
+  color: white !important;
 }
 
 .driver-popover-prev-btn {
-    border-radius: 10px !important;
-    font-weight: 700 !important;
-    background: rgba(255,255,255,0.3) !important;
-    border: 1px solid rgba(255,255,255,0.5) !important;
-    backdrop-filter: blur(10px) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  background: rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
 }
 
 .driver-popover-close-btn {
-    color: #1e3a8a !important;
-    font-size: 18px !important;
+  color: #1e3a8a !important;
+  font-size: 18px !important;
 }
 
 .driver-popover-progress-text {
-    color: #64748b !important;
-    font-weight: 600 !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
 }
 
 button,

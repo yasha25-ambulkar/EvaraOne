@@ -47,7 +47,7 @@ export const getDeviceIcon = (
 ): L.Icon | L.DivIcon => {
   if (!assetType) return FALLBACK_ICON;
   const t = assetType.toLowerCase();
-  
+
   let iconUrl = "";
   if (t.includes("tank") || t.includes("sump") || t === "oht" || t === "evaratank") {
     iconUrl = "/tank.png";
@@ -56,19 +56,20 @@ export const getDeviceIcon = (
   } else if (t.includes("flow") || t.includes("meter") || t.includes("pump") || t === "evaraflow") {
     iconUrl = "/meter.png";
   }
-  
+
   if (!iconUrl) return FALLBACK_ICON;
 
   const online = isOnline(status);
   const dotColor = online ? "#22c55e" : "#ef4444";
   const dotShadow = online ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)";
 
-  // Standardize the icon wrapper size.
+  // Standardize the icon wrapper size. 'full' size vs 'mini' depends on parameter if we wanted to support it, 
+  // but for consistency we use 44px
   return L.divIcon({
     className: "custom-device-marker",
     html: `
       <div class="marker-container">
-        <img src="${iconUrl}" class="marker-image" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
+        <img src="${iconUrl}" class="marker-image" />
         <div class="marker-status-dot" style="background-color: ${dotColor}; box-shadow: 0 0 6px ${dotShadow};"></div>
       </div>
     `,

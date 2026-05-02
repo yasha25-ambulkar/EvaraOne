@@ -92,7 +92,7 @@ function getDeviceIcon(template: string, status: "Online" | "Offline"): L.Icon |
     className: "custom-device-marker",
     html: `
       <div class="marker-container">
-        <img src="${iconUrl}" class="marker-image" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
+        <img src="${iconUrl}" class="marker-image" />
         <div class="marker-status-dot" style="background-color: ${dotColor}; box-shadow: 0 0 6px ${dotShadow};"></div>
       </div>
     `,
@@ -560,8 +560,8 @@ const SharedMap = ({
   // SaaS Architecture: Persistent Theme Observer
   useEffect(() => {
     const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark') || 
-                    document.documentElement.getAttribute('data-theme') === 'dark';
+      const isDark = document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark';
       setTheme(isDark ? 'dark' : 'light');
     };
 
@@ -620,8 +620,8 @@ const SharedMap = ({
       const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || d.last_seen || d.last_online_at || null;
       // OPTIMIZATION: Trust the passed status if it's already normalized, 
       // otherwise fallback to computing it from the latest timestamp.
-      const s = (d.status === 'Online' || d.status === 'Offline') 
-        ? d.status 
+      const s = (d.status === 'Online' || d.status === 'Offline')
+        ? d.status
         : computeDeviceStatus(latestTs);
 
       const key = `${t}_${s}`;
@@ -670,7 +670,7 @@ const SharedMap = ({
           <TileLayer
             key={theme}
             attribution={theme === 'dark' ? '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
-            url={theme === 'dark' 
+            url={theme === 'dark'
               ? 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'
               : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             }
