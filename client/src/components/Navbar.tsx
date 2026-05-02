@@ -51,8 +51,16 @@ const Navbar = () => {
 
 
     return (
-        <div className="fixed top-2 left-0 right-0 z-[2000] flex justify-center px-4 md:px-12 pointer-events-none">
-            <nav className="navbar-glass flex items-center justify-between w-full max-w-[1280px] h-[60px] md:h-[68px] transition-all duration-[220ms] pointer-events-auto">
+        <div className="fixed top-0 left-0 right-0 z-[2000] flex justify-center pointer-events-none">
+            <nav 
+                className="flex items-center justify-between w-full h-[64px] md:h-[72px] px-6 md:px-12 transition-all duration-[220ms] pointer-events-auto"
+                style={{
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.3)'
+                }}
+            >
                 {/* Logo Section */}
                 <div className="flex items-center gap-[8px] flex-shrink-0">
                     <img src="/evara-logo.png" alt="EvaraTech" className="w-[42px] h-[42px] object-contain" />
