@@ -68,24 +68,24 @@ export const getDeviceIcon = (
   return L.divIcon({
     className: "custom-device-marker",
     html: `
-      <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
-        <img src="${iconUrl}" style="width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));" />
+      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+        <img src="${iconUrl}" style="width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
         <div style="
           position: absolute;
-          bottom: 2px;
-          right: 2px;
-          width: 12px;
-          height: 12px;
+          bottom: 1px;
+          right: 1px;
+          width: 8px;
+          height: 8px;
           background-color: ${dotColor};
-          border: 2px solid white;
+          border: 1.5px solid white;
           border-radius: 50%;
-          box-shadow: 0 0 8px ${dotShadow};
+          box-shadow: 0 0 6px ${dotShadow};
         "></div>
       </div>
     `,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-    popupAnchor: [0, -22],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
   });
 };
 
