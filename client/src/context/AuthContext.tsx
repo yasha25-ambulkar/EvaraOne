@@ -252,6 +252,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           // Create profile in Firestore
           const profile = {
+            uid: credential.user.uid,
+            firebase_uid: credential.user.uid,
+            email: credential.user.email,
             full_name: displayName,
             role: "customer",
             plan: "pro",
