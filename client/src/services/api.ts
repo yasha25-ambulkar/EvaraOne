@@ -6,14 +6,12 @@ import axios, {
 import { io } from 'socket.io-client';
 import { auth } from "../lib/firebase";
 
-// In development: use relative path for Vite proxy to work
-// In production: use absolute URL from env
-const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
-const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:8000');
+// HARDCODED PRODUCTION URLS (Pick up where env vars failed)
+const API_BASE_URL = "https://evaraone-production-511c.up.railway.app";
+const VITE_API_URL = `${API_BASE_URL}/api/v1`;
+const SOCKET_URL = API_BASE_URL;
 
-console.log('[API Config] VITE_API_URL:', VITE_API_URL);
-console.log('[API Config] SOCKET_URL:', SOCKET_URL);
-console.log('[API Config] DEV mode:', import.meta.env.DEV);
+console.log('[API Config] Using Hardcoded Production URL:', API_BASE_URL);
 
 export const socket = io(SOCKET_URL, {
   auth: async (cb) => {
