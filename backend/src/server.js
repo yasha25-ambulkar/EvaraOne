@@ -83,7 +83,16 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "https:", "data:"],
-      connectSrc: ["'self'", "https://*.railway.app", "wss://*.railway.app"],
+      connectSrc: [
+        "'self'",
+        "https://*.railway.app",
+        "wss://*.railway.app",
+        "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+        "https://www.googleapis.com",
+        "https://*.firebaseio.com",
+        "https://*.googleapis.com",
+      ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"]
