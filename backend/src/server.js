@@ -82,7 +82,13 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "https:", "data:"],
+      imgSrc: [
+        "'self'", 
+        "https:", 
+        "data:", 
+        "https://*.tile.openstreetmap.org", 
+        "https://*.openstreetmap.org"
+      ],
       connectSrc: [
         "'self'",
         "https://*.railway.app",
@@ -92,13 +98,15 @@ app.use(helmet({
         "https://www.googleapis.com",
         "https://*.firebaseio.com",
         "https://*.googleapis.com",
+        "https://evaraone-production-511c.up.railway.app",
+        "wss://evaraone-production-511c.up.railway.app",
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"]
     }
   },
-  crossOriginEmbedderPolicy: true,
+  crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: true,
   crossOriginResourcePolicy: { policy: "cross-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }
