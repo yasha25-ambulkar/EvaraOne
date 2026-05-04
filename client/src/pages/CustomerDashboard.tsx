@@ -5,6 +5,10 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import DeviceCard from '../components/dashboard/DeviceCard';
 import ConsumptionTrendChart from '../components/dashboard/ConsumptionTrendChart';
 import ReportsDownloader from '../components/dashboard/ReportsDownloader';
+import { computeDeviceStatus } from '../services/DeviceService';
+import { Link } from 'react-router-dom';
+import { getDeviceAnalyticsRoute } from '../utils/deviceRouting';
+
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
@@ -101,10 +105,9 @@ export default function CustomerDashboard() {
   // ── Derived stats ──
   const totalDevices = (nodes as any[]).length;
   const onlineDevices = (nodes as any[]).filter((n: any) => {
-    if (n.status === 'Online') return true;
-    const ts = n.lastPing || n.last_seen;
-    if (!ts) return false;
-    return Date.now() - new Date(ts).getTime() < 5 * 60 * 1000;
+    const ts = n.lastPing || n.last_seen || n.last_telemetry?.timestamp;
+    if (!ts) return n.status === 'Online';
+    return computeDeviceStatus(ts) === 'Online';
   }).length;
 
   const isLoading = nodesLoading;
@@ -189,8 +192,20 @@ export default function CustomerDashboard() {
             {(nodes as any[]).map((node: any, index: number) => (
               <ErrorBoundary key={node.id || node.hardwareId}>
                 <div data-tour={index === 0 ? 'device-card' : undefined} className="contents">
-                  <DeviceCard device={node} />
+                  <Link 
+                    to={getDeviceAnalyticsRoute({
+                      id: node.id,
+                      hardwareId: node.hardwareId || node.id,
+                      analytics_template: node.analytics_template || undefined,
+                      device_type: node.category || undefined,
+                      asset_type: node.asset_type || undefined,
+                    })}
+                    className="contents"
+                  >
+                    <DeviceCard device={node} />
+                  </Link>
                 </div>
+
               </ErrorBoundary>
             ))}
           </div>

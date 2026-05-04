@@ -22,7 +22,8 @@ export const useRealtimeTelemetry = (deviceId: string | undefined) => {
 
         const onTelemetryUpdate = (data: any) => {
             // Ensure the update is for the current device
-            if (data.device_id === deviceId || data.node_id === deviceId || data.id === deviceId) {
+            const incomingId = data.device_id || data.deviceId || data.node_id || data.id;
+            if (incomingId === deviceId) {
                 setTelemetry(data);
             }
         };

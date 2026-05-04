@@ -56,6 +56,7 @@ const SHAPE_KEYS: Record<TankShape, DimKey[]> = {
   rectangular: ['length', 'breadth', 'height'],
   cylindrical: ['radius', 'height'],
   square:      ['side', 'height'],
+  sump:        ['length', 'breadth', 'height'],
 };
 
 // ── Public API types ──────────────────────────────────────────────────────────
@@ -184,7 +185,7 @@ export function useTankCalculation(): UseTankCalculationReturn {
       return isNaN(v) ? 0 : toMetres(v, unit);
     };
 
-    if (shape === 'rectangular') {
+    if (shape === 'rectangular' || shape === 'sump') {
       return { lengthM: m('length'), breadthM: m('breadth'), heightM: m('height'), capacityL: result.litres };
     }
     if (shape === 'cylindrical') {

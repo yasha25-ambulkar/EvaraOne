@@ -32,13 +32,14 @@ export function fromMetres(valueInMetres: number, unit: TankUnit): number {
 
 // ── Shape types ───────────────────────────────────────────────────────────────
 
-export type TankShape = 'rectangular' | 'cylindrical' | 'square';
+export type TankShape = 'rectangular' | 'cylindrical' | 'square' | 'sump';
 
 /** Human-readable label for each shape. */
 export const SHAPE_LABELS: Record<TankShape, string> = {
   rectangular: 'Rectangular Tank',
   cylindrical: 'Cylindrical Tank',
   square: 'Square Tank',
+  sump: 'Sump Tank',
 };
 
 /** Which dimension keys are required for each shape. */
@@ -46,6 +47,7 @@ export const SHAPE_FIELDS: Record<TankShape, string[]> = {
   rectangular: ['length', 'breadth', 'height'],
   cylindrical: ['radius', 'height'],
   square: ['side', 'height'],
+  sump: ['length', 'breadth', 'height'],
 };
 
 // ── Dimension types ───────────────────────────────────────────────────────────
@@ -83,7 +85,9 @@ export function calculateVolume(
   let volumeM3: number;
 
   switch (shape) {
-    case 'rectangular': {
+    case 'rectangular':
+    case 'sump': {
+      // sump uses same formula as rectangular
       const { length, breadth, height } = dims;
       if (!length || !breadth || !height) return null;
       if (length <= 0 || breadth <= 0 || height <= 0) return null;

@@ -7,11 +7,18 @@ const AUTH_CACHE_TTL = 180; // 3 minutes
 
 const requireAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
+    
+    // DEBUG: Log incoming auth header
+    console.log(`[Auth Middleware] Request: ${req.method} ${req.originalUrl}`);
+    console.log(`[Auth Middleware] Authorization Header: ${authHeader ? (authHeader.substring(0, 20) + '...') : 'MISSING'}`);
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        console.warn(`[Auth Middleware] ❌ Missing or invalid Bearer token format`);
         return res.status(401).json({ error: "Missing auth token" });
     }
 
     const idToken = authHeader.split(" ")[1];
+
 
     try {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -86,6 +93,9 @@ const requireAuth = async (req, res, next) => {
         next();
     } catch (error) {
         // ✅ FIX #3: Log full error server-side, send generic message to client
+        console.error(`[Auth Middleware] ❌ Token verification FAILED for token: ${idToken ? idToken.substring(0, 10) + '...' : 'NONE'}`);
+        console.error(`[Auth Middleware] Error: ${error.message}`);
+        
         logger.error('[Auth] ❌ Token verification FAILED:');
         logger.error('[Auth] Error name:', error.name);
         logger.error('[Auth] Error message:', error.message);
@@ -102,6 +112,7 @@ const requireAuth = async (req, res, next) => {
             details: error.message,
             code: error.code
         });
+
     }
 };
 

@@ -23,16 +23,18 @@ export default function SuperAdminDashboard() {
 
     useEffect(() => {
         const handle = (data: any) => {
-            const id = data.device_id || data.node_id;
+            const id = data.device_id || data.deviceId || data.node_id;
             if (!id) return;
-            const status = computeDeviceStatus(data.timestamp || data.created_at || data.last_seen);
+            const ts = data.timestamp || data.created_at || data.last_seen || data.lastUpdatedAt || data.last_updated_at;
+            const status = computeDeviceStatus(ts);
             setRealtimeStatuses(prev => ({ ...prev, [id]: status }));
         };
         socket.on('telemetry_update', handle);
         return () => { socket.off('telemetry_update', handle); };
     }, []);
 
-    const { totalDevices, onlineDevices, offlineDevices, tankNodes, flowNodes, deepNodes, tdsNodes } = useMemo(() => {
+    const { totalDevices, onlineDevices, offlineDevices, tankNodes, flowNodes, deepNodes, tdsNodes, opsNodes } = useMemo(() => {
+
         const total = nodes.length;
         const online = nodes.filter(n => (realtimeStatuses[n.id] || n.status) === 'Online').length;
         return {
@@ -41,7 +43,9 @@ export default function SuperAdminDashboard() {
             flowNodes: nodes.filter(n => ['evaraflow', 'EvaraFlow', 'flow', 'flow_meter'].includes(n.asset_type)).length,
             deepNodes: nodes.filter(n => ['evaradeep', 'EvaraDeep', 'bore', 'govt'].includes(n.asset_type)).length,
             tdsNodes: nodes.filter(n => ['evaratds', 'EvaraTDS', 'tds', 'tds_meter'].includes(n.asset_type)).length,
+            opsNodes: nodes.filter(n => ['evaraops', 'EvaraOps', 'ops', 'motor'].includes(n.asset_type)).length,
         };
+
     }, [nodes, realtimeStatuses]);
 
     const { data: customers = [], isLoading: customersLoading } = useQuery({ 
@@ -130,9 +134,10 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div className="max-h-[40vh]">
                     <ErrorBoundary>
-                        <ProductPieChart tank={tankNodes} flow={flowNodes} deep={deepNodes} tds={tdsNodes} className="h-full" />
+                        <ProductPieChart tank={tankNodes} flow={flowNodes} deep={deepNodes} tds={tdsNodes} ops={opsNodes} className="h-full" />
                     </ErrorBoundary>
                 </div>
+
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-4 lg:px-6 mb-4 relative z-10">

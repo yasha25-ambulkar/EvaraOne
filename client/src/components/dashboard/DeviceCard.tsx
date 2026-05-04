@@ -9,18 +9,17 @@ const productLabel = (device: any): string => {
   if (/flow/i.test(t)) return 'EvaraFlow';
   if (/tank|sump/i.test(t)) return 'EvaraTank';
   if (/tds/i.test(t)) return 'EvaraTDS';
+  if (/ops|motor/i.test(t)) return 'EvaraOps';
+
   return 'Device';
 };
 
+import { computeDeviceStatus } from '../../services/DeviceService';
+
 const isNodeOnline = (device: any): boolean => {
-  if (device?.status === 'Online') return true;
-  if (device?.lastPing) {
-    return new Date().getTime() - new Date(device.lastPing).getTime() < 5 * 60 * 1000;
-  }
-  if (device?.last_seen) {
-    return new Date().getTime() - new Date(device.last_seen).getTime() < 5 * 60 * 1000;
-  }
-  return false;
+  const ts = device?.last_telemetry?.timestamp || device?.lastPing || device?.last_seen || device?.last_online_at;
+  if (!ts) return device?.status === 'Online';
+  return computeDeviceStatus(ts) === 'Online';
 };
 
 // ── Loading Skeleton ──────────────────────────────────────────────────────────

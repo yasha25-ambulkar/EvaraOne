@@ -11,13 +11,14 @@
 'use strict';
 
 const { refreshDeviceState } = require('../services/deviceStateService');
+const { refreshTDSDeviceState } = require('../services/tdsStateService');
 const { db } = require("../config/firebase.js");
 
 // ─────────────────────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 60 * 1000; // 60 seconds
+const POLL_INTERVAL_MS = 20 * 1000; // 20 seconds for high-fidelity updates
 
 // ─────────────────────────────────────────────────────────────
 // Internal state
@@ -32,12 +33,13 @@ let _isRunning    = false;
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Default getter to load all EvaraTank devices from Firestore.
+ * Loader to fetch ALL active devices from Firestore (all device types).
+ * Excludes decommissioned and archived devices.
  */
 async function getTankDevices() {
   try {
     const snapshot = await db.collection("devices")
-      .where("asset_type", "==", "EvaraTank")
+      .where("status", "not-in", ["DECOMMISSIONED", "ARCHIVED"])
       .get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
@@ -139,17 +141,46 @@ async function _tick(getDevices) {
 
 async function _pollDevice(device) {
   const id = device.id || device.hardware_id || '?';
+  const type = (device.device_type || 'tank').toLowerCase();
+  
   try {
-    const state = await refreshDeviceState(device);
-    console.log(
-      `[telemetryWorker] ${id} → ` +
-      `${state.percentage?.toFixed(1)}% | ` +
-      `${state.volumeLitres}L | ` +
-      `${state.waterState}`
-    );
+    if (type === 'evaratds' || type === 'tds') {
+      const state = await refreshTDSDeviceState(device);
+      console.log(
+        `[telemetryWorker] TDS ${id} → ` +
+        `${state.tdsValue} ppm | ` +
+        `${state.temperature}°C | ` +
+        `${state.quality}`
+      );
+      
+      // EMIT real-time update for Socket.io
+      telemetryEvents.emit('device:update', {
+        deviceId: id,
+        device_id: id,
+        node_id: id,
+        ...state
+      });
+    } else {
+      // Default to tank
+      const state = await refreshDeviceState(device);
+      console.log(
+        `[telemetryWorker] Tank ${id} → ` +
+        `${state.percentage?.toFixed(1)}% | ` +
+        `${state.volumeLitres}L | ` +
+        `${state.waterState}`
+      );
+
+      // EMIT real-time update for Socket.io
+      telemetryEvents.emit('device:update', {
+        deviceId: id,
+        device_id: id,
+        node_id: id,
+        ...state
+      });
+    }
   } catch (err) {
-    console.error(`[telemetryWorker] ${id} failed:`, err.message);
-    throw err;
+    console.error(`[telemetryWorker] ${id} (${type}) failed:`, err.message);
+    // Don't rethrow, keep polling other devices
   }
 }
 

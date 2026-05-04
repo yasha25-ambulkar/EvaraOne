@@ -48,11 +48,11 @@ api.interceptors.request.use(
         return config;
       }
 
-      // Get fresh ID token
-      const token = await user.getIdToken(true); // Force refresh
+      // Get ID token (Firebase handles caching and refresh automatically)
+      const token = await user.getIdToken(); 
       config.headers.Authorization = `Bearer ${token}`;
       
-      console.log(`[API Interceptor] ✅ Token injected for ${config.method?.toUpperCase()} ${config.url}`);
+      // console.log(`[API Interceptor] ✅ Token injected for ${config.method?.toUpperCase()} ${config.url}`);
     } catch (error) {
       console.error("[API Interceptor] Failed to get token:", error);
       // Don't throw - let request proceed (will fail with 401, which is correct)

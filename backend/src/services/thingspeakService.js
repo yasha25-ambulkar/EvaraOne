@@ -68,33 +68,57 @@ async function fetchCleanReadings(device) {
 }
 
 /**
- * Fetches only the single latest reading from ThingSpeak.
+ * Fetches only the single latest reading from ThingSpeak and parses it for distance.
  * Used by the polling worker for live updates.
  *
  * @param {object} device
  * @returns {Promise<{distanceCm: number, timestampMs: number} | null>}
  */
 async function fetchLatestReading(device) {
-  const { channelId, apiKey, fieldKey } = resolveThingSpeakConfig(device);
+  const { fieldKey } = resolveThingSpeakConfig(device);
+  const feed = await fetchLatestData(device);
+  
+  if (!feed) return null;
+
+  const distanceCm = parseFloat(feed[fieldKey]);
+  if (isNaN(distanceCm) || distanceCm <= 0) return null;
+
+  return {
+    distanceCm,
+    timestampMs: new Date(feed.created_at).getTime(),
+  };
+}
+
+/**
+ * Fetches the raw latest feed object from ThingSpeak.
+ * Supports both (device) object or (channelId, apiKey) parameters for flexible use.
+ * 
+ * @param {object|string} arg1 - Device object OR Channel ID
+ * @param {string} [arg2] - Read API Key (if arg1 is Channel ID)
+ * @returns {Promise<object | null>} Raw feed object
+ */
+async function fetchLatestData(arg1, arg2) {
+  let channelId, apiKey;
+
+  if (arg1 && typeof arg1 === 'object') {
+    const config = resolveThingSpeakConfig(arg1);
+    channelId = config.channelId;
+    apiKey = config.apiKey;
+  } else {
+    channelId = arg1;
+    apiKey = arg2;
+  }
 
   if (!channelId || !apiKey) return null;
 
-  const url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds/last.json` +
-              `?api_key=${apiKey}`;
+  const url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds/last.json?api_key=${apiKey}`;
 
   try {
-    const res  = await fetch(url);
+    const res = await fetch(url);
     if (!res.ok) return null;
-    const feed = await res.json();
-
-    const distanceCm = parseFloat(feed[fieldKey]);
-    if (isNaN(distanceCm) || distanceCm <= 0) return null;
-
-    return {
-      distanceCm,
-      timestampMs: new Date(feed.created_at).getTime(),
-    };
-  } catch {
+    const json = await res.json();
+    return json && Object.keys(json).length > 0 ? json : null;
+  } catch (err) {
     return null;
   }
 }
@@ -109,6 +133,8 @@ async function fetchLatestReading(device) {
  * Supports multiple storage patterns used across the project.
  */
 function resolveThingSpeakConfig(device) {
+  if (!device) return { channelId: null, apiKey: null, fieldKey: 'field2' };
+
   const cfg = device.configuration ?? device.customer_config ?? device ?? {};
 
   // Channel ID
@@ -121,10 +147,12 @@ function resolveThingSpeakConfig(device) {
 
   // Read API Key
   const apiKey =
-    cfg.thingspeak_api_key ??
-    cfg.read_api_key        ??
-    device.thingspeak_api_key ??
-    device.read_api_key     ??
+    cfg.thingspeak_read_api_key ??
+    cfg.thingspeak_api_key      ??
+    cfg.read_api_key            ??
+    device.thingspeak_read_api_key ??
+    device.thingspeak_api_key      ??
+    device.read_api_key          ??
     null;
 
   // Field key — which ThingSpeak field has distance data
@@ -140,5 +168,6 @@ function resolveThingSpeakConfig(device) {
 module.exports = {
   fetchCleanReadings,
   fetchLatestReading,
+  fetchLatestData,
   resolveThingSpeakConfig,
 };

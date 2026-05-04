@@ -794,29 +794,37 @@ exports.getNodes = async (req, res) => {
                 const ids = typedGroups[type];
                 const refs = ids.map(id => db.collection(type.toLowerCase()).doc(id));
                 const metas = await db.getAll(...refs);
-                return metas.map(m => m.exists ? { id: m.id, meta: m.data(), type } : null).filter(Boolean);
+                // Don't filter out if metadata is missing — return what we have in registry
+                return metas.map(m => ({ 
+                    id: m.id, 
+                    meta: m.exists ? m.data() : {}, 
+                    type 
+                }));
             })
         );
 
         for (const batch of typeBatches) {
             for (const item of batch) {
-                const { id, meta } = item;
-                if (req.user.role !== "superadmin" && meta.customer_id !== req.user.uid) continue;
-
-                const { thingspeak_read_api_key, ...safeMeta } = meta;
+                const { id, meta, type } = item;
                 const registryData = registryDataMap[id];
 
+                // Auth check for non-superadmins
+                if (req.user.role !== "superadmin") {
+                    const ownerId = meta.customer_id || registryData.customer_id;
+                    if (ownerId !== (req.user.customer_id || req.user.uid)) continue;
+                }
+
+                const { thingspeak_read_api_key, ...safeMeta } = meta;
+
                 // ✅ FIX: Map device_type to analytics_template if missing
-                let analyticsTemplate = registryData.analytics_template;
+                let analyticsTemplate = registryData.analytics_template || meta.analytics_template;
                 if (!analyticsTemplate) {
-                    const deviceType = (registryData.device_type || "").toLowerCase();
-                    logger.debug(`[AdminController] Auto-injecting analytics_template for device ${id}: device_type="${deviceType}"`);
-                    if (deviceType === "evaratank") analyticsTemplate = "EvaraTank";
-                    else if (deviceType === "evaradeep") analyticsTemplate = "EvaraDeep";
-                    else if (deviceType === "evaraflow") analyticsTemplate = "EvaraFlow";
-                    else if (deviceType === "evaratds") analyticsTemplate = "EvaraTDS";
+                    const typeLower = type.toLowerCase();
+                    if (typeLower === "evaratank") analyticsTemplate = "EvaraTank";
+                    else if (typeLower === "evaradeep") analyticsTemplate = "EvaraDeep";
+                    else if (typeLower === "evaraflow") analyticsTemplate = "EvaraFlow";
+                    else if (typeLower === "evaratds") analyticsTemplate = "EvaraTDS";
                     else analyticsTemplate = "EvaraTank"; // default
-                    logger.debug(`[AdminController] Injected: analyticsTemplate="${analyticsTemplate}"`);
                 }
 
                 const deviceObject = {

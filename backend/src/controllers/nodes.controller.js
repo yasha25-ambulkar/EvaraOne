@@ -16,6 +16,9 @@
 
 const { getDeviceState }  = require('../services/deviceStateService');
 const { getNodeDetails }  = require('../services/deviceLookupService'); 
+const { db } = require("../config/firebase.js");
+const cache = require("../config/cache.js");
+const logger = require("../utils/logger.js");
 
 // ─────────────────────────────────────────────────────────────
 // Helper: load device + get state
@@ -24,25 +27,157 @@ const { getNodeDetails }  = require('../services/deviceLookupService');
 async function loadState(hardwareId) {
   const device = await getNodeDetails(hardwareId);
   if (!device) throw new Error(`Device not found: ${hardwareId}`);
+  
+  const type = (device.device_type || '').toLowerCase();
+  
+  // Use specialized state services based on device type
+  if (type === 'evaratds' || type === 'tds') {
+    const { getTDSDeviceState } = require('../services/tdsStateService');
+    return { device, state: await getTDSDeviceState(device) };
+  }
+  
+  // Default to Tank state service
   return { device, state: await getDeviceState(device) };
 }
 
+
 // ── GET / ────────────────────────────────────────────────────────────────
 exports.getNodes = async (req, res) => {
-  return res.status(200).json([]);
+    try {
+        const isSuperAdmin = req.user.role === "superadmin";
+        const customerId = req.query.customer_id || req.user.customer_id || req.user.uid;
+        
+        const nodesCacheKey = isSuperAdmin && !req.query.customer_id
+            ? "nodes:all"
+            : `nodes:user:${customerId}`;
+
+        const cachedNodes = await cache.get(nodesCacheKey);
+        if (cachedNodes && req.query.nocache !== 'true') return res.status(200).json(cachedNodes);
+
+
+        let query = db.collection("devices");
+
+        if (!isSuperAdmin) {
+            // Regular users only see their own visible devices
+            query = query
+                .where("customer_id", "==", customerId)
+                .where("isVisibleToCustomer", "==", true);
+        } else if (req.query.customer_id) {
+            // Superadmin filtering by customer
+            query = query.where("customer_id", "==", req.query.customer_id);
+        }
+
+        const snapshot = await query.limit(200).get();
+        
+        // Batched Metadata Fetching
+        const typedGroups = {};
+        const registryDataMap = {};
+
+        for (const doc of snapshot.docs) {
+            const registry = doc.data();
+            const type = registry.device_type;
+            if (!type) continue;
+
+            if (!typedGroups[type]) typedGroups[type] = [];
+            typedGroups[type].push(doc.id);
+            registryDataMap[doc.id] = registry;
+        }
+
+        const typeBatches = await Promise.all(
+            Object.keys(typedGroups).map(async (type) => {
+                const ids = typedGroups[type];
+                const refs = ids.map(id => db.collection(type.toLowerCase()).doc(id));
+                const metas = await db.getAll(...refs);
+                // Don't filter out devices missing metadata — return registry info at minimum
+                return metas.map(m => ({ 
+                    id: m.id, 
+                    meta: m.exists ? m.data() : {}, 
+                    type 
+                }));
+            })
+        );
+
+        const devices = await Promise.all(typeBatches.flat().map(async (item) => {
+            const { id, meta, type } = item;
+            const registryData = registryDataMap[id];
+
+            // Auto-inject analytics_template if missing
+            let analyticsTemplate = registryData.analytics_template || meta.analytics_template;
+            if (!analyticsTemplate) {
+                const typeLower = type.toLowerCase();
+                if (typeLower === "evaratank") analyticsTemplate = "EvaraTank";
+                else if (typeLower === "evaradeep") analyticsTemplate = "EvaraDeep";
+                else if (typeLower === "evaraflow") analyticsTemplate = "EvaraFlow";
+                else if (typeLower === "evaratds") analyticsTemplate = "EvaraTDS";
+                else analyticsTemplate = "EvaraTank"; // Default
+            }
+
+            const deviceBase = {
+                id,
+                ...registryData,
+                ...meta,
+                analytics_template: analyticsTemplate
+            };
+
+            try {
+                // Fetch latest in-memory state from deviceStateService
+                const state = await getDeviceState(deviceBase);
+                return {
+                    ...deviceBase,
+                    last_telemetry: state.telemetrySnapshot,
+                    online_status: state.online // Explicitly include backend-calculated status
+                };
+            } catch (err) {
+                logger.warn(`[NodesController] Failed to get state for ${id}:`, err.message);
+                return deviceBase;
+            }
+        }));
+
+        await cache.set(nodesCacheKey, devices, 1);
+
+        res.status(200).json(devices);
+    } catch (error) {
+        logger.error("[NodesController] getNodes error:", error.message);
+        res.status(500).json({ error: "Failed to fetch nodes" });
+    }
 };
 
 // ── GET /:id ─────────────────────────────────────────────────────────────
 exports.getNodeById = async (req, res) => {
-  return res.status(200).json({ id: req.params.id, name: 'Tank', asset_type: 'EvaraTank' });
+  try {
+    const device = await getNodeDetails(req.params.id);
+    if (!device) {
+      return res.status(404).json({ success: false, error: "Device not found" });
+    }
+    return res.status(200).json(device);
+  } catch (err) {
+    console.error('[getNodeById]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 };
 
 // ── GET /:id/telemetry ────────────────────────────────────────────────────
 exports.getNodeTelemetry = async (req, res) => {
   try {
-    const { state } = await loadState(req.params.id);
-    const snap = state.telemetrySnapshot;
+    const { device, state } = await loadState(req.params.id);
+    const type = (device.device_type || '').toLowerCase();
 
+    if (type === 'evaratds' || type === 'tds') {
+      return res.status(200).json({
+        success: true,
+        deviceId: state.id,
+        online: state.status === 'Online',
+        status: state.status,
+        lastUpdated: state.lastUpdated,
+        tdsValue: state.tdsValue,
+        temperature: state.temperature,
+        quality: state.quality,
+        waterQualityRating: state.waterQualityRating,
+        timestamp: state.timestamp
+      });
+    }
+
+    const snap = state.telemetrySnapshot || {};
     return res.status(200).json({
       success:          true,
       deviceId:         state.deviceId,
@@ -69,7 +204,28 @@ exports.getNodeTelemetry = async (req, res) => {
 // ── GET /:id/analytics ────────────────────────────────────────────────────
 exports.getNodeAnalytics = async (req, res) => {
   try {
-    const { state } = await loadState(req.params.id);
+    const { device, state } = await loadState(req.params.id);
+    const type = (device.device_type || '').toLowerCase();
+
+    if (type === 'evaratds' || type === 'tds') {
+      const { getTDSHistory } = require('../services/tdsStateService');
+      const history = await getTDSHistory({ id: state.id, ...device }, 60);
+
+      return res.status(200).json({
+        success: true,
+        deviceId: state.id,
+        deviceName: device.label || device.device_name,
+        online: state.status === 'Online',
+        status: state.status,
+        lastUpdated: state.lastUpdated,
+        tdsValue: state.tdsValue,
+        temperature: state.temperature,
+        quality: state.quality,
+        waterQualityRating: state.waterQualityRating,
+        tdsHistory: history,
+        alertsCount: 0
+      });
+    }
 
     return res.status(200).json({
       success:       true,

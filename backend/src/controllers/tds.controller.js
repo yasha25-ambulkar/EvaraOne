@@ -17,6 +17,7 @@ const AppError = require("../utils/AppError.js");
 
 // ✅ AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
 const resolveDevice = require("../utils/resolveDevice.js");
+const { resolveDeviceMetadata } = require("../services/deviceMetadataResolver.js");
 
 /**
  * Helper to resolve TDS metadata document
@@ -27,84 +28,23 @@ async function resolveMetadata(deviceDoc) {
   if (!deviceDoc) return null;
   const id = deviceDoc.id;
   const registry = deviceDoc.data();
+  const deviceType = registry.device_type || 'EvaraTDS';
 
-  logger.debug(`[resolveMetadata] Attempting to resolve metadata for device ${id}`);
+  logger.debug(`[resolveMetadata] Using centralized resolver for device ${id}`);
   
-  // 1. Try lookup by device DocID (standard pattern - most common)
-  logger.debug(`[resolveMetadata] Step 1: Trying direct lookup by ID: ${id}`);
-  let metaDoc = await db.collection("evaratds").doc(id).get();
-  if (metaDoc.exists) {
-    logger.debug(`[resolveMetadata] ✅ Found by direct ID`);
-    return metaDoc;
+  const metadata = await resolveDeviceMetadata(id, deviceType, registry);
+  
+  if (metadata && !metadata.isPartial) {
+    // Wrap in object with data() method to maintain backward compatibility with controller code
+    return {
+      exists: true,
+      data: () => metadata
+    };
   }
-  logger.debug(`[resolveMetadata] ❌ Not found by direct ID`);
-
-  // 2. Query by hardware device_id field
-  if (registry.device_id) {
-    logger.debug(`[resolveMetadata] Step 2: Trying query by device_id: "${registry.device_id}"`);
-    const q1 = await db.collection("evaratds").where("device_id", "==", registry.device_id).limit(1).get();
-    if (!q1.empty) {
-      logger.debug(`[resolveMetadata] ✅ Found by device_id`);
-      return q1.docs[0];
-    }
-    logger.debug(`[resolveMetadata] ❌ Not found by device_id`);
-    
-    // Also try case-insensitive match
-    logger.debug(`[resolveMetadata] Step 2b: Trying case-insensitive device_id: "${registry.device_id?.toLowerCase()}"`);
-    const q1Lower = await db.collection("evaratds").where("device_id", "==", registry.device_id?.toLowerCase()).limit(1).get();
-    if (!q1Lower.empty) {
-      logger.debug(`[resolveMetadata] ✅ Found by lowercase device_id`);
-      return q1Lower.docs[0];
-    }
-    logger.debug(`[resolveMetadata] ❌ Not found by lowercase device_id`);
-  } else {
-    logger.debug(`[resolveMetadata] ⚠️  No device_id in registry`);
-  }
-
-  // 3. Query by hardware node_id field
-  if (registry.node_id) {
-    logger.debug(`[resolveMetadata] Step 3: Trying query by node_id: "${registry.node_id}"`);
-    const q2 = await db.collection("evaratds").where("node_id", "==", registry.node_id).limit(1).get();
-    if (!q2.empty) {
-      logger.debug(`[resolveMetadata] ✅ Found by node_id`);
-      return q2.docs[0];
-    }
-    logger.debug(`[resolveMetadata] ❌ Not found by node_id`);
-    
-    // Also try case-insensitive match
-    logger.debug(`[resolveMetadata] Step 3b: Trying case-insensitive node_id: "${registry.node_id?.toLowerCase()}"`);
-    const q2Lower = await db.collection("evaratds").where("node_id", "==", registry.node_id?.toLowerCase()).limit(1).get();
-    if (!q2Lower.empty) {
-      logger.debug(`[resolveMetadata] ✅ Found by lowercase node_id`);
-      return q2Lower.docs[0];
-    }
-    logger.debug(`[resolveMetadata] ❌ Not found by lowercase node_id`);
-  } else {
-    logger.debug(`[resolveMetadata] ⚠️  No node_id in registry`);
-  }
-
-  // 4. Try lookup by the ID parameter itself (if it was hardware ID)
-  logger.debug(`[resolveMetadata] Step 4: Trying reverse lookup - treating ID as device_id`);
-  const q3 = await db.collection("evaratds").where("device_id", "==", id).limit(1).get();
-  if (!q3.empty) {
-    logger.debug(`[resolveMetadata] ✅ Found by ID as device_id`);
-    return q3.docs[0];
-  }
-  logger.debug(`[resolveMetadata] ❌ Not found by ID as device_id`);
-
-  logger.debug(`[resolveMetadata] Step 5: Trying reverse lookup - treating ID as node_id`);
-  const q4 = await db.collection("evaratds").where("node_id", "==", id).limit(1).get();
-  if (!q4.empty) {
-    logger.debug(`[resolveMetadata] ✅ Found by ID as node_id`);
-    return q4.docs[0];
-  }
-  logger.debug(`[resolveMetadata] ❌ Not found by ID as node_id`);
-
-  logger.debug(`[resolveMetadata] ❌ METADATA RESOLUTION COMPLETE: NO METADATA FOUND FOR ${id}`);
-  logger.debug(`[resolveMetadata] Registry had: device_id=${registry.device_id}, node_id=${registry.node_id}`);
   
   return null;
 }
+
 
 /**
  * Get TDS device telemetry
@@ -168,147 +108,28 @@ exports.getTDSTelemetry = async (req, res, next) => {
       throw new AppError("TDS metadata not found", 404);
     }
     logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 3 SUCCESS: Metadata resolved`);
-    logger.debug(`[TDS-getTDSTelemetry]    Metadata ID: ${metaDoc.id}`);
 
     const metadata = metaDoc.data();
-    const channel = metadata.thingspeak_channel_id?.trim();
-    const apiKey = metadata.thingspeak_read_api_key?.trim();
+    const { getTDSDeviceState } = require("../services/tdsStateService");
 
-    if (!channel || !apiKey) {
-      logger.warn(`[TDS-getTDSTelemetry] ⚠️  ThingSpeak credentials missing, returning empty telemetry`);
-      // Return partial response instead of erroring - device exists but no data
-      const response = {
-        id,
-        deviceName: metadata.label || metadata.device_name || "TDS Device",
-        type: "TDS",
-        tdsValue: null,
-        temperature: null,
-        quality: "Unknown",
-        waterQualityRating: "Unknown",
-        status: DEVICE_STATUS.OFFLINE,
-        unit: "ppm",
-        minThreshold: 0,
-        maxThreshold: 2000,
-        latitude: metadata.latitude,
-        longitude: metadata.longitude,
-        lastUpdated: new Date().toISOString(),
-        timestamp: null,
-        alertsCount: 0,
-        tdsHistory: [],
-        error: "ThingSpeak credentials not configured"
-      };
-      return res.status(200).json(response);
-    }
-
-    // Fetch latest data from ThingSpeak
-    const latestData = await fetchLatestData(channel, apiKey);
-    if (!latestData) {
-      logger.warn(`[TDS-getTDSTelemetry] ⚠️  Failed to fetch ThingSpeak data, returning empty telemetry`);
-      // Return partial response instead of erroring
-      const response = {
-        id,
-        deviceName: metadata.label || metadata.device_name || "TDS Device",
-        type: "TDS",
-        tdsValue: null,
-        temperature: null,
-        quality: "Unknown",
-        waterQualityRating: "Unknown",
-        status: DEVICE_STATUS.OFFLINE,
-        unit: "ppm",
-        minThreshold: 0,
-        maxThreshold: 2000,
-        latitude: metadata.latitude,
-        longitude: metadata.longitude,
-        lastUpdated: new Date().toISOString(),
-        timestamp: null,
-        alertsCount: 0,
-        tdsHistory: [],
-        error: "Failed to fetch ThingSpeak data"
-      };
-      return res.status(200).json(response);
-    }
-
-    // sensor_field_mapping format: { "field1": "voltage", "field2": "tds_value", "field3": "temperature" }
-    // Keys = ThingSpeak field names, Values = what they represent
-    // Find which ThingSpeak field holds each sensor value
-    const mapping = metadata.sensor_field_mapping || {};
-    
-    logger.debug("[TDS-getTDSTelemetry] Sensor field mapping:", mapping);
-    
-    const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
-    
-    logger.debug("[TDS-getTDSTelemetry] Resolved TDS field:", tdsField, "Value:", latestData[tdsField]);
-    logger.debug("[TDS-getTDSTelemetry] Resolved Temp field:", tempField, "Value:", latestData[tempField]);
-
-    const tdsValue = parseFloat(latestData[tdsField]) || null;
-    const temperature = parseFloat(latestData[tempField]) || null;
-
-    logger.debug("[TDS-getTDSTelemetry] Final TDS Value:", tdsValue, "Temp:", temperature);
+    // Fetch state (from cache, live, or fallback)
+    const state = await getTDSDeviceState({ id, ...registry, ...metadata });
 
     const config = metadata.configuration || {};
 
-    // Determine water quality based on TDS - map to frontend expected values
-    let quality = "Good";
-    if (tdsValue !== null) {
-      if (tdsValue < 300) quality = "Good";           // EXCELLENT
-      else if (tdsValue < 600) quality = "Good";      // GOOD
-      else if (tdsValue < 1000) quality = "Acceptable"; // FAIR
-      else if (tdsValue < 1500) quality = "Acceptable"; // POOR
-      else quality = "Critical";                       // VERY_POOR
-    }
-
-    // Determine status based on last update - using centralized threshold
-    const lastUpdated = new Date(latestData.created_at || Date.now());
-    const now = new Date();
-    const timeSinceUpdate = now - lastUpdated;
-    let status = DEVICE_STATUS.ONLINE;
-    if (timeSinceUpdate > STATUS_THRESHOLD_MS) status = DEVICE_STATUS.OFFLINE;
-    else if (timeSinceUpdate > STATUS_THRESHOLD_MS / 2) status = DEVICE_STATUS.OFFLINE_RECENT;
-
-    // Format response with camelCase to match frontend expectations
+    // Format response to match frontend expectations
     const response = {
-      id,
+      ...state,
       deviceName: metadata.label || metadata.device_name || "TDS Device",
       type: "TDS",
-      tdsValue: tdsValue,
-      temperature,
-      quality,
-      waterQualityRating: quality,  // Alias for frontend compatibility
-      status,
-      unit: "ppm",
       minThreshold: config.min_threshold || 0,
       maxThreshold: config.max_threshold || 2000,
       latitude: metadata.latitude,
       longitude: metadata.longitude,
-      lastUpdated: lastUpdated.toISOString(),
-      timestamp: latestData.created_at,
-      created_at: latestData.created_at,  // Add created_at for frontend consistency
-      alertsCount: 0,  // Placeholder - can be enhanced later
-      tdsHistory: [],  // Placeholder - will be fetched separately via /history endpoint
+      created_at: state.timestamp,
+      alertsCount: 0,
+      tdsHistory: [], // Fetched separately
     };
-
-    // ✅ UPDATE device registry with latest telemetry and status
-    // This ensures AllNodes dashboard shows fresh data and correct status
-    await db.collection('devices').doc(id).update({
-      last_seen: new Date().toISOString(),
-      last_online_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      last_telemetry: {
-        tdsValue: tdsValue,
-        temperature: temperature,
-        waterQualityRating: quality,
-        timestamp: latestData.created_at,
-        created_at: latestData.created_at,
-        status: status
-      }
-    }).catch(err => {
-      logger.warn("[TDS] Warning: Could not update device record:", err.message);
-      // Non-critical, don't fail the request
-    });
-
-    // Cache for 1 minute
-    await cache.set(`tds:telemetry:${id}`, response, 60);
 
     res.status(200).json(response);
   } catch (error) {
@@ -389,45 +210,18 @@ exports.getTDSHistory = async (req, res, next) => {
       throw new AppError("ThingSpeak credentials missing", 400);
     }
 
-    // Fetch historical data from ThingSpeak
-    const url = `https://api.thingspeak.com/channels/${channel}/feeds.json?api_key=${apiKey}&results=${Math.min(limit, 288)}&timezone=UTC`;
-    const response = await axios.get(url, { timeout: 10000 });
+    // Fetch historical data using the service (handles fallback)
+    const { getTDSHistory } = require("../services/tdsStateService");
+    const data = await getTDSHistory({ id, ...registry, ...metadata }, limit);
 
-    if (!response.data.feeds) {
-      return res.status(200).json({ data: [], count: 0 });
-    }
-
-    // sensor_field_mapping: { "field1": "tds_value", "field2": "temperature" }
-    const mapping = metadata.sensor_field_mapping || {};
+    logger.debug("[TDS-getTDSHistory] Returning", data.length, 'history points');
     
-    // Use same field resolution logic as telemetry endpoint for consistency
-    const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
-
-    logger.debug("[TDS-getTDSHistory] Field mapping:", mapping);
-    logger.debug("[TDS-getTDSHistory] Resolved TDS field:", tdsField);
-    logger.debug("[TDS-getTDSHistory] Resolved Temp field:", tempField);
-
-    const data = response.data.feeds.map((feed) => {
-      const tdsValue = parseFloat(feed[tdsField]) || null;
-      const temperature = parseFloat(feed[tempField]) || null;
-
-      // Map to frontend expected quality values
-      let quality = "Good";
-      if (tdsValue !== null) {
-        if (tdsValue < 300) quality = "Good";           // EXCELLENT
-        else if (tdsValue < 600) quality = "Good";      // GOOD
-        else if (tdsValue < 1000) quality = "Acceptable"; // FAIR
-        else if (tdsValue < 1500) quality = "Acceptable"; // POOR
-        else quality = "Critical";                       // VERY_POOR
-      }
-
-      return {
-        timestamp: feed.created_at,
-        value: tdsValue,
-        temperature,
-        quality,
-      };
+    res.status(200).json({
+      id,
+      label: metadata.label,
+      history: data,
+      count: data.length,
+      period_hours: parseInt(hoursParam),
     });
 
     logger.debug("[TDS-getTDSHistory] Returning", data.length, 'history points');
@@ -629,11 +423,11 @@ exports.getTDSAnalytics = async (req, res) => {
       return res.status(400).json({ error: "ThingSpeak credentials missing" });
     }
 
-    // Fetch data from ThingSpeak
-    const url = `https://api.thingspeak.com/channels/${channel}/feeds.json?api_key=${apiKey}&results=288&timezone=UTC`;
-    const response = await axios.get(url, { timeout: 10000 });
+    // Fetch data using the service (handles fallback)
+    const { getTDSHistory } = require("../services/tdsStateService");
+    const history = await getTDSHistory({ id, ...registry, ...metadata }, 288);
 
-    if (!response.data.feeds) {
+    if (!history || history.length === 0) {
       return res.status(200).json({
         avg_tds: null,
         min_tds: null,
@@ -643,18 +437,12 @@ exports.getTDSAnalytics = async (req, res) => {
       });
     }
 
-    // sensor_field_mapping: { "field1": "tds_value", "field2": "temperature" }
-    const mapping = metadata.sensor_field_mapping || {};
-    const tdsField = Object.keys(mapping).find(k => mapping[k] === "tds_value") || "field1";
-    const tempField = Object.keys(mapping).find(k => mapping[k] === "temperature") || "field2";
-
-
-    const tdsValues = response.data.feeds
-      .map((feed) => parseFloat(feed[tdsField]))
-      .filter((v) => !isNaN(v));
-    const tempValues = response.data.feeds
-      .map((feed) => parseFloat(feed[tempField]))
-      .filter((v) => !isNaN(v));
+    const tdsValues = history
+      .map((h) => h.value)
+      .filter((v) => v !== null && !isNaN(v));
+    const tempValues = history
+      .map((h) => h.temperature)
+      .filter((v) => v !== null && !isNaN(v));
 
     const analytics = {
       avg_tds:
@@ -669,6 +457,8 @@ exports.getTDSAnalytics = async (req, res) => {
           : null,
       readings_count: tdsValues.length,
     };
+
+    res.status(200).json(analytics);
 
     res.status(200).json(analytics);
   } catch (error) {

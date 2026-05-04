@@ -18,7 +18,7 @@ export interface MapDevice extends Device {
 
 /**
  * Determine device online/offline status from telemetry timestamp freshness.
- * Standardized to 2 hours threshold as per latest user request.
+ * Standardized to 30 minutes threshold as per latest user request.
  */
 export function computeDeviceStatus(lastTimestamp: any): "Online" | "Offline" {
   if (!lastTimestamp) return "Offline";
@@ -57,9 +57,9 @@ export function computeDeviceStatus(lastTimestamp: any): "Online" | "Offline" {
 
     const ageMs = Date.now() - date.getTime();
     
-    // 20 minutes threshold (1,200,000 ms)
+    // 30 minutes threshold (1,800,000 ms)
     // Matches backend calculation in deviceStateService.js
-    if (ageMs < 1200000) {
+    if (ageMs < 1800000) {
         return "Online";
     }
 

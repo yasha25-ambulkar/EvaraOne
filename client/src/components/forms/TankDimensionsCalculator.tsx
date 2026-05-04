@@ -41,7 +41,7 @@ export interface TankDimensionsCalculatorProps {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SHAPES: TankShape[] = ['rectangular', 'cylindrical', 'square'];
+const SHAPES: TankShape[] = ['rectangular', 'cylindrical', 'square', 'sump'];
 
 const UNITS: { value: TankUnit; label: string }[] = [
   { value: 'm',  label: 'metres (m)' },

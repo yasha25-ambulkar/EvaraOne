@@ -71,52 +71,37 @@ async function recalculateAllDevicesStatus() {
         // 1. last_updated_at (set when telemetry arrives)
         // 2. last_online_at (set when device comes online)
         // 3. last_seen (legacy field)
-        const lastUpdatedAt = 
+        const lastUpdatedAt =
           meta.last_updated_at ||          // Primary: actual telemetry timestamp
-          meta.last_online_at ||          // Secondary: device online timestamp  
+          meta.last_online_at ||          // Secondary: device online timestamp
           meta.last_seen ||                // Tertiary: legacy last seen
           meta.lastUpdatedAt;              // Fallback: alternative naming
-        
+
         const currentStatus = meta.status || "OFFLINE";
 
         if (!lastUpdatedAt) {
           // No timestamp at all - mark as OFFLINE
           if (currentStatus !== 'OFFLINE') {
             updates.push(
-              db.collection(type.toLowerCase()).doc(deviceId).update({
-                status: 'OFFLINE'
-              })
+              updateDeviceStatusAtomic(deviceId, type, 'OFFLINE', registry)
             );
             statusChanges++;
           }
           continue;
         }
-        
+
         // Use centralized status calculation
         const desiredStatus = deviceState.calculateDeviceStatus(lastUpdatedAt);
-        
+
         // Only update if status changed (reduce DB writes)
         if (currentStatus !== desiredStatus) {
           updates.push(
-            db.collection(type.toLowerCase()).doc(deviceId).update({
-              status: desiredStatus,
-              statusLastChecked: now.toISOString()
-            })
+            updateDeviceStatusAtomic(deviceId, type, desiredStatus, registry)
           );
-          
-          // ✅ FIX #21: Also update registry status so it stays in sync
-          if (registry) {
-            updates.push(
-              db.collection('devices').doc(deviceId).update({
-                status: desiredStatus,
-                statusLastChecked: now.toISOString()
-              })
-            );
-          }
-          
+
           statusChanges++;
           logger.info(`Device status changed: ${deviceId}`, { category: 'cron', deviceId, from: currentStatus, to: desiredStatus });
-          
+
           // ✅ FIX #22: BROADCAST STATUS CHANGE VIA SOCKET.IO
           // Notify all users of this customer that a device status changed
           const customerId = registry?.customer_id || registry?.customerId || meta.customer_id || meta.customerId;
@@ -129,9 +114,9 @@ async function recalculateAllDevicesStatus() {
               timestamp: now.toISOString()
             };
             global.io.to(`customer:${customerId}`).emit('device:status-changed', statusEvent);
-            logger.info(`Socket event emitted: device:status-changed for ${deviceId}`, { 
-              category: 'cron', 
-              deviceId, 
+            logger.info(`Socket event emitted: device:status-changed for ${deviceId}`, {
+              category: 'cron',
+              deviceId,
               customerId,
               oldStatus: currentStatus,
               newStatus: desiredStatus
@@ -174,6 +159,52 @@ function startStatusCron() {
       logger.error('[DeviceStatusCron] Status sweep cycle failed', { error: err.message, category: 'cron' });
     }
   }, STATUS_CHECK_INTERVAL);
+}
+
+/**
+ * Update device status atomically across both typed collection and registry.
+ * Uses Firestore transaction to ensure consistency.
+ */
+async function updateDeviceStatusAtomic(deviceId, deviceType, newStatus, registryDoc) {
+  try {
+    const now = new Date();
+    const statusUpdate = {
+      status: newStatus,
+      statusLastChecked: now.toISOString()
+    };
+
+    // Use Firestore transaction for atomicity
+    await db.runTransaction(async (transaction) => {
+      // 1. Read both documents to verify they exist
+      const typedRef = db.collection(deviceType.toLowerCase()).doc(deviceId);
+      const registryRef = db.collection('devices').doc(deviceId);
+
+      const typedDoc = await transaction.get(typedRef);
+      const registryDoc_Read = await transaction.get(registryRef);
+
+      if (!typedDoc.exists || !registryDoc_Read.exists) {
+        throw new Error(`Device ${deviceId} not found in one or both collections`);
+      }
+
+      // 2. Update both atomically
+      transaction.update(typedRef, statusUpdate);
+      transaction.update(registryRef, statusUpdate);
+    });
+
+    logger.info(`[deviceStatusCron] Atomic status update succeeded for ${deviceId} → ${newStatus}`, {
+      category: 'cron',
+      deviceId,
+      deviceType,
+      newStatus
+    });
+  } catch (err) {
+    logger.error(`[deviceStatusCron] Atomic status update failed for ${deviceId}:`, {
+      category: 'cron',
+      deviceId,
+      error: err.message
+    });
+    throw err;
+  }
 }
 
 // Support standalone execution (e.g., Railway background worker)

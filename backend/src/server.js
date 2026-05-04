@@ -27,6 +27,8 @@ const { httpLogger, requestIdMiddleware, logger } = require("./config/pino.js");
 const { initializeCacheVersions } = require("./utils/cacheVersioning.js");
 // ✅ HYBRID CACHING: Telemetry archive service
 const TelemetryArchiveService = require("./services/telemetryArchiveService.js");
+// ✅ PHASE 2: Snapshot persistence (Task #2.1)
+const { initializeSnapshots, archiveOldSnapshots } = require("./services/deviceStateService.js");
 
 // Validate environment before starting
 validateEnv();
@@ -596,15 +598,8 @@ app.use("/api/v1/admin", globalSaaSAuth, adminOnly, adminRoutes);
 const nodesRoutes = require("./routes/nodes.routes.js");
 const evaratdsRoutes = require("./routes/evaratds.routes.js");
 
-// Health Check Endpoint
-app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    env: process.env.NODE_ENV
-  });
-});
+// Health Check is handled below in Task #1 section
+
 
 app.use("/api/v1/nodes", nodesRoutes);  // DEBUG: auth bypassed temporarily
 app.use("/api/v1/evaratds", globalSaaSAuth, evaratdsRoutes);
@@ -676,7 +671,7 @@ try {
     server.on("error", (err) => {
         logger.error("[Server] Fatal error event:", err);
         if (err.code === "EADDRINUSE") {
-            logger.error(`[Server] Port ${PORT} is already in use.`);
+            logger.error(`[Server] Port ${PORT} is already in use. Please check if another process is running or change the PORT in .env.`);
         }
         process.exit(1);
     });
@@ -715,7 +710,26 @@ try {
         } catch (err) {
             logger.error({ error: err.message }, '[Server] Telemetry cleanup scheduling failed');
         }
-        
+
+        // Initialize midnight snapshots from Redis/Firestore
+        try {
+            await initializeSnapshots();
+            logger.info('[Server] Midnight snapshots initialized from persistence layer');
+        } catch (err) {
+            logger.error({ error: err.message }, '[Server] Snapshot initialization failed');
+        }
+
+        // Schedule daily snapshot archival at 00:05
+        try {
+            schedule.scheduleJob('5 0 * * *', async () => {
+                logger.info('[Server] Running daily snapshot archival');
+                await archiveOldSnapshots();
+            });
+            logger.info('[Server] Daily snapshot archival scheduled at 00:05');
+        } catch (err) {
+            logger.error({ error: err.message }, '[Server] Snapshot archival scheduling failed');
+        }
+
         // Initialize our background worker
         startWorker();
     });
@@ -789,4 +803,3 @@ process.on("uncaughtException", (err) => {
         process.exit(1);
     }, 2000);
 });
-

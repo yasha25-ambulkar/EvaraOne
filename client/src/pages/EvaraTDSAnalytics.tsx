@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import clsx from 'clsx';
+import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 
 // Constants for Water Quality
 const QUALITY_CONFIG = {
@@ -61,8 +62,25 @@ const EvaraTDSAnalytics = () => {
             return response.data;
         },
         enabled: !!id,
-        refetchInterval: 30000
+        refetchInterval: 60000 // Slower fetch now that we have real-time
     });
+
+    const { telemetry } = useRealtimeTelemetry(id);
+
+    // Merge real-time telemetry with query data
+    const mergedDevice = useMemo(() => {
+        if (!device) return null;
+        if (!telemetry) return device;
+        
+        return {
+            ...device,
+            tdsValue: telemetry.tdsValue ?? device.tdsValue,
+            temperature: telemetry.temperature ?? device.temperature,
+            waterQualityRating: telemetry.quality ?? device.waterQualityRating,
+            status: 'Online', // If we get a real-time update, it's definitely online
+            lastTimestamp: telemetry.timestamp || device.lastTimestamp
+        };
+    }, [device, telemetry]);
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -85,9 +103,9 @@ const EvaraTDSAnalytics = () => {
     };
 
     // Derived Data
-    const quality = (device?.waterQualityRating || 'Good') as keyof typeof QUALITY_CONFIG;
+    const quality = (mergedDevice?.waterQualityRating || 'Good') as keyof typeof QUALITY_CONFIG;
     const qualityConfig = QUALITY_CONFIG[quality] || QUALITY_CONFIG.Good;
-    const deviceName = device?.name || device?.deviceName || device?.device_name || device?.label || device?.id || 'TDS Meter';
+    const deviceName = mergedDevice?.name || mergedDevice?.deviceName || mergedDevice?.device_name || mergedDevice?.label || mergedDevice?.id || 'TDS Meter';
 
     const { chartData: tdsHistory, chartTicks } = useMemo(() => {
         if (!device?.tdsHistory || device.tdsHistory.length === 0) return { chartData: [], chartTicks: [] };
@@ -184,15 +202,15 @@ const EvaraTDSAnalytics = () => {
                         <div className="flex items-center gap-2 flex-wrap pb-1">
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
-                                status === 'Online' 
+                                (mergedDevice.status || 'Offline') === 'Online' 
                                     ? "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border-[#10b981]/50 dark:border-emerald-500/40"
                                     : "bg-[#fff1f2] dark:bg-red-500/10 text-[#e11d48] dark:text-red-400 border-[#fb7185]/50 dark:border-red-500/40"
                             )}>
                                 <div className={clsx(
                                     "w-1.5 h-1.5 rounded-full animate-pulse",
-                                    status === 'Online' ? "bg-[#10b981]" : "bg-[#e11d48]"
+                                    (mergedDevice.status || 'Offline') === 'Online' ? "bg-[#10b981]" : "bg-[#e11d48]"
                                 )} />
-                                {status || 'Offline'}
+                                {mergedDevice.status || 'Offline'}
                             </div>
                             <button onClick={handleRefresh} disabled={isRefreshing} className={clsx("flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95", isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10")}>
                                 <RefreshCw size={12} className={clsx('stroke-[2.5px]', isRefreshing && 'animate-spin')} />
@@ -227,7 +245,7 @@ const EvaraTDSAnalytics = () => {
                                 </div>
                             </div>
                             <div className="flex-1 flex items-center justify-center py-2">
-                                <TDSMeterVisual tdsValue={device.tdsValue || 0} quality={quality as any} />
+                                <TDSMeterVisual tdsValue={mergedDevice.tdsValue || 0} quality={quality as any} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/10">
@@ -236,7 +254,7 @@ const EvaraTDSAnalytics = () => {
                                 </div>
                                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/10">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-orange-500/80 mb-1">Temperature</p>
-                                    <p className="text-lg font-black text-orange-500">{device.temperature || 0}°C</p>
+                                    <p className="text-lg font-black text-orange-500">{mergedDevice.temperature || 0}°C</p>
                                 </div>
                             </div>
                         </div>
@@ -244,10 +262,10 @@ const EvaraTDSAnalytics = () => {
                         {/* Right: Stats Grid + Chart */}
                         <div className="flex flex-col gap-4">
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                                <MiniStatCard title="TDS Monitor" value={device.tdsValue || 0} unit="ppm" icon={Droplets} accentColor="#3b82f6" iconBg="rgba(59,130,246,0.1)" />
-                                <MiniStatCard title="Temperature" value={device.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
+                                <MiniStatCard title="TDS Monitor" value={mergedDevice.tdsValue || 0} unit="ppm" icon={Droplets} accentColor="#3b82f6" iconBg="rgba(59,130,246,0.1)" />
+                                <MiniStatCard title="Temperature" value={mergedDevice.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
                                 <MiniStatCard title="Purity Index" value={quality.toUpperCase()} icon={qualityConfig.icon} accentColor={qualityConfig.color} iconBg={`${qualityConfig.color}1a`} />
-                                <MiniStatCard title="Notifications" value={device.alertsCount || 0} icon={Bell} accentColor="#ef4444" iconBg="rgba(239,68,68,0.1)" />
+                                <MiniStatCard title="Notifications" value={mergedDevice.alertsCount || 0} icon={Bell} accentColor="#ef4444" iconBg="rgba(239,68,68,0.1)" />
                             </div>
 
                             {/* Chart Card */}
@@ -297,8 +315,8 @@ const EvaraTDSAnalytics = () => {
             </main>
 
             <DeleteConfirmModal show={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} onConfirm={handleDelete} isDeleting={isDeleting} deviceName={deviceName} />
-            <NodeInfoModal show={showNodeInfo} onClose={() => setShowNodeInfo(false)} device={device} deviceName={deviceName} id={id} />
-            <ParamsModal show={showParams} onClose={() => setShowParams(false)} device={device} quality={quality} />
+            <NodeInfoModal show={showNodeInfo} onClose={() => setShowNodeInfo(false)} device={mergedDevice} deviceName={deviceName} id={id} />
+            <ParamsModal show={showParams} onClose={() => setShowParams(false)} device={mergedDevice} quality={quality} />
         </div>
     );
 };

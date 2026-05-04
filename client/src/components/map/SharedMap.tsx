@@ -317,9 +317,9 @@ const DeviceHoverPanel = ({
   );
 
   // Real-time status detection based on active WebSocket snap or fallback to device API status
-  const computedStatus = snap
-    ? computeDeviceStatus(snap.timestamp)
-    : device.status;
+  const baseForStatus = snap || device.last_telemetry || {};
+  const statusTs = baseForStatus.timestamp || baseForStatus.lastUpdatedAt || baseForStatus.last_updated_at || baseForStatus.created_at || baseForStatus.last_seen || device.last_seen || device.last_online_at || null;
+  const computedStatus = statusTs ? computeDeviceStatus(statusTs) : (device.status || "Offline");
   const isOnline = computedStatus === "Online";
 
   const deviceHardwareId = (device as any).hardwareId || device.id;
@@ -532,7 +532,7 @@ const SharedMap = ({
   // Listen to BOTH room-based and global broadcast events
   useEffect(() => {
     const handleUpdate = (data: any) => {
-      const id = data.device_id || data.node_id;
+      const id = data.device_id || data.deviceId || data.node_id;
       if (!id) return;
       setRealtimeStatuses(prev => ({ ...prev, [id]: data }));
     };
@@ -575,11 +575,8 @@ const SharedMap = ({
       const snap = realtimeStatuses[d.id];
       const base = snap || d.last_telemetry || {};
       const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || d.last_seen || d.last_online_at || null;
-      // OPTIMIZATION: Trust the passed status if it's already normalized, 
-      // otherwise fallback to computing it from the latest timestamp.
-      const s = (d.status === 'Online' || d.status === 'Offline')
-        ? d.status
-        : computeDeviceStatus(latestTs);
+      // Authoritative status from latest timestamp
+      const s = latestTs ? computeDeviceStatus(latestTs) : (d.status || 'Offline');
 
       const key = `${t}_${s}`;
       if (!m.has(key)) m.set(key, getDeviceIcon(t, s));
@@ -644,10 +641,8 @@ const SharedMap = ({
             const snap = realtimeStatuses[device.id];
             const base = snap || device.last_telemetry || {};
             const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || device.last_seen || device.last_online_at || null;
-            // OPTIMIZATION: Trust the passed status if it's already normalized
-            const s = (device.status === 'Online' || device.status === 'Offline')
-              ? device.status
-              : computeDeviceStatus(latestTs);
+            // Authoritative status from latest timestamp
+            const s = latestTs ? computeDeviceStatus(latestTs) : (device.status || 'Offline');
 
             const key = `${t}_${s}`;
             const icon =

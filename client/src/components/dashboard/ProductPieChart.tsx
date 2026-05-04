@@ -6,22 +6,28 @@ interface ProductPieChartProps {
     flow: number;
     deep: number;
     tds: number;
+    ops: number;
     className?: string;
 }
+
 
 export const ProductPieChart = ({
     tank,
     flow,
     deep,
     tds,
+    ops,
     className
 }: ProductPieChartProps) => {
+
     const data = [
         { name: 'EvaraTank', value: Math.max(tank, 0.01), color: '#6EB5FF' },
         { name: 'EvaraFlow', value: Math.max(flow, 0.01), color: '#0891B2' },
         { name: 'EvaraDeep', value: Math.max(deep, 0.01), color: '#2B5FA3' },
-        { name: 'EvaraTDS',  value: Math.max(tds,  0.01), color: '#8B72E0' }
+        { name: 'EvaraTDS',  value: Math.max(tds,  0.01), color: '#8B72E0' },
+        { name: 'EvaraOps',  value: Math.max(ops,  0.01), color: '#3182CE' }
     ];
+
 
     return (
         <div className={clsx("apple-glass-card px-[20px] py-[16px] rounded-[20px] flex flex-col h-full", className)}>
