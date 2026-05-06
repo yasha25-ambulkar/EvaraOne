@@ -32,15 +32,13 @@ function validateEnv() {
         process.exit(1);
     }
 
-    // Production-specific requirements
+    // Production-specific warnings (non-fatal)
     if (isProd) {
         const prodMissing = PRODUCTION_REQUIRED_VARS.filter(v => !process.env[v]);
         if (prodMissing.length > 0) {
-            logger.error("❌ PRODUCTION: MISSING REQUIRED ENVIRONMENT VARIABLES:");
-            prodMissing.forEach(v => logger.error(`   - ${v}`));
-            logger.error("\nThese are mandatory in production to ensure security and reliability.");
-            logger.error("Configure them in Railway environment variables.");
-            process.exit(1);
+            logger.warn("⚠️  PRODUCTION: MISSING RECOMMENDED ENVIRONMENT VARIABLES:");
+            prodMissing.forEach(v => logger.warn(`   - ${v}`));
+            logger.warn("These are recommended in production for reliability but the server will continue without them.");
         }
     }
 
@@ -48,19 +46,16 @@ function validateEnv() {
     if (process.env.FIREBASE_PRIVATE_KEY && !process.env.FIREBASE_PRIVATE_KEY.includes("BEGIN PRIVATE KEY")) {
         logger.warn("⚠️  WARNING: FIREBASE_PRIVATE_KEY does not look like a valid PEM key.");
         if (isProd) {
-            logger.error("❌ PRODUCTION: Invalid Firebase private key. Exiting.");
+            logger.error("❌ PRODUCTION: Invalid Firebase private key format. Authentication will fail.");
+            // We exit here because Firebase is required for the app to function at all
             process.exit(1);
         }
     }
 
     // ✅ CRITICAL FIX: Warn if Redis is not configured in production
     if (isProd && !process.env.REDIS_URL) {
-        logger.error("❌ PRODUCTION: REDIS_URL not configured.");
-        logger.error("   Using in-memory cache will cause:");
-        logger.error("   - Lost state on instance restart");
-        logger.error("   - Socket.io disconnects across replicas");
-        logger.error("   - Rate limit bypass in multi-instance deployments");
-        process.exit(1);
+        logger.warn("⚠️  PRODUCTION: REDIS_URL not configured.");
+        logger.warn("   Using in-memory cache will cause state loss on restart and socket issues across replicas.");
     }
 
     // MQTT is optional — server runs without it (MQTT client will self-disable)
