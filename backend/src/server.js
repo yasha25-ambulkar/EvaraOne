@@ -620,23 +620,32 @@ app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
 // Production: Serve frontend static files (MUST be before error handlers)
 if (process.env.NODE_ENV === "production") {
-    const publicPath = path.join(__dirname, "../../client/dist");
-    const fs = require("fs");
-    if (fs.existsSync(publicPath)) {
-        logger.debug(`[Server] Serving frontend from ${publicPath}`);
-        app.use(express.static(publicPath));
+    const publicPath = path.resolve(__dirname, "../../client/dist");
+    
+    // Serve static files with long-term caching for assets
+    app.use(express.static(publicPath, {
+        maxAge: '1y',
+        immutable: true,
+        index: false // We handle index.html below
+    }));
+
+    logger.info(`[Server] Static assets enabled from: ${publicPath}`);
+
+    // SPA catch-all: serve index.html for all non-API routes
+    app.get("*", (req, res, next) => {
+        // Skip API and Socket.io routes
+        if (req.url.startsWith("/api/") || req.url.startsWith("/socket.io/")) {
+            return next();
+        }
         
-        // SPA catch-all: serve index.html for non-API routes
-        // Express 5 requires named wildcard params: /{*splat} instead of *
-        app.get("/{*splat}", (req, res, next) => {
-            if (req.url.startsWith("/api/") || req.url.startsWith("/socket.io/")) {
-                return next();
+        const indexPath = path.join(publicPath, "index.html");
+        res.sendFile(indexPath, (err) => {
+            if (err) {
+                logger.error(`[Server] Failed to serve index.html: ${err.message}`);
+                next(err);
             }
-            res.sendFile(path.join(publicPath, "index.html"));
         });
-    } else {
-        logger.warn(`[Server] Frontend build not found at ${publicPath}`);
-    }
+    });
 }
 
 // ============================================================================
