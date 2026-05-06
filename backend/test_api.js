@@ -1,19 +1,12 @@
-const { getNodeAnalytics } = require("./src/controllers/nodes.controller.js");
+const axios = require('axios');
 
-async function testAnalytics() {
-    const req = {
-        params: { id: "UxSim3VQh2qI232wDgHo" },
-        user: { role: "superadmin" } // bypass auth checks for test
-    };
-    
-    const res = {
-        status: (code) => {
-            return {
-                json: (data) => console.log("Status:", code, "JSON:", JSON.stringify(data).substring(0, 500) + "...")
-            };
-        }
-    };
-    
-    await getNodeAnalytics(req, res);
+async function checkApi() {
+  try {
+    const res = await axios.get('http://localhost:5002/api/v1/nodes/EV-TNK-003/telemetry');
+    console.log(JSON.stringify(res.data, null, 2));
+  } catch (err) {
+    console.error('API call failed:', err.response?.data || err.message);
+  }
 }
-testAnalytics().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
+
+checkApi();

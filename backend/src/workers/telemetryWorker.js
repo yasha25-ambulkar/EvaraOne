@@ -13,12 +13,14 @@
 const { refreshDeviceState } = require('../services/deviceStateService');
 const { refreshTDSDeviceState } = require('../services/tdsStateService');
 const { db } = require("../config/firebase.js");
+const logger = require("../utils/logger.js");
 
 // ─────────────────────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 20 * 1000; // 20 seconds for high-fidelity updates
+const POLL_INTERVAL_MS = 15 * 1000; // 15 seconds (ThingSpeak minimum)
+const STAGGER_DELAY_MS = 100;      // 100ms between each device fetch to prevent burst overload
 
 // ─────────────────────────────────────────────────────────────
 // Internal state
@@ -69,9 +71,23 @@ function start(devices = [], getDevices = null) {
 
   console.log(`[telemetryWorker] Started. Polling ${_devices.length} device(s) initially.`);
 
-  // Run immediately on start, then every interval
-  _tick(effectiveGetDevices);
-  _timer = setInterval(() => _tick(effectiveGetDevices), POLL_INTERVAL_MS);
+  // Run immediately on start
+  _tick(effectiveGetDevices).then(() => {
+    if (_isRunning) {
+      _timer = setTimeout(() => _runLoop(effectiveGetDevices), POLL_INTERVAL_MS);
+    }
+  });
+}
+
+/**
+ * Recursive loop wrapper to prevent overlapping ticks
+ */
+async function _runLoop(getDevices) {
+  if (!_isRunning) return;
+  await _tick(getDevices);
+  if (_isRunning) {
+    _timer = setTimeout(() => _runLoop(getDevices), POLL_INTERVAL_MS);
+  }
 }
 
 /**
@@ -79,7 +95,7 @@ function start(devices = [], getDevices = null) {
  */
 function stop() {
   if (_timer) {
-    clearInterval(_timer);
+    clearTimeout(_timer);
     _timer = null;
   }
   _isRunning = false;
@@ -128,14 +144,23 @@ async function _tick(getDevices) {
 
   console.log(`[telemetryWorker] Tick — polling ${_devices.length} device(s)...`);
 
-  // Poll all devices in parallel
-  const results = await Promise.allSettled(
-    _devices.map(device => _pollDevice(device))
-  );
+  // Poll devices with a small stagger to prevent API burst overload
+  let ok = 0;
+  let failed = 0;
+  
+  for (const device of _devices) {
+    try {
+      await _pollDevice(device);
+      ok++;
+    } catch (err) {
+      failed++;
+    }
+    
+    if (STAGGER_DELAY_MS > 0) {
+      await new Promise(resolve => setTimeout(resolve, STAGGER_DELAY_MS));
+    }
+  }
 
-  // Log summary
-  const ok      = results.filter(r => r.status === 'fulfilled').length;
-  const failed  = results.filter(r => r.status === 'rejected').length;
   console.log(`[telemetryWorker] Tick complete — ${ok} ok, ${failed} failed.`);
 }
 
@@ -146,12 +171,12 @@ async function _pollDevice(device) {
   try {
     if (type === 'evaratds' || type === 'tds') {
       const state = await refreshTDSDeviceState(device);
-      console.log(
-        `[telemetryWorker] TDS ${id} → ` +
-        `${state.tdsValue} ppm | ` +
-        `${state.temperature}°C | ` +
-        `${state.quality}`
-      );
+      logger.info(`[telemetryWorker] TDS ${id} → ${state.tdsValue} ppm | ${state.temperature}°C | ${state.quality}`, {
+        category: 'telemetry',
+        deviceId: id,
+        type: 'tds',
+        ...state
+      });
       
       // EMIT real-time update for Socket.io
       telemetryEvents.emit('device:update', {
@@ -161,14 +186,14 @@ async function _pollDevice(device) {
         ...state
       });
     } else {
-      // Default to tank
-      const state = await refreshDeviceState(device);
-      console.log(
-        `[telemetryWorker] Tank ${id} → ` +
-        `${state.percentage?.toFixed(1)}% | ` +
-        `${state.volumeLitres}L | ` +
-        `${state.waterState}`
-      );
+      // Default to tank (now with light mode for 99% less overhead)
+      const state = await refreshDeviceState(device, { light: true });
+      logger.info(`[telemetryWorker] Tank ${id} → ${state.percentage?.toFixed(1)}% | ${state.volumeLitres}L | ${state.waterState}`, {
+        category: 'telemetry',
+        deviceId: id,
+        type: 'tank',
+        ...state
+      });
 
       // EMIT real-time update for Socket.io
       telemetryEvents.emit('device:update', {
@@ -179,7 +204,7 @@ async function _pollDevice(device) {
       });
     }
   } catch (err) {
-    console.error(`[telemetryWorker] ${id} (${type}) failed:`, err.message);
+    logger.error(`[telemetryWorker] ${id} (${type}) failed: ${err.message}`, err);
     // Don't rethrow, keep polling other devices
   }
 }

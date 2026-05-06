@@ -14,8 +14,12 @@ const TDSCard = ({ node, realtimeStatus }: TDSCardProps) => {
     const data = realtimeStatus || node.last_telemetry || {};
 const tdsValue = data.tds_value ?? data.tdsValue ?? 0;
     const waterQuality = data.water_quality ?? data.waterQualityRating ?? data.water_quality_rating ?? "Unknown";
-    const lastSeen = data.timestamp || data.lastUpdatedAt || data.last_updated_at || data.last_seen || node.last_seen || null;
-    const isOnline = computeDeviceStatus(lastSeen) === "Online";
+    const lastSeen = data.timestamp || data.lastUpdated || data.lastUpdatedAt || data.last_updated_at || data.last_seen || node.last_seen || node.last_telemetry?.timestamp || null;
+    
+    // Authoritative status check: Prioritize backend-calculated online_status
+    const isOnline = (typeof node.online_status === 'boolean') 
+        ? node.online_status 
+        : computeDeviceStatus(lastSeen) === "Online";
 
     // History for sparkline
     let historyData = (data.tdsHistory || data.tds_history || []);
@@ -39,11 +43,11 @@ return (
         <Link
             to={`/evaratds/${node.hardwareId || node.id}`}
             className={clsx(
-                "group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full border apple-glass-card",
+                "group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full h-full min-h-[280px] border apple-glass-card",
 isOnline ? "bg-white/40 dark:bg-white/5 border-white/20" : "bg-slate-500/5 border-slate-500/10"
             )}
         >
-            <div className="p-5 flex flex-col flex-1 relative z-10 w-full gap-[18px] min-h-[160px]">
+            <div className="p-3 flex flex-col flex-1 relative z-10 w-full gap-2 min-h-[140px]">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -82,7 +86,7 @@ EvaraTDS
                     </div>
 
                     {/* Compact Sparkline - Clean layout with blue waves */}
-                    <div className="h-10 w-full relative">
+                    <div className="h-24 w-full relative -mt-3">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={history}>
 <defs>
@@ -128,12 +132,12 @@ isAnimationActive={false}
 
             {/* Bottom Nav Button */}
             <div
-                className="relative overflow-hidden px-5 py-[13px] text-center text-[11.5px] font-[900] tracking-[0.15em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#1e3a8a]/90"
+                className="relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#1e3a8a]/90 min-h-[48px]"
                 style={{
                     color: '#fff',
                     background: '#2563eb',
                     borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-}}
+                }}
             >
                 <span className="relative z-10 drop-shadow-sm">VIEW MORE</span>
                 <span className="text-[14px] relative z-10 drop-shadow-sm transform transition-transform group-hover:translate-x-1">→</span>

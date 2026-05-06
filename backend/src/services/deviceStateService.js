@@ -42,7 +42,7 @@ const _midnightSnapshots = new Map();
  * @param {object} device - Firestore device document
  * @returns {Promise<object>} - full tank state
  */
-async function getDeviceState(device) {
+async function getDeviceState(device, options = { light: false }) {
   const id = device.id || device.hardware_id || device.device_id;
 
   // Return cached state if available
@@ -51,7 +51,7 @@ async function getDeviceState(device) {
   }
 
   // Cold start — fetch and compute
-  return await refreshDeviceState(device);
+  return await refreshDeviceState(device, options);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -65,16 +65,40 @@ async function getDeviceState(device) {
  * @param {object} device - Firestore device document
  * @returns {Promise<object>}
  */
-async function refreshDeviceState(device) {
+async function refreshDeviceState(device, options = { light: false }) {
   const id   = device.id || device.hardware_id || device.device_id;
   const dims = resolveDimensions(device);
+  const isLight = options.light || false;
 
   let readings;
   try {
-    readings = await fetchCleanReadings(device);
+    if (isLight) {
+      // Light update: only fetch the single latest point
+      const { fetchLatestReading } = require('./thingspeakService');
+      const latestReading = await fetchLatestReading(device);
+      
+      if (!latestReading) {
+        return _cache.get(id) ?? buildOfflineState(id);
+      }
+      
+      // If we have a cached history, append the new reading
+      const cached = _cache.get(id);
+      if (cached && cached.history && cached.history.length > 0) {
+        // Simple logic: we just need the latest and previous for rate
+        const prevPoint = {
+          distanceCm: cached.distanceCm,
+          timestampMs: new Date(cached.lastUpdated).getTime()
+        };
+        readings = [prevPoint, latestReading];
+      } else {
+        readings = [latestReading];
+      }
+    } else {
+      // Full update: fetch 100 results (for charts)
+      readings = await fetchCleanReadings(device);
+    }
   } catch (err) {
-    console.error(`[deviceStateService] fetchCleanReadings failed for ${id}:`, err.message);
-    // Return offline state, keep old cache if it exists
+    console.error(`[deviceStateService] fetch failed for ${id}:`, err.message);
     return _cache.get(id) ?? buildOfflineState(id);
   }
 
@@ -119,17 +143,40 @@ async function refreshDeviceState(device) {
   );
 
   // ── Build history for chart ────────────────────────────────
-  // Map all clean readings to chart points
-  const history = readings.map(r => {
-    const m = computeAllMetrics(r.distanceCm, dims);
-    return {
-      timestamp:      new Date(r.timestampMs).toISOString(),
-      level:          m.percentage,           // frontend maps h.level → level_percentage
-      volume:         m.volumeLitres,         // frontend maps h.volume → total_liters
-      flow_rate:      null,                   // not calculated per-point (only latest pair)
-      distance:       Math.round(r.distanceCm * 100) / 100,
-    };
-  });
+  // Only update history if we did a full fetch or if we have a cache to append to
+  let history = [];
+  if (!isLight) {
+    history = readings.map(r => {
+      const m = computeAllMetrics(r.distanceCm, dims);
+      return {
+        timestamp:      new Date(r.timestampMs).toISOString(),
+        level:          m.percentage,
+        volume:         m.volumeLitres,
+        flow_rate:      null,
+        distance:       Math.round(r.distanceCm * 100) / 100,
+      };
+    });
+  } else {
+    // For light updates, preserve existing history from cache if available
+    const cached = _cache.get(id);
+    if (cached && cached.history) {
+      history = [...cached.history];
+      // Append latest if it's new
+      const latestTs = new Date(latest.timestampMs).toISOString();
+      if (history.length === 0 || history[history.length - 1].timestamp !== latestTs) {
+        const m = computeAllMetrics(latest.distanceCm, dims);
+        history.push({
+          timestamp:      latestTs,
+          level:          m.percentage,
+          volume:         m.volumeLitres,
+          flow_rate:      null,
+          distance:       Math.round(latest.distanceCm * 100) / 100,
+        });
+        // Keep only last 100
+        if (history.length > 100) history.shift();
+      }
+    }
+  }
 
   // ── tankBehavior — exactly what useWaterAnalytics reads ───
   const tankBehavior = {
@@ -156,9 +203,13 @@ async function refreshDeviceState(device) {
   };
 
   // ── Full state ─────────────────────────────────────────────
+  const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  const timeSinceUpdate = Date.now() - latest.timestampMs;
+  const isOnline = timeSinceUpdate <= OFFLINE_THRESHOLD_MS;
+
   const state = {
     deviceId:             id,
-    online:               true,
+    online:               isOnline,
     lastUpdated:          new Date(latest.timestampMs).toISOString(),
 
     // Core metrics

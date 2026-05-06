@@ -72,12 +72,19 @@ const EvaraTDSAnalytics = () => {
         if (!device) return null;
         if (!telemetry) return device;
         
+        // Authoritative status from backend
+        const isOnline = (typeof (device as any).online_status === 'boolean')
+            ? (device as any).online_status
+            : (typeof (telemetry as any).online === 'boolean')
+                ? (telemetry as any).online
+                : true;
+
         return {
             ...device,
             tdsValue: telemetry.tdsValue ?? device.tdsValue,
             temperature: telemetry.temperature ?? device.temperature,
             waterQualityRating: telemetry.quality ?? device.waterQualityRating,
-            status: 'Online', // If we get a real-time update, it's definitely online
+            status: isOnline ? 'Online' : 'Offline',
             lastTimestamp: telemetry.timestamp || device.lastTimestamp
         };
     }, [device, telemetry]);

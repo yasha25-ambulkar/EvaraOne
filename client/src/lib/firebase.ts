@@ -11,6 +11,15 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// Debug: Verify Firebase config is loaded
+if (!firebaseConfig.apiKey) {
+    console.error('[Firebase] CRITICAL: VITE_FIREBASE_API_KEY is missing from environment');
+}
+if (!firebaseConfig.authDomain) {
+    console.error('[Firebase] CRITICAL: VITE_FIREBASE_AUTH_DOMAIN is missing from environment');
+}
+console.log('[Firebase] Initializing with authDomain:', firebaseConfig.authDomain);
+
 export const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);

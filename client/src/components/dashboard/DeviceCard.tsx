@@ -9,7 +9,6 @@ const productLabel = (device: any): string => {
   if (/flow/i.test(t)) return 'EvaraFlow';
   if (/tank|sump/i.test(t)) return 'EvaraTank';
   if (/tds/i.test(t)) return 'EvaraTDS';
-  if (/ops|motor/i.test(t)) return 'EvaraOps';
 
   return 'Device';
 };
@@ -17,7 +16,15 @@ const productLabel = (device: any): string => {
 import { computeDeviceStatus } from '../../services/DeviceService';
 
 const isNodeOnline = (device: any): boolean => {
-  const ts = device?.last_telemetry?.timestamp || device?.lastPing || device?.last_seen || device?.last_online_at;
+  const ts = 
+    device?.last_telemetry?.timestamp || 
+    device?.last_telemetry?.lastUpdated ||
+    device?.telemetrySnapshot?.timestamp ||
+    device?.telemetrySnapshot?.lastUpdated ||
+    device?.lastUpdated ||
+    device?.lastPing || 
+    device?.last_seen || 
+    device?.last_online_at;
   if (!ts) return device?.status === 'Online';
   return computeDeviceStatus(ts) === 'Online';
 };

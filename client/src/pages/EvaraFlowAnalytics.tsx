@@ -635,7 +635,13 @@ const EvaraFlowAnalytics = () => {
     const snapshotTs = telemetryData?.timestamp ?? null;
     const deviceLastSeen = deviceInfo?.last_seen ?? null;
     const bestTimestamp = snapshotTs ?? deviceLastSeen;
-    const onlineStatus = computeOnlineStatus(bestTimestamp);
+    
+    // Authoritative status from backend
+    const onlineStatus = (typeof (deviceInfo as any).online_status === 'boolean')
+        ? ((deviceInfo as any).online_status ? 'Online' : 'Offline')
+        : (typeof (telemetryData as any).online === 'boolean')
+            ? ((telemetryData as any).online ? 'Online' : 'Offline')
+            : computeOnlineStatus(bestTimestamp);
 
     useEffect(() => {
         // High Priority: Use fields discovered by the Smart-Scan backend

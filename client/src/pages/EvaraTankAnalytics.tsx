@@ -374,12 +374,15 @@ const EvaraTankAnalytics = () => {
     // Online status
 
     const snapshotTs = activeTelemetry?.timestamp ?? null;
-
     const deviceLastSeen = deviceInfo?.last_seen ?? null;
-
     const bestTimestamp = snapshotTs ?? deviceLastSeen;
 
-    const onlineStatus = computeOnlineStatus(bestTimestamp);
+    // Authoritative status from backend
+    const onlineStatus = (typeof (deviceInfo as any)?.online_status === 'boolean')
+        ? ((deviceInfo as any).online_status ? 'Online' : 'Offline')
+        : (typeof (activeTelemetry as any)?.online === 'boolean')
+            ? ((activeTelemetry as any).online ? 'Online' : 'Offline')
+            : computeOnlineStatus(bestTimestamp);
 
 
 
@@ -428,11 +431,12 @@ const EvaraTankAnalytics = () => {
             isCorrected: activeTelemetry?.is_corrected || false,
             originalValue: activeTelemetry?.original_value || backendPct,
             confidence: activeTelemetry?.confidence || 1,
-            pattern: activeTelemetry?.pattern || null,
+            customer_name: (deviceInfo as any)?.customer_name || null,
+            online_status: (deviceInfo as any)?.online_status,
             data_label: activeTelemetry?.data_label || null,
             prediction_mode: activeTelemetry?.prediction_mode || false,
         };
-    }, [activeTelemetry, localCfg]);
+    }, [activeTelemetry, localCfg, deviceInfo]);
 
 
 

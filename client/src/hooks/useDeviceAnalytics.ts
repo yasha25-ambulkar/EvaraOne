@@ -23,6 +23,7 @@ export interface NodeInfoData {
   community_name?: string;
   customer_config?: any;
   customer_name?: string | null;
+  online_status?: boolean;
 }
 
 export interface AnalyticsData {
@@ -213,6 +214,7 @@ export const useDeviceAnalytics = (
           community_name: d.community_name,
           customer_config: d.customer_config,
           customer_name: d.customer_name || null,
+          online_status: d.online_status,
         } as NodeInfoData
       },
       history: {

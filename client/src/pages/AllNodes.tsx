@@ -37,8 +37,8 @@ type NodeCategory =
   | 'FlowMeter'
   | 'flow'
   | 'EvaraTDS'
-  | 'EvaraOps';
-type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraOps';
+  | 'EvaraTDS';
+type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
 
 
 // ─── Category config ─────────────────────────────────────────────────────────
@@ -142,14 +142,6 @@ export const CATEGORY_CONFIG: Record<
     badge: "bg-blue-100 text-blue-700",
     dot: "bg-blue-500",
   },
-  EvaraOps: {
-    label: "EvaraOps",
-    icon: <img src="/ops.png" className="w-8 h-8 object-contain" />,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    badge: "bg-blue-100 text-blue-700",
-    dot: "bg-blue-500",
-  },
 };
 
 
@@ -206,16 +198,6 @@ const ANALYTICS_CONFIG: Record<
     badge: "bg-blue-50 text-blue-700 border border-blue-200",
     dot: "bg-blue-500",
   },
-  EvaraOps: {
-    label: "EvaraOps",
-    desc: "Motor Control",
-    icon: <img src="/ops.png" className="w-6 h-6 object-contain" />,
-    activeBg: "bg-blue-700",
-    activeText: "text-white",
-    activeBorder: "border-blue-700",
-    badge: "bg-blue-50 text-blue-800 border border-blue-200",
-    dot: "bg-blue-600",
-  },
 };
 
 
@@ -226,20 +208,26 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
   const base = realtimeSnapshot || node.last_telemetry || {};
   const effectiveTs = 
     base.timestamp || 
+    base.lastUpdated ||
     base.lastUpdatedAt || 
     base.last_updated_at || 
     base.created_at || 
-    base.last_seen || 
+    base.telemetrySnapshot?.timestamp ||
+    base.telemetrySnapshot?.lastUpdated ||
+    node.last_telemetry?.timestamp ||
+    node.last_telemetry?.lastUpdated ||
     node.last_seen || 
     node.last_online_at || 
     node.updated_at || 
     null;
 
-  const currentStatus = computeDeviceStatus(effectiveTs);
+  // Authoritative status check: Prioritize backend-calculated online_status
+  const currentStatus = (typeof node.online_status === 'boolean') 
+    ? (node.online_status ? "Online" : "Offline")
+    : computeDeviceStatus(effectiveTs);
   const isOnline = currentStatus === "Online";
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
   const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
-  const isOps = node.analytics_template === 'EvaraOps' || (node.category || "").toString() === 'EvaraOps' || (node.category || "").toString() === 'ops' || (node.category || "").toString() === 'motor';
 
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
@@ -265,16 +253,16 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         asset_type: node.asset_type || undefined,
       })}
       className={clsx(
-        "group rounded-[32px] shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-500 overflow-hidden flex flex-col relative mx-auto w-full border border-white/40",
-        isOps ? "bg-emerald-500/5 backdrop-blur-3xl" : cardTint
+        "group rounded-[24px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col relative mx-auto w-full h-full min-h-[280px] border apple-glass-card",
+        cardTint
       )}
     >
-      <div className="p-5 flex flex-col flex-1 relative z-10 w-full min-h-[160px] gap-[18px]">
+      <div className="p-3 flex flex-col flex-1 relative z-10 w-full min-h-[140px] gap-2">
         {/* Top: Icon + Title + Status */}
         <div className="flex items-start justify-between w-full">
           <div className="flex items-start gap-3 w-full pr-2">
             <div className="w-[46px] h-[46px] bg-white dark:bg-white/10 rounded-[14px] shadow-sm flex items-center justify-center shrink-0">
-              {isOps ? <img src="/ops.png" className="w-8 h-8 object-contain" /> : cfg.icon}
+              {cfg.icon}
             </div>
             <div className="flex flex-col justify-center gap-[5px] overflow-hidden pt-0.5">
               <h3 className="font-[900] text-[17px] leading-none truncate w-full uppercase tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -391,72 +379,13 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
               </div>
             </div>
           </div>
-        ) : isOps ? (
-          <div className="flex flex-col flex-1 gap-6 mt-2">
-            {/* Level + Circular Status */}
-            <div className="flex items-center justify-between px-2">
-              {/* Large Level */}
-              <div className="flex flex-col">
-                <div className="flex items-baseline">
-                  <span className="text-[54px] font-[900] leading-none text-slate-700 tracking-tighter">{pct.toFixed(0)}</span>
-                  <span className="text-[28px] font-[900] text-slate-500 ml-1">%</span>
-                </div>
-                <span className="text-[14px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 ml-1">Level</span>
-              </div>
-
-              {/* Status Circles */}
-              <div className="flex gap-4">
-                <div className="flex flex-col items-center gap-2">
-                  <div className={clsx(
-                    "w-16 h-16 rounded-full flex items-center justify-center border-4 shadow-lg transition-all duration-500",
-                    motorRunning ? "bg-green-500/10 border-green-500/30 shadow-green-500/20" : "bg-slate-100 border-slate-200 shadow-inner"
-                  )}>
-                    <div className={clsx(
-                      "w-4 h-4 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.8)]",
-                      motorRunning ? "bg-green-500 animate-pulse" : "bg-slate-300"
-                    )} />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Motor:</span>
-                    <span className={clsx("text-[9px] font-black uppercase tracking-widest", motorRunning ? "text-green-600" : "text-slate-500")}>
-                      {motorRunning ? "Running" : "Stopped"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center bg-slate-100/50 border-4 border-slate-200/50 shadow-inner">
-                    <div className="w-6 h-6 rounded-full bg-slate-300/50" />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mode:</span>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Auto</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Pills Container */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-12 bg-white/40 border border-white/60 backdrop-blur-md rounded-2xl flex items-center px-4 gap-2 shadow-sm">
-                <MapPin size={16} className="text-slate-400" />
-                <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest truncate">
-                  {node.location_name || "Pump House A"}
-                </span>
-              </div>
-              <div className="h-12 px-6 bg-[#D8F3DC] border border-white/60 backdrop-blur-md rounded-2xl flex items-center gap-2 shadow-sm shrink-0">
-                <Activity size={16} className="text-slate-600" />
-                <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Info</span>
-              </div>
-            </div>
-          </div>
         ) : (
           <div className="flex-1 mt-2"></div>
         )}
 
 
         {/* Bottom Metadata (Only for Tanks/Generic) */}
-        {!isFlow && !isOps && (
+        {!isFlow && (
           <div className="mt-auto flex items-center justify-between pt-3 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />
@@ -481,14 +410,11 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
 
       {/* Footer Nav Button - Harmonized with TDSCard */}
       <div
-        className={clsx(
-          "relative overflow-hidden px-5 py-[18px] text-center text-[12px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#001845]",
-          isOps ? "bg-[#1B263B]" : "bg-[#0F3096]/70 backdrop-blur-xl border-t border-white/20"
-        )}
-        style={!isOps ? {
+        className="relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#001845] min-h-[48px] bg-[#0F3096]/70 backdrop-blur-xl border-t border-white/20"
+        style={{
           color: 'var(--liquid-button-text)',
           boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-        } : { color: 'white' }}
+        }}
       >
         <span className="relative z-10 drop-shadow-sm">VIEW MORE</span>
         <span className="text-[14px] relative z-10 drop-shadow-sm transform transition-transform group-hover:translate-x-1">→</span>
@@ -550,15 +476,19 @@ const AllNodes = () => {
     const base = snap || n.last_telemetry || {};
     const effectiveTs = 
       base.timestamp || 
+      base.lastUpdated ||
       base.lastUpdatedAt || 
       base.last_updated_at || 
       base.created_at || 
       base.last_seen || 
+      base.telemetrySnapshot?.timestamp ||
       n.last_seen || 
       n.last_online_at || 
       null;
 
-    const currentStatus = computeDeviceStatus(effectiveTs);
+    const currentStatus = (typeof n.online_status === 'boolean') 
+      ? (n.online_status ? "Online" : "Offline")
+      : computeDeviceStatus(effectiveTs);
 
     const matchStatus = statusFilter === "all" || currentStatus === statusFilter;
     const q = search.toLowerCase();
@@ -576,15 +506,19 @@ const AllNodes = () => {
       const base = snap || n.last_telemetry || {};
       const effectiveTs = 
         base.timestamp || 
+        base.lastUpdated ||
         base.lastUpdatedAt || 
         base.last_updated_at || 
         base.created_at || 
         base.last_seen || 
+        base.telemetrySnapshot?.timestamp ||
         n.last_seen || 
         n.last_online_at || 
         null;
 
-      return computeDeviceStatus(effectiveTs);
+      return (typeof n.online_status === 'boolean') 
+        ? (n.online_status ? "Online" : "Offline")
+        : computeDeviceStatus(effectiveTs);
     });
     const online = statuses.filter(s => s === "Online").length;
     const offline = statuses.filter(s => s === "Offline").length;

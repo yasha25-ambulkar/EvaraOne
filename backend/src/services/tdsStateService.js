@@ -93,7 +93,8 @@ async function refreshTDSDeviceState(device) {
 
     // Update Firestore background update
     db.collection('devices').doc(id).update({
-      last_seen: new Date().toISOString(),
+      last_seen: lastUpdated.toISOString(), // Use DATA timestamp, not current time
+      online_status: status === DEVICE_STATUS.ONLINE,
       last_telemetry: {
         ...state,
         updated_at: new Date().toISOString()

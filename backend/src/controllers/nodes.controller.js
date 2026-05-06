@@ -109,6 +109,7 @@ exports.getNodes = async (req, res) => {
                 else if (typeLower === "evaradeep") analyticsTemplate = "EvaraDeep";
                 else if (typeLower === "evaraflow") analyticsTemplate = "EvaraFlow";
                 else if (typeLower === "evaratds") analyticsTemplate = "EvaraTDS";
+                else if (typeLower === "evaraphase" || typeLower === "evaraops") analyticsTemplate = "EvaraPhase";
                 else analyticsTemplate = "EvaraTank"; // Default
             }
 
@@ -120,20 +121,42 @@ exports.getNodes = async (req, res) => {
             };
 
             try {
-                // Fetch latest in-memory state from deviceStateService
-                const state = await getDeviceState(deviceBase);
-                return {
-                    ...deviceBase,
-                    last_telemetry: state.telemetrySnapshot,
-                    online_status: state.online // Explicitly include backend-calculated status
-                };
+                let state;
+                const typeLower = type.toLowerCase();
+
+                if (typeLower === "evaratds" || typeLower === "tds") {
+                    const { getTDSDeviceState } = require('../services/tdsStateService');
+                    state = await getTDSDeviceState(deviceBase);
+                    
+                    // Standardize TDS response for the dashboard loop
+                    return {
+                        ...deviceBase,
+                        online_status: state.status === "Online",
+                        lastUpdated: state.lastUpdated,
+                        last_telemetry: state
+                    };
+                } else {
+                    // Default Tank/Flow/Deep logic
+                    state = await getDeviceState(deviceBase, { light: true });
+                    
+                    const safeUpdatedAt = deviceBase.updated_at?.toDate ? deviceBase.updated_at.toDate().toISOString() : deviceBase.updated_at;
+                    const safeLastUpdated = deviceBase.lastUpdated?.toDate ? deviceBase.lastUpdated.toDate().toISOString() : deviceBase.lastUpdated;
+
+                    return {
+                        ...deviceBase,
+                        updated_at: safeUpdatedAt,
+                        lastUpdated: safeLastUpdated,
+                        last_telemetry: state.telemetrySnapshot,
+                        online_status: state.online
+                    };
+                }
             } catch (err) {
                 logger.warn(`[NodesController] Failed to get state for ${id}:`, err.message);
                 return deviceBase;
             }
         }));
 
-        await cache.set(nodesCacheKey, devices, 1);
+        await cache.set(nodesCacheKey, devices, 5); // Increased to 5s to reduce burst load
 
         res.status(200).json(devices);
     } catch (error) {
@@ -144,16 +167,22 @@ exports.getNodes = async (req, res) => {
 
 // ── GET /:id ─────────────────────────────────────────────────────────────
 exports.getNodeById = async (req, res) => {
-  try {
-    const device = await getNodeDetails(req.params.id);
-    if (!device) {
-      return res.status(404).json({ success: false, error: "Device not found" });
+    try {
+        const { device, state } = await loadState(req.params.id);
+        if (!device) return res.status(404).json({ success: false, error: "Device not found" });
+        
+        const safeLastSeen = device.last_seen?.toDate ? device.last_seen.toDate().toISOString() : device.last_seen;
+
+        return res.status(200).json({ 
+          ...device, 
+          id: device.id,
+          last_seen: safeLastSeen,
+          online_status: state.online 
+        });
+    } catch (err) {
+        console.error('[getNodeById]', err.message);
+        return res.status(500).json({ success: false, error: err.message });
     }
-    return res.status(200).json(device);
-  } catch (err) {
-    console.error('[getNodeById]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
 };
 
 // ── GET /:id/telemetry ────────────────────────────────────────────────────
@@ -182,6 +211,7 @@ exports.getNodeTelemetry = async (req, res) => {
       success:          true,
       deviceId:         state.deviceId,
       online:           state.online,
+      online_status:    state.online,
       lastUpdated:      state.lastUpdated,
 
       // Fields read by useDeviceAnalytics fallback chain:
@@ -231,6 +261,7 @@ exports.getNodeAnalytics = async (req, res) => {
       success:       true,
       deviceId:      state.deviceId,
       online:        state.online,
+      online_status: state.online,
       lastUpdated:   state.lastUpdated,
 
       // ── What useDeviceAnalytics reads ──────────────────────

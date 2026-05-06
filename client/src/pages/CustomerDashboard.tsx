@@ -231,7 +231,7 @@ export default function CustomerDashboard() {
                 <>
                   {(() => {
                     const deviceTypes = (nodes as any[]).reduce((acc: any, node: any) => {
-                      const type = node.asset_type || node.deviceType || node.device_type || 'Unknown';
+                      let type = node.asset_type || node.deviceType || node.device_type || 'Unknown';
                       acc[type] = (acc[type] || 0) + 1;
                       return acc;
                     }, {});

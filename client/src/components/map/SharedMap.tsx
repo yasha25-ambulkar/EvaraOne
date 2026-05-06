@@ -318,8 +318,10 @@ const DeviceHoverPanel = ({
 
   // Real-time status detection based on active WebSocket snap or fallback to device API status
   const baseForStatus = snap || device.last_telemetry || {};
-  const statusTs = baseForStatus.timestamp || baseForStatus.lastUpdatedAt || baseForStatus.last_updated_at || baseForStatus.created_at || baseForStatus.last_seen || device.last_seen || device.last_online_at || null;
-  const computedStatus = statusTs ? computeDeviceStatus(statusTs) : (device.status || "Offline");
+  const statusTs = baseForStatus.timestamp || baseForStatus.lastUpdated || baseForStatus.lastUpdatedAt || baseForStatus.last_updated_at || baseForStatus.created_at || baseForStatus.last_seen || device.last_seen || device.last_online_at || null;
+  const computedStatus = (typeof (device as any).online_status === 'boolean') 
+    ? ((device as any).online_status ? "Online" : "Offline")
+    : (statusTs ? computeDeviceStatus(statusTs) : (device.status || "Offline"));
   const isOnline = computedStatus === "Online";
 
   const deviceHardwareId = (device as any).hardwareId || device.id;
@@ -570,13 +572,22 @@ const SharedMap = ({
     for (const d of filteredDevices) {
       const t = (d as any).analytics_template || d.asset_type || "";
 
-      // FIX: Use computeDeviceStatus on the latest available timestamp to ensure the marker dot
-      // matches the real-time status seen in the hover panel.
       const snap = realtimeStatuses[d.id];
       const base = snap || d.last_telemetry || {};
-      const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || d.last_seen || d.last_online_at || null;
+      const latestTs = 
+        base.timestamp || 
+        base.lastUpdated ||
+        base.lastUpdatedAt || 
+        base.last_updated_at || 
+        base.created_at || 
+        base.last_seen || 
+        d.last_seen || 
+        d.last_online_at || 
+        null;
       // Authoritative status from latest timestamp
-      const s = latestTs ? computeDeviceStatus(latestTs) : (d.status || 'Offline');
+      const s = (typeof (d as any).online_status === 'boolean') 
+        ? ((d as any).online_status ? "Online" : "Offline")
+        : (latestTs ? computeDeviceStatus(latestTs) : (d.status || 'Offline'));
 
       const key = `${t}_${s}`;
       if (!m.has(key)) m.set(key, getDeviceIcon(t, s));
@@ -637,12 +648,22 @@ const SharedMap = ({
             const t =
               (device as any).analytics_template || device.asset_type || "";
 
-            // FIX: Ensure marker status is computed correctly here too
             const snap = realtimeStatuses[device.id];
             const base = snap || device.last_telemetry || {};
-            const latestTs = base.timestamp || base.lastUpdatedAt || base.last_updated_at || base.created_at || base.last_seen || device.last_seen || device.last_online_at || null;
+            const latestTs = 
+              base.timestamp || 
+              base.lastUpdated ||
+              base.lastUpdatedAt || 
+              base.last_updated_at || 
+              base.created_at || 
+              base.last_seen || 
+              device.last_seen || 
+              device.last_online_at || 
+              null;
             // Authoritative status from latest timestamp
-            const s = latestTs ? computeDeviceStatus(latestTs) : (device.status || 'Offline');
+            const s = (typeof (device as any).online_status === 'boolean') 
+              ? ((device as any).online_status ? "Online" : "Offline")
+              : (latestTs ? computeDeviceStatus(latestTs) : (device.status || 'Offline'));
 
             const key = `${t}_${s}`;
             const icon =
