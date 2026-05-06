@@ -676,7 +676,7 @@ try {
         process.exit(1);
     });
 
-    server.listen(PORT, async () => {
+    server.listen(PORT, "0.0.0.0", async () => {
         logger.debug(`[Server] ✅ Backend running on port ${PORT}`);
         
         // ✅ PHASE 2: Task #11 - Initialize cache versions on startup
