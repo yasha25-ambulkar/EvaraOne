@@ -3,3 +3,7 @@ buildCommand = "npm install && cd client && npm install && npm run build"
 
 [deploy]
 startCommand = "cd backend && NODE_ENV=production node --openssl-legacy-provider src/server.js"
+
+[variables]
+PORT = "3000"
+NODE_ENV = "production"
