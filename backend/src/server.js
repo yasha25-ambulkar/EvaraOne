@@ -620,29 +620,33 @@ app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
 // Production: Serve frontend static files (MUST be before error handlers)
 if (process.env.NODE_ENV === "production") {
-    const publicPath = path.resolve(__dirname, "../../client/dist");
+    // Since start script does 'cd backend', cwd is the backend folder
+    const publicPath = path.join(process.cwd(), '../client/dist');
     
-    // Serve static files with long-term caching for assets
+    // 1. Serve static assets with long-term caching
     app.use(express.static(publicPath, {
         maxAge: '1y',
         immutable: true,
-        index: false // We handle index.html below
+        fallthrough: true
     }));
 
-    logger.info(`[Server] Static assets enabled from: ${publicPath}`);
+    logger.info(`[Server] Production static assets enabled from: ${publicPath}`);
 
-    // SPA catch-all: serve index.html for all non-API routes
+    // 2. SPA Catch-all: Only serve index.html for non-file, non-API requests
     app.get("*", (req, res, next) => {
-        // Skip API and Socket.io routes
-        if (req.url.startsWith("/api/") || req.url.startsWith("/socket.io/")) {
+        // Skip if API, Socket.io, or looks like a static file (has extension)
+        if (req.url.startsWith("/api/") || 
+            req.url.startsWith("/socket.io/") || 
+            path.extname(req.url)) {
             return next();
         }
         
         const indexPath = path.join(publicPath, "index.html");
         res.sendFile(indexPath, (err) => {
             if (err) {
-                logger.error(`[Server] Failed to serve index.html: ${err.message}`);
-                next(err);
+                // If index.html is missing, don't just hang - log it
+                logger.error(`[Server] Failed to serve index.html from ${indexPath}: ${err.message}`);
+                next(); // Fall through to 404 handler
             }
         });
     });
