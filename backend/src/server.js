@@ -46,8 +46,8 @@ const app = express();
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
   : [
+      "https://evaraone-production-56b4.up.railway.app",
       "https://app.evaratech.com",
-      "http://localhost:8080",
       "http://localhost:5173",
       "http://localhost:3000"
     ];
