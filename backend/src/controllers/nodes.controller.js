@@ -24,7 +24,7 @@ const logger = require("../utils/logger.js");
 // Helper: load device + get state
 // ─────────────────────────────────────────────────────────────
 
-async function loadState(hardwareId) {
+async function loadState(hardwareId, options = {}) {
   const device = await getNodeDetails(hardwareId);
   if (!device) throw new Error(`Device not found: ${hardwareId}`);
   
@@ -37,7 +37,7 @@ async function loadState(hardwareId) {
   }
   
   // Default to Tank state service
-  return { device, state: await getDeviceState(device) };
+  return { device, state: await getDeviceState(device, options) };
 }
 
 
@@ -234,7 +234,8 @@ exports.getNodeTelemetry = async (req, res) => {
 // ── GET /:id/analytics ────────────────────────────────────────────────────
 exports.getNodeAnalytics = async (req, res) => {
   try {
-    const { device, state } = await loadState(req.params.id);
+    const range = req.query.range || '24h';
+    const { device, state } = await loadState(req.params.id, { range });
     const type = (device.device_type || '').toLowerCase();
 
     if (type === 'evaratds' || type === 'tds') {
@@ -303,9 +304,8 @@ exports.getNodeGraphData = async (req, res) => {
 // ── GET /:id/graph-hybrid ─────────────────────────────────────────────────
 exports.getNodeGraphDataHybrid = async (req, res) => {
   try {
-    const { state } = await loadState(req.params.id);
-
     const range = req.query.range ?? '24h';
+    const { state } = await loadState(req.params.id, { range });
     let dataPoints = state.history;
 
     if (range === '1h') {

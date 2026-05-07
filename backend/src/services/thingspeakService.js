@@ -29,17 +29,23 @@ const FETCH_RESULTS = 100;
  * Fetches readings from ThingSpeak and returns a clean array.
  *
  * @param {object} device - Firestore device document
+ * @param {object} [options] - Fetch options (results, days)
  * @returns {Promise<Array<{distanceCm: number, timestampMs: number}>>}
  */
-async function fetchCleanReadings(device) {
+async function fetchCleanReadings(device, options = {}) {
   const { channelId, apiKey, fieldKey } = resolveThingSpeakConfig(device);
 
   if (!channelId || !apiKey) {
     throw new Error(`[thingspeakService] Missing channelId or apiKey for device ${device.id}`);
   }
 
-  const url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds.json` +
-              `?api_key=${apiKey}&results=${FETCH_RESULTS}`;
+  let url = `${THINGSPEAK_BASE}/channels/${channelId}/feeds.json?api_key=${apiKey}`;
+  
+  if (options.days) {
+    url += `&days=${options.days}`;
+  } else {
+    url += `&results=${options.results || FETCH_RESULTS}`;
+  }
 
   let json;
   try {

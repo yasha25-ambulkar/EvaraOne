@@ -22,6 +22,19 @@ const {
   computeCapacity,
 } = require('../utils/tankMath');
 
+/**
+ * Helper to convert range strings to day counts for ThingSpeak
+ */
+function resolveRangeToDays(range) {
+  if (!range) return null;
+  const r = range.toLowerCase();
+  if (r === '1w' || r === '7d') return 7;
+  if (r === '3d') return 3;
+  if (r === '24h' || r === '1d') return 1;
+  if (r === '30d') return 30;
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // In-memory cache  { deviceId → state }
 // ─────────────────────────────────────────────────────────────
@@ -45,12 +58,32 @@ const _midnightSnapshots = new Map();
 async function getDeviceState(device, options = { light: false }) {
   const id = device.id || device.hardware_id || device.device_id;
 
-  // Return cached state if available
+  // Return cached state if available AND it has enough history to cover the requested range
   if (_cache.has(id)) {
-    return _cache.get(id);
+    const cached = _cache.get(id);
+    const requestedDays = resolveRangeToDays(options.range);
+    
+    if (!requestedDays) {
+        // No specific range requested, return whatever is in cache
+        return cached;
+    }
+
+    // Check if cached history covers the requested range
+    const history = cached.history || [];
+    if (history.length > 0) {
+        const oldestTs = new Date(history[0].timestamp).getTime();
+        const newestTs = new Date(history[history.length - 1].timestamp).getTime();
+        const rangeMs = (requestedDays * 24 * 60 * 60 * 1000);
+        
+        // If the gap between oldest and newest is at least 80% of requested range, use cache
+        // (80% buffer to account for polling intervals and minor gaps)
+        if ((newestTs - oldestTs) >= (rangeMs * 0.8)) {
+            return cached;
+        }
+    }
   }
 
-  // Cold start — fetch and compute
+  // Cold start or range expansion — fetch and compute
   return await refreshDeviceState(device, options);
 }
 
@@ -94,8 +127,9 @@ async function refreshDeviceState(device, options = { light: false }) {
         readings = [latestReading];
       }
     } else {
-      // Full update: fetch 100 results (for charts)
-      readings = await fetchCleanReadings(device);
+      // Full update: fetch results based on range
+      const days = resolveRangeToDays(options.range);
+      readings = await fetchCleanReadings(device, { days: days || null });
     }
   } catch (err) {
     console.error(`[deviceStateService] fetch failed for ${id}:`, err.message);
@@ -172,8 +206,8 @@ async function refreshDeviceState(device, options = { light: false }) {
           flow_rate:      null,
           distance:       Math.round(latest.distanceCm * 100) / 100,
         });
-        // Keep only last 100
-        if (history.length > 100) history.shift();
+        // Keep a larger buffer for analytics (e.g. last 5000 points)
+        if (history.length > 5000) history.shift();
       }
     }
   }
