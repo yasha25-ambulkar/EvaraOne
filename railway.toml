@@ -1,5 +1,5 @@
 [build]
-buildCommand = "npm install && cd client && npm install && npm run build"
+buildCommand = "npm install && cd client && npm install && npm run build && cd ../backend && npm install --production=false"
 
 [deploy]
 startCommand = "cd backend && NODE_ENV=production node --openssl-legacy-provider src/server.js"
