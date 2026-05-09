@@ -76,9 +76,9 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // CORS denied
-    logger.warn({ origin, allowed: allowedOrigins }, '[CORS] Origin rejected');
-    callback(new Error('CORS policy: Not allowed by CORS'));
+    // ✅ CORS FIX: Use (null, false) NOT new Error() — Error causes 500, false causes 403
+    logger.warn({ origin }, '[CORS] Origin rejected');
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -89,21 +89,25 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ============================================================================
-// Helmet Security Headers (Enhanced)
+// Helmet Security Headers
 // ============================================================================
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      // ✅ FIX: Allow self-hosted Vite bundles — must not block .js files
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // ✅ FIX: Allow self-hosted CSS + Google Fonts + inline styles (Vite injects these)
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      // ✅ FIX: Allow images from common sources
       imgSrc: [
-        "'self'", 
-        "https:", 
-        "data:", 
-        "https://*.tile.openstreetmap.org", 
+        "'self'",
+        "https:",
+        "data:",
+        "https://*.tile.openstreetmap.org",
         "https://*.openstreetmap.org"
       ],
+      // ✅ FIX: Allow WebSocket and API connections to Railway, Firebase, Google
       connectSrc: [
         "'self'",
         "https://*.railway.app",
@@ -113,10 +117,10 @@ app.use(helmet({
         "https://www.googleapis.com",
         "https://*.firebaseio.com",
         "https://*.googleapis.com",
-        "https://evaraone-production-511c.up.railway.app",
-        "wss://evaraone-production-511c.up.railway.app",
+        "https://firestore.googleapis.com",
       ],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      // ✅ FIX: Allow Google Fonts
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"]
     }
@@ -126,6 +130,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
+
 
 // ============================================================================
 // Trust proxy for reverse proxy support (Railway, Nginx, etc)
