@@ -618,28 +618,8 @@ app.get("/api/v1/admin/audit-logs", globalSaaSAuth, getAuditLogs);
 app.get("/api/v1/stats/dashboard/summary", globalSaaSAuth, getDashboardSummary);
 app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
-// Production: Serve frontend static files (MUST be before error handlers)
-if (process.env.NODE_ENV === "production") {
-    const publicPath = path.join(process.cwd(), '../client/dist');
-    
-    app.use(express.static(publicPath, {
-        maxAge: '1y',
-        immutable: true
-    }));
-
-    app.get("(.*)", (req, res, next) => {
-        if (req.url.startsWith("/api/") || path.extname(req.url)) return next();
-        res.sendFile(path.join(publicPath, "index.html"), (err) => {
-            if (err) {
-                console.error("sendFile error:", err);
-                next(err);
-            }
-        });
-    });
-}
-
 // ============================================================================
-// ✅ TASK #1 — Health check endpoint for Railway
+// ✅ TASK #1 — Health check endpoint (MUST be before static catch-all)
 // ============================================================================
 app.get('/api/v1/health', (req, res) => {
   const health = {
@@ -652,13 +632,30 @@ app.get('/api/v1/health', (req, res) => {
       mqtt: global.mqttConnected ? 'connected' : 'disconnected'
     }
   };
-
-  // If Firebase is down, tell Railway we're sick (503)
-  // Otherwise say we're fine (200)
-  // ✅ Resilience Fix: Always return 200 during startup so we can see logs
-  // Railway will kill the app if it gets a 503, preventing us from debugging.
   res.status(200).json(health);
 });
+
+// Production: Serve frontend static files (MUST be after API routes)
+if (process.env.NODE_ENV === "production") {
+    const publicPath = path.join(process.cwd(), '../client/dist');
+
+    app.use(express.static(publicPath, {
+        maxAge: '1y',
+        immutable: true
+    }));
+
+    // ✅ FIX: Use named wildcard for Express 5 / path-to-regexp v8 compatibility
+    // '*', '(.*)' are both invalid in this version — use '/{*path}' instead
+    app.get('/{*path}', (req, res, next) => {
+        if (req.path.startsWith('/api/') || path.extname(req.path)) return next();
+        res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+            if (err) {
+                console.error('sendFile error:', err);
+                next(err);
+            }
+        });
+    });
+}
 
 // ✅ ISSUE #5: Register centralized error handler (must be AFTER all routes)
 // Handles Zod validation errors, AppError errors, and unknown errors
