@@ -664,7 +664,7 @@ app.get('/api/v1/health', (req, res) => {
 // All controllers should use next(err) or throw AppError
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 8080;
 
 try {
     server.on("error", (err) => {
