@@ -42,11 +42,24 @@ Sentry.init({
 
 const app = express();
 
-// ✅ PHASE 2: Task #14 - Lock CORS to specific domains (no *.railway.app wildcard)
+// ✅ CRITICAL FIX: Serve static files BEFORE CORS middleware
+// Asset requests (JS/CSS) must never hit CORS logic — they are same-origin.
+// When CORS calls callback(new Error(...)), Express returns 500, not 403.
+if (process.env.NODE_ENV === "production") {
+    const staticPath = path.resolve(__dirname, '../../client/dist');
+    logger.info(`[Server] Static path: ${staticPath}`);
+    app.use(express.static(staticPath, {
+        maxAge: '1y',
+        immutable: true,
+        fallthrough: true
+    }));
+}
+
+// ✅ PHASE 2: Task #14 - Lock CORS to specific domains
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
   : [
-      "https://evaraone-production-56b4.up.railway.app",
+      "https://evara-iot-platform-production.up.railway.app",
       "https://app.evaratech.com",
       "http://localhost:5173",
       "http://localhost:3000"
@@ -619,6 +632,15 @@ app.get("/api/v1/stats/dashboard/summary", globalSaaSAuth, getDashboardSummary);
 app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
 // ============================================================================
+// Production: Serve frontend static files (MUST be before API/CORS)
+// ============================================================================
+if (process.env.NODE_ENV === "production") {
+    const publicPath = path.resolve(__dirname, '../../client/dist');
+    logger.info(`[Server] Serving static files from: ${publicPath}`);
+    app.use(express.static(publicPath, { maxAge: '1y', immutable: true, fallthrough: true }));
+}
+
+// ============================================================================
 // ✅ TASK #1 — Health check endpoint (MUST be before static catch-all)
 // ============================================================================
 app.get('/api/v1/health', (req, res) => {
@@ -635,29 +657,13 @@ app.get('/api/v1/health', (req, res) => {
   res.status(200).json(health);
 });
 
-// Production: Serve frontend static files (MUST be after API routes)
+// SPA catch-all: for all non-API, non-asset routes, serve index.html
 if (process.env.NODE_ENV === "production") {
-    // ✅ Use __dirname (always resolves to /app/backend/src/) regardless of cwd
-    // process.cwd() can be unreliable depending on how Railway starts the process
     const publicPath = path.resolve(__dirname, '../../client/dist');
-
-    logger.info(`[Server] Serving static files from: ${publicPath}`);
-
-    app.use(express.static(publicPath, {
-        maxAge: '1y',
-        immutable: true,
-        // Fallthrough: if file not found, pass to next middleware (don't 500)
-        fallthrough: true
-    }));
-
-    // ✅ FIX: Use named wildcard for Express 5 / path-to-regexp v8 compatibility
-    // '*', '(.*)' are both invalid in this version — use '/{*path}' instead
     app.get('/{*path}', (req, res, next) => {
-        // If request is for a static asset file and it wasn't served, return 404
         if (path.extname(req.path)) {
             return res.status(404).send('Asset not found: ' + req.path);
         }
-        // For all other routes (SPA navigation), serve index.html
         res.sendFile(path.join(publicPath, 'index.html'), (err) => {
             if (err) {
                 logger.error('sendFile error:', err.message);
@@ -666,6 +672,7 @@ if (process.env.NODE_ENV === "production") {
         });
     });
 }
+
 
 // ✅ ISSUE #5: Register centralized error handler (must be AFTER all routes)
 // Handles Zod validation errors, AppError errors, and unknown errors
