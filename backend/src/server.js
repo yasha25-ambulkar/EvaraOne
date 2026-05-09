@@ -636,14 +636,7 @@ app.get("/api/v1/admin/audit-logs", globalSaaSAuth, getAuditLogs);
 app.get("/api/v1/stats/dashboard/summary", globalSaaSAuth, getDashboardSummary);
 app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
-// ============================================================================
-// Production: Serve frontend static files (MUST be before API/CORS)
-// ============================================================================
-if (process.env.NODE_ENV === "production") {
-    const publicPath = path.resolve(__dirname, '../../client/dist');
-    logger.info(`[Server] Serving static files from: ${publicPath}`);
-    app.use(express.static(publicPath, { maxAge: '1y', immutable: true, fallthrough: true }));
-}
+
 
 // ============================================================================
 // ✅ TASK #1 — Health check endpoint (MUST be before static catch-all)
