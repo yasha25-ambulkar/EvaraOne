@@ -16,18 +16,28 @@ const productLabel = (device: any): string => {
 import { computeDeviceStatus } from '../../services/DeviceService';
 
 const isNodeOnline = (device: any): boolean => {
-  const ts = 
-    device?.last_telemetry?.timestamp || 
+  // 1. Authoritative backend flag — highest priority (same logic as AllNodes & TDSCard)
+  if (typeof device?.online_status === 'boolean') return device.online_status;
+
+  // 2. Pre-computed status from NodeService.mapNodeData() — second priority
+  if (device?.status === 'Online') return true;
+  if (device?.status === 'Offline') return false;
+
+  // 3. Fallback: compute from the best available timestamp
+  const ts =
+    device?.last_telemetry?.timestamp ||
     device?.last_telemetry?.lastUpdated ||
     device?.telemetrySnapshot?.timestamp ||
     device?.telemetrySnapshot?.lastUpdated ||
     device?.lastUpdated ||
-    device?.lastPing || 
-    device?.last_seen || 
+    device?.lastPing ||
+    device?.last_seen ||
     device?.last_online_at;
-  if (!ts) return device?.status === 'Online';
+
+  if (!ts) return false;
   return computeDeviceStatus(ts) === 'Online';
 };
+
 
 // ── Loading Skeleton ──────────────────────────────────────────────────────────
 function DeviceCardSkeleton() {
