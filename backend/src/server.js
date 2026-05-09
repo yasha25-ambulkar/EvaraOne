@@ -637,20 +637,30 @@ app.get('/api/v1/health', (req, res) => {
 
 // Production: Serve frontend static files (MUST be after API routes)
 if (process.env.NODE_ENV === "production") {
-    const publicPath = path.join(process.cwd(), '../client/dist');
+    // ✅ Use __dirname (always resolves to /app/backend/src/) regardless of cwd
+    // process.cwd() can be unreliable depending on how Railway starts the process
+    const publicPath = path.resolve(__dirname, '../../client/dist');
+
+    logger.info(`[Server] Serving static files from: ${publicPath}`);
 
     app.use(express.static(publicPath, {
         maxAge: '1y',
-        immutable: true
+        immutable: true,
+        // Fallthrough: if file not found, pass to next middleware (don't 500)
+        fallthrough: true
     }));
 
     // ✅ FIX: Use named wildcard for Express 5 / path-to-regexp v8 compatibility
     // '*', '(.*)' are both invalid in this version — use '/{*path}' instead
     app.get('/{*path}', (req, res, next) => {
-        if (req.path.startsWith('/api/') || path.extname(req.path)) return next();
+        // If request is for a static asset file and it wasn't served, return 404
+        if (path.extname(req.path)) {
+            return res.status(404).send('Asset not found: ' + req.path);
+        }
+        // For all other routes (SPA navigation), serve index.html
         res.sendFile(path.join(publicPath, 'index.html'), (err) => {
             if (err) {
-                console.error('sendFile error:', err);
+                logger.error('sendFile error:', err.message);
                 next(err);
             }
         });
