@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const { logger } = require("../config/pino.js");
 
 try {
   if (!admin.apps.length) {
@@ -9,10 +10,10 @@ try {
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
       }),
     });
-    console.log("✅ Firebase initialized successfully");
+    logger.info("✅ Firebase Admin SDK initialized successfully");
   }
 } catch (err) {
-  console.error("❌ Firebase init failed:", err.message);
+  logger.error("❌ Firebase Admin SDK initialization failed:", err.message);
   process.exit(1);
 }
 

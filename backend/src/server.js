@@ -627,7 +627,7 @@ if (process.env.NODE_ENV === "production") {
         immutable: true
     }));
 
-    app.get("*", (req, res, next) => {
+    app.get("(.*)", (req, res, next) => {
         if (req.url.startsWith("/api/") || path.extname(req.url)) return next();
         res.sendFile(path.join(publicPath, "index.html"), (err) => {
             if (err) {

@@ -13,11 +13,7 @@ const REQUIRED_VARS = [
     "FIREBASE_PRIVATE_KEY"
 ];
 
-// ✅ CRITICAL FIX: In production, these are REQUIRED (not optional)
-const PRODUCTION_REQUIRED_VARS = [
-    "REDIS_URL",
-    "SENTRY_DSN"
-];
+
 
 function validateEnv() {
     const isProd = process.env.NODE_ENV === 'production';
@@ -33,15 +29,7 @@ function validateEnv() {
         process.exit(1);
     }
 
-    // Production-specific warnings (non-fatal)
-    if (isProd) {
-        const prodMissing = PRODUCTION_REQUIRED_VARS.filter(v => !process.env[v]);
-        if (prodMissing.length > 0) {
-            logger.warn("⚠️  PRODUCTION: MISSING RECOMMENDED ENVIRONMENT VARIABLES:");
-            prodMissing.forEach(v => logger.warn(`   - ${v}`));
-            logger.warn("These are recommended in production for reliability but the server will continue without them.");
-        }
-    }
+
 
     // Validate Firebase private key format
     if (process.env.FIREBASE_PRIVATE_KEY && !process.env.FIREBASE_PRIVATE_KEY.includes("BEGIN PRIVATE KEY")) {
@@ -53,19 +41,17 @@ function validateEnv() {
         }
     }
 
-    // ✅ CRITICAL FIX: Warn if Redis is not configured in production
-    if (isProd && !process.env.REDIS_URL) {
-        logger.warn("⚠️  PRODUCTION: REDIS_URL not configured.");
-        logger.warn("   Using in-memory cache will cause state loss on restart and socket issues across replicas.");
-    }
-
-    // MQTT is optional — server runs without it (MQTT client will self-disable)
-    if (isProd && !process.env.MQTT_BROKER_URL) {
-        logger.warn("⚠️  MQTT_BROKER_URL not configured. Device telemetry ingestion will be disabled.");
-    }
-
-    if (isProd && (!process.env.MQTT_USERNAME || !process.env.MQTT_PASSWORD)) {
-        logger.warn("⚠️  MQTT credentials (MQTT_USERNAME / MQTT_PASSWORD) not set. MQTT will be skipped.");
+    // ✅ PRODUCTION: Optimization Warnings (Non-fatal)
+    if (isProd) {
+        if (!process.env.REDIS_URL) {
+            logger.warn("⚠️  PRODUCTION: REDIS_URL not configured. Using in-memory fallback (performance may be impacted).");
+        }
+        if (!process.env.SENTRY_DSN) {
+            logger.info("ℹ️  PRODUCTION: Sentry monitoring disabled (SENTRY_DSN missing).");
+        }
+        if (!process.env.MQTT_BROKER_URL) {
+            logger.info("ℹ️  PRODUCTION: MQTT disabled (MQTT_BROKER_URL missing).");
+        }
     }
 
     logger.debug("✅ Environment Variables Validated");
