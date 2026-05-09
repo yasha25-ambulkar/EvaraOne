@@ -180,13 +180,23 @@ async function refreshDeviceState(device, options = { light: false }) {
   // Only update history if we did a full fetch or if we have a cache to append to
   let history = [];
   if (!isLight) {
-    history = readings.map(r => {
+    history = readings.map((r, i) => {
       const m = computeAllMetrics(r.distanceCm, dims);
+      
+      // Calculate flow rate for this point relative to the previous one
+      let flow_rate = 0;
+      if (i > 0) {
+        const prev = readings[i - 1];
+        const prevMetrics = computeAllMetrics(prev.distanceCm, dims);
+        const deltaMinutes = (r.timestampMs - prev.timestampMs) / 60000;
+        flow_rate = computeRate(prevMetrics.volumeLitres, m.volumeLitres, deltaMinutes);
+      }
+
       return {
         timestamp:      new Date(r.timestampMs).toISOString(),
         level:          m.percentage,
         volume:         m.volumeLitres,
-        flow_rate:      null,
+        flow_rate:      flow_rate,
         distance:       Math.round(r.distanceCm * 100) / 100,
       };
     });
@@ -203,7 +213,7 @@ async function refreshDeviceState(device, options = { light: false }) {
           timestamp:      latestTs,
           level:          m.percentage,
           volume:         m.volumeLitres,
-          flow_rate:      null,
+          flow_rate:      rateLpm,
           distance:       Math.round(latest.distanceCm * 100) / 100,
         });
         // Keep a larger buffer for analytics (e.g. last 5000 points)
