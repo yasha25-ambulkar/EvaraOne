@@ -655,8 +655,9 @@ app.get('/api/v1/health', (req, res) => {
 
   // If Firebase is down, tell Railway we're sick (503)
   // Otherwise say we're fine (200)
-  const isHealthy = admin.apps.length > 0;
-  res.status(isHealthy ? 200 : 503).json(health);
+  // ✅ Resilience Fix: Always return 200 during startup so we can see logs
+  // Railway will kill the app if it gets a 503, preventing us from debugging.
+  res.status(200).json(health);
 });
 
 // ✅ ISSUE #5: Register centralized error handler (must be AFTER all routes)

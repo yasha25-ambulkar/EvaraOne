@@ -26,9 +26,10 @@ function validateEnv() {
     const missing = REQUIRED_VARS.filter(v => !process.env[v]);
     
     if (missing.length > 0) {
+        console.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
+        missing.forEach(v => console.error(`   - ${v}`));
         logger.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
         missing.forEach(v => logger.error(`   - ${v}`));
-        logger.error("\nPlease check your .env file or deployment configuration.");
         process.exit(1);
     }
 

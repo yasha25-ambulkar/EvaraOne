@@ -1,9 +1,10 @@
 [build]
-buildCommand = "npm install && cd client && npm install && npm run build && cd ../backend && npm install --production=false"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "cd backend && NODE_ENV=production node --openssl-legacy-provider src/server.js"
+startCommand = "npm start"
+healthcheckPath = "/api/v1/health"
 
 [variables]
-PORT = "3000"
 NODE_ENV = "production"
+

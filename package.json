@@ -9,8 +9,8 @@
     "install:backend": "cd backend && npm install --production",
     "install:client": "cd client && npm install",
     "build:client": "cd client && npm run build",
-    "build": "cd client && npm install && npm run build",
-    "start": "cd backend && NODE_ENV=production node --openssl-legacy-provider src/server.js",
+    "build": "npm install && cd client && npm install && npm run build && cd ../backend && npm install --production",
+    "start": "cd backend && NODE_ENV=production node src/server.js",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd client && npm run dev\""
   },
   "devDependencies": {
