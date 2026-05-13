@@ -56,18 +56,23 @@ async function refreshTDSDeviceState(device) {
     }
 
     const channelMetadata = response.channel || {};
-    const mapping = metadata.sensor_field_mapping || metadata.configuration?.sensor_field_mapping || {};
+    
+    // FUNCTION: Find field key by matching keywords in metadata names
+    const findFieldByKeyword = (keywords, fallback) => {
+      for (const [key, name] of Object.entries(channelMetadata)) {
+        if (!key.startsWith('field')) continue;
+        const lowerName = String(name).toLowerCase();
+        if (keywords.some(kw => lowerName.includes(kw.toLowerCase()))) {
+          return key;
+        }
+      }
+      return fallback;
+    };
 
-    // 1. ADVANCED RESOLUTION: Try to resolve by name first (Stable Anchor Architecture)
-    // We look for common names if the mapping doesn't explicitly tell us
-    const tdsField = resolveFieldByName(channelMetadata, mapping, "tdsValue") || 
-                     resolveFieldKey(mapping, ["tdsValue", "tds_value", "TDS"], "field2");
-    
-    const tempField = resolveFieldByName(channelMetadata, mapping, "temperature") || 
-                      resolveFieldKey(mapping, ["temperature", "temp", "Temperature"], "field3");
-    
-    const voltageField = resolveFieldByName(channelMetadata, mapping, "voltage") || 
-                         resolveFieldKey(mapping, ["voltage", "volt", "Voltage"], "field1");
+    // Resolve fields by inspecting metadata names (Highest Priority)
+    const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    const tempField = findFieldByKeyword(['temp', 'celsius'], 'field3');
+    const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
@@ -191,17 +196,23 @@ async function getTDSHistory(device, limit = 1000) {
     }
 
     const channelMetadata = response.data.channel || {};
-    const mapping = device.sensor_field_mapping || device.configuration?.sensor_field_mapping || {};
-
-    // Use name-based resolution as primary, fall back to key mapping
-    const tdsField = resolveFieldByName(channelMetadata, mapping, "tdsValue") || 
-                     resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
     
-    const tempField = resolveFieldByName(channelMetadata, mapping, "temperature") || 
-                      resolveFieldKey(mapping, ["temperature", "temp"], "field3");
+    // FUNCTION: Find field key by matching keywords in metadata names
+    const findFieldByKeyword = (keywords, fallback) => {
+      for (const [key, name] of Object.entries(channelMetadata)) {
+        if (!key.startsWith('field')) continue;
+        const lowerName = String(name).toLowerCase();
+        if (keywords.some(kw => lowerName.includes(kw.toLowerCase()))) {
+          return key;
+        }
+      }
+      return fallback;
+    };
 
-    const voltageField = resolveFieldByName(channelMetadata, mapping, "voltage") || 
-                         resolveFieldKey(mapping, ["voltage", "volt"], "field1");
+    // Resolve fields by inspecting metadata names
+    const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    const tempField = findFieldByKeyword(['temp', 'celsius'], 'field3');
+    const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
 
     return response.data.feeds.map(feed => {
       const tdsValue = parseFloat(feed[tdsField]);
