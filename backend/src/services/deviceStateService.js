@@ -545,7 +545,7 @@ function clearCache(deviceId) {
  * @returns {string} - "ONLINE" | "OFFLINE" | "UNKNOWN"
  */
 function calculateDeviceStatus(lastUpdatedAt) {
-  const OFFLINE_THRESHOLD_MS = 20 * 60 * 1000; // 20 minutes
+  const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
   // Handle missing or invalid timestamps
   if (!lastUpdatedAt) {

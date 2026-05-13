@@ -72,19 +72,26 @@ const EvaraTDSAnalytics = () => {
         if (!device) return null;
         if (!telemetry) return device;
         
-        // Authoritative status from backend
-        const isOnline = (typeof (device as any).online_status === 'boolean')
-            ? (device as any).online_status
-            : (typeof (telemetry as any).online === 'boolean')
-                ? (telemetry as any).online
-                : true;
+        // Priority: Real-time telemetry 'online' flag, then backend 'online_status'
+        // If the backend says 'OfflineRecent', we treat it as isOnline=false for the boolean flag
+        // but preserve the 'OfflineRecent' string for the status label.
+        const backendOnline = (device as any).online_status === true;
+        const telemetryOnline = (typeof (telemetry as any).online === 'boolean') ? (telemetry as any).online : true;
+        
+        const isOnline = telemetryOnline || backendOnline;
+        
+        // Determine the display status string
+        let displayStatus = isOnline ? 'Online' : 'Offline';
+        if (!isOnline && (device as any).status === 'OfflineRecent') {
+            displayStatus = 'OfflineRecent';
+        }
 
         return {
             ...device,
             tdsValue: telemetry.tdsValue ?? device.tdsValue,
             temperature: telemetry.temperature ?? device.temperature,
             waterQualityRating: telemetry.quality ?? device.waterQualityRating,
-            status: isOnline ? 'Online' : 'Offline',
+            status: displayStatus,
             lastTimestamp: telemetry.timestamp || device.lastTimestamp
         };
     }, [device, telemetry]);
@@ -209,13 +216,15 @@ const EvaraTDSAnalytics = () => {
                         <div className="flex items-center gap-2 flex-wrap pb-1">
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
-                                (mergedDevice.status || 'Offline') === 'Online' 
+                                (mergedDevice.status === 'Online')
                                     ? "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border-[#10b981]/50 dark:border-emerald-500/40"
-                                    : "bg-[#fff1f2] dark:bg-red-500/10 text-[#e11d48] dark:text-red-400 border-[#fb7185]/50 dark:border-red-500/40"
+                                    : (mergedDevice.status === 'OfflineRecent')
+                                        ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/40"
+                                        : "bg-[#fff1f2] dark:bg-red-500/10 text-[#e11d48] dark:text-red-400 border-[#fb7185]/50 dark:border-red-500/40"
                             )}>
                                 <div className={clsx(
                                     "w-1.5 h-1.5 rounded-full animate-pulse",
-                                    (mergedDevice.status || 'Offline') === 'Online' ? "bg-[#10b981]" : "bg-[#e11d48]"
+                                    (mergedDevice.status === 'Online') ? "bg-[#10b981]" : (mergedDevice.status === 'OfflineRecent') ? "bg-amber-500" : "bg-[#e11d48]"
                                 )} />
                                 {mergedDevice.status || 'Offline'}
                             </div>

@@ -56,8 +56,9 @@ async function refreshTDSDeviceState(device) {
 
     // Resolve field mappings
     const mapping = metadata.sensor_field_mapping || metadata.configuration?.sensor_field_mapping || {};
-    const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
+    // Use the exact internal keys from our Firestore standardization: tdsValue, temperature
+    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field1");
+    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field2");
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
@@ -72,12 +73,16 @@ async function refreshTDSDeviceState(device) {
       else quality = "Critical";
     }
 
-    // Status calculation
+    // Status calculation - more lenient thresholds for TDS devices
     const lastUpdated = new Date(latestData.created_at || Date.now());
     const timeSinceUpdate = Date.now() - lastUpdated.getTime();
+    
+    // Use slightly larger thresholds for TDS (40 mins offline, 20 mins recent)
+    const TDS_OFFLINE_THRESHOLD = 40 * 60 * 1000; 
+    
     let status = DEVICE_STATUS.ONLINE;
-    if (timeSinceUpdate > STATUS_THRESHOLD_MS) status = DEVICE_STATUS.OFFLINE;
-    else if (timeSinceUpdate > STATUS_THRESHOLD_MS / 2) status = DEVICE_STATUS.OFFLINE_RECENT;
+    if (timeSinceUpdate > TDS_OFFLINE_THRESHOLD) status = DEVICE_STATUS.OFFLINE;
+    else if (timeSinceUpdate > TDS_OFFLINE_THRESHOLD / 2) status = DEVICE_STATUS.OFFLINE_RECENT;
 
     const state = {
       id,
