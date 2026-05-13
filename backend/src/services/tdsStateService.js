@@ -57,8 +57,9 @@ async function refreshTDSDeviceState(device) {
     // Resolve field mappings
     const mapping = metadata.sensor_field_mapping || metadata.configuration?.sensor_field_mapping || {};
     // Use the exact internal keys from our Firestore standardization: tdsValue, temperature
-    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field1");
-    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field2");
+    // Fallback to field2 (TDS) and field3 (Temp) per ThingSpeak channel metadata
+    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
+    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field3");
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
@@ -150,7 +151,7 @@ function buildOfflineState(id, metadata, error) {
  * Fetches historical data for a TDS device.
  * Falls back to last_telemetry if ThingSpeak is unreachable.
  */
-async function getTDSHistory(device, limit = 60) {
+async function getTDSHistory(device, limit = 1000) {
   const id = device.id;
   const channel = (device.thingspeak_channel_id || device.configuration?.thingspeak_channel_id)?.trim();
   const apiKey = (device.thingspeak_read_api_key || device.configuration?.thingspeak_read_api_key)?.trim();
@@ -175,7 +176,7 @@ async function getTDSHistory(device, limit = 60) {
 
     const mapping = device.sensor_field_mapping || device.configuration?.sensor_field_mapping || {};
     // Correctly resolve field keys using the mapping from Firestore
-    // Support both camelCase and snake_case internal keys
+    // For Bakul RO: field2 is TDS, field3 is Temp
     const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
     const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field3");
 
