@@ -27,10 +27,30 @@ interface TelemetryPayload {
 }
 
 const formatKPIValue = (val: number, isOffline?: boolean) =>
-    (isOffline || isNaN(val)) ? '—' : val.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: 0 });
+    (isOffline || val == null || isNaN(val) || !isFinite(val)) ? '—' : val.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: 0 });
 
 const formatMeterValue = (val: number, isOffline?: boolean) =>
-    (isOffline || isNaN(val)) ? '—' : val.toFixed(2);
+    (isOffline || val == null || isNaN(val) || !isFinite(val)) ? '—' : val.toFixed(2);
+
+/**
+ * Robust date parser to handle Firestore Timestamps, ISO strings, and numeric timestamps.
+ */
+const safeParseDate = (ts: any): Date => {
+    if (!ts) return new Date(NaN);
+    if (ts instanceof Date) return ts;
+    if (typeof ts === 'object') {
+        if ('_seconds' in ts) return new Date(ts._seconds * 1000);
+        if ('seconds' in ts) return new Date(ts.seconds * 1000);
+    }
+    if (typeof ts === 'number') {
+        return ts < 10000000000 ? new Date(ts * 1000) : new Date(ts);
+    }
+    const d = new Date(ts);
+    if (isNaN(d.getTime()) && typeof ts === 'string' && ts.includes(' ')) {
+        return new Date(ts.replace(' ', 'T'));
+    }
+    return d;
+};
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
@@ -617,10 +637,11 @@ const EvaraFlowAnalytics = () => {
     const telemetryData = (unifiedData?.latest && !('error' in unifiedData.latest)
         ? unifiedData.latest
         : undefined) as TelemetryPayload | undefined;
-    const deviceInfo = ('data' in (unifiedData?.info ?? {})
-        ? (unifiedData!.info as any).data
+    const deviceInfo = (unifiedData?.info && 'data' in (unifiedData.info as any)
+        ? (unifiedData.info as any).data
         : undefined) as NodeInfoData | undefined;
 
+    const alertsCount = (deviceInfo as any)?.alerts_count || 0;
     const customerConfig = (deviceInfo as any)?.customer_config || {};
     const isSuperAdmin = user?.role === 'superadmin';
 
@@ -637,9 +658,9 @@ const EvaraFlowAnalytics = () => {
     const bestTimestamp = snapshotTs ?? deviceLastSeen;
     
     // Authoritative status from backend
-    const onlineStatus = (typeof (deviceInfo as any).online_status === 'boolean')
+    const onlineStatus = (typeof (deviceInfo as any)?.online_status === 'boolean')
         ? ((deviceInfo as any).online_status ? 'Online' : 'Offline')
-        : (typeof (telemetryData as any).online === 'boolean')
+        : (typeof (telemetryData as any)?.online === 'boolean')
             ? ((telemetryData as any).online ? 'Online' : 'Offline')
             : computeOnlineStatus(bestTimestamp);
 
@@ -687,6 +708,7 @@ const EvaraFlowAnalytics = () => {
     // The backend TelemetryWorker polls ThingSpeak every 60s, processes the data,
     // and writes to Firestore. We subscribe to that document for live updates.
     const deviceDocId = deviceInfo?.id || hardwareId;
+    const configId = deviceConfig?.id || (unifiedData as any)?.config?.id;
     const deviceType = deviceConfig?.device_type || (unifiedData as any)?.config?.config?.device_type || 'flow_meter';
     const firestoreFlow = useFirestoreFlowData(deviceDocId, deviceType);
 
@@ -702,19 +724,28 @@ const EvaraFlowAnalytics = () => {
     const tsFeeds = useMemo(() => {
         if (!historyFeeds || historyFeeds.length === 0) return [];
         return historyFeeds.map((f: any) => {
-            const utcTime = new Date(f.timestamp || f.created_at).getTime();
-            const istTime = new Date(utcTime + (5.5 * 60 * 60 * 1000));
+            const date = safeParseDate(f.timestamp || f.created_at);
+            const utcTime = date.getTime();
+            const istTime = isNaN(utcTime) ? date : new Date(utcTime + (5.5 * 60 * 60 * 1000));
             const reading = f.total_liters ?? (f.raw?.[fieldTotal] ? parseFloat(f.raw[fieldTotal]) : null);
             const flowReading = f.flow_rate ?? (f.raw?.[fieldFlow] ? parseFloat(f.raw[fieldFlow]) : null);
             return { ...f, istTime, reading, flowReading };
-        }).filter((f: any) => (f.reading != null && !isNaN(f.reading)) || (f.flowReading != null && !isNaN(f.flowReading)));
+        }).filter((f: any) => 
+            (f.reading != null && !isNaN(f.reading)) || 
+            (f.flowReading != null && !isNaN(f.flowReading)) ||
+            (!isNaN(f.istTime.getTime()))
+        );
     }, [historyFeeds, fieldTotal, fieldFlow]);
 
     // Derived Offline Logic
     const { isTSOffline, tsIstLabel, tsDurationLabel } = useMemo(() => {
         if (!tsCreatedAt) return { isTSOffline: false, tsIstLabel: '', tsDurationLabel: '' };
 
-        const lastSeenDate = new Date(tsCreatedAt);
+        const lastSeenDate = safeParseDate(tsCreatedAt);
+        if (isNaN(lastSeenDate.getTime())) {
+            return { isTSOffline: true, tsIstLabel: 'Unknown', tsDurationLabel: 'Syncing data...' };
+        }
+
         const now = new Date();
         const diffMs = now.getTime() - lastSeenDate.getTime();
         const diffMin = diffMs / 60000;
@@ -730,13 +761,19 @@ const EvaraFlowAnalytics = () => {
             hour12: false,
             timeZone: 'Asia/Kolkata'
         };
-        const istLabel = new Intl.DateTimeFormat('en-IN', formatOptions).format(lastSeenDate).replace(',', '') + ' IST';
+        
+        let istLabel = 'Syncing...';
+        try {
+            istLabel = new Intl.DateTimeFormat('en-IN', formatOptions).format(lastSeenDate).replace(',', '') + ' IST';
+        } catch (e) {
+            console.error('[Flow] Date formatting failed:', e);
+        }
 
         // Duration Formatting
         const hoursAgo = Math.floor(diffMin / 60);
         const durationLabel = hoursAgo > 0
             ? `Device offline · Last seen ${hoursAgo} hours ago`
-            : `Device offline · Last seen ${Math.floor(diffMin)} minutes ago`;
+            : `Device offline · Last seen ${Math.max(0, Math.floor(diffMin))} minutes ago`;
 
         return { isTSOffline: offline, tsIstLabel: istLabel, tsDurationLabel: durationLabel };
     }, [tsCreatedAt]);
@@ -820,7 +857,8 @@ const EvaraFlowAnalytics = () => {
     const meterHistory = useMemo(() => {
         return historyFeeds
             .map((f: any) => {
-                const ts = new Date(f.timestamp || f.created_at).getTime();
+                const date = safeParseDate(f.timestamp || f.created_at);
+                const ts = date.getTime();
                 let reading: number;
                 if (f.total_liters != null) {
                     reading = f.total_liters;
@@ -828,9 +866,9 @@ const EvaraFlowAnalytics = () => {
                     const raw = parseFloat(f.raw?.[fieldTotal] as string);
                     reading = isNaN(raw) ? NaN : raw;
                 }
-                return { ts, reading };
+                return { ts, reading, date };
             })
-            .filter((e: { ts: number; reading: number }) => !isNaN(e.reading));
+            .filter((e: { ts: number; reading: number }) => !isNaN(e.ts) && !isNaN(e.reading));
     }, [historyFeeds, fieldTotal]);
 
     const { deltaVolumeLitres, avgFlowLperMin } = useMemo(() => {

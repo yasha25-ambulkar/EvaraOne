@@ -132,11 +132,10 @@ isAnimationActive={false}
 
             {/* Bottom Nav Button */}
             <div
-                className="relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#1e3a8a]/90 min-h-[48px]"
+                className="relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:brightness-110 min-h-[48px] bg-blue-700 backdrop-blur-xl border-t border-white/20"
                 style={{
                     color: '#fff',
-                    background: '#2563eb',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                 }}
             >
                 <span className="relative z-10 drop-shadow-sm">VIEW MORE</span>

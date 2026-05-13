@@ -122,6 +122,7 @@ class NodeService {
     else if (categoryRaw.includes('flow') || categoryRaw.includes('pump')) category = 'flow';
     else if (categoryRaw.includes('sump')) category = 'sump';
     else if (categoryRaw.includes('tds')) category = 'tds';
+    else if (categoryRaw.includes('phase') || categoryRaw.includes('ops')) category = 'phase';
     else category = 'unknown';
 
     const displayName = data.displayName || data.display_name || data.label || hardwareId;
@@ -169,6 +170,7 @@ class NodeService {
           category === 'flow' ? 'EvaraFlow' :
           category === 'deep' ? 'EvaraDeep' :
           category === 'tds' ? 'EvaraTDS' :
+          category === 'phase' ? 'EvaraMotor' :
           null  // unknown devices get null, not EvaraTank
       ),
       analyticsTemplate: data.analyticsTemplate || data.analytics_template || (
@@ -176,6 +178,7 @@ class NodeService {
           category === 'flow' ? 'EvaraFlow' :
           category === 'deep' ? 'EvaraDeep' :
           category === 'tds' ? 'EvaraTDS' :
+          category === 'phase' ? 'EvaraMotor' :
           null
       ),
       last_seen: safeIso(lastSeenTime),
