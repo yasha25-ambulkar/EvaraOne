@@ -39,7 +39,7 @@ import {
 } from "firebase/auth";
 import type { User as FirebaseUser } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+import { auth, db, isFirebaseEnabled } from "../lib/firebase";
 
 export type UserRole = "superadmin" | "community_admin" | "customer";
 export type UserPlan = "free" | "pro" | "enterprise";
@@ -72,6 +72,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const firebaseReady = isFirebaseEnabled && !!auth && !!db;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -143,6 +144,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   useEffect(() => {
+    if (!firebaseReady || !auth) {
+      console.warn('[AuthContext] Firebase is disabled in local dev; auth features are unavailable.');
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(
       auth,
       async (firebaseUser: FirebaseUser | null) => {
@@ -156,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     return () => unsubscribe();
-  }, [fetchProfile]);
+  }, [firebaseReady, auth, fetchProfile]);
 
   const login = useCallback(
     async (
@@ -165,6 +173,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     ): Promise<{ success: boolean; user?: User; error?: string }> => {
       setLoading(true);
       try {
+        if (!firebaseReady || !auth) {
+          setLoading(false);
+          return {
+            success: false,
+            error: "Firebase auth is not configured in this environment.",
+          };
+        }
+
         // Step 1: Firebase authentication
         const credential = await signInWithEmailAndPassword(
           auth,
@@ -239,7 +255,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       password: string,
       displayName: string,
     ): Promise<{ success: boolean; error?: string }> => {
+      setLoading(true);
       try {
+        if (!firebaseReady || !auth || !db) {
+          setLoading(false);
+          return { success: false, error: 'Firebase signup is not configured in this environment.' };
+        }
+
         const credential = await createUserWithEmailAndPassword(
           auth,
           email,
@@ -264,11 +286,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           await setDoc(doc(db, "customers", credential.user.uid), profile);
 
           await fetchProfile(credential.user);
+          setLoading(false);
           return { success: true };
         }
 
+        setLoading(false);
         return { success: false, error: "Signup failed" };
       } catch (err: any) {
+        setLoading(false);
         return {
           success: false,
           error: err.message || "Signup failed",
@@ -279,6 +304,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async (): Promise<void> => {
+    if (!auth) {
+      setUser(null);
+      return;
+    }
+
     await signOut(auth);
     setUser(null);
   }, []);

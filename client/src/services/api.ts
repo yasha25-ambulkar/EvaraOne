@@ -4,7 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { io } from 'socket.io-client';
-import { auth } from "../lib/firebase";
+import { auth, isFirebaseEnabled } from "../lib/firebase";
 
 // API Configuration
 // Use environment variable if provided, otherwise fallback to the current origin in production
@@ -22,7 +22,7 @@ console.log('[API Config] API URL:', VITE_API_URL);
 
 export const socket = io(SOCKET_URL, {
   auth: async (cb) => {
-    const user = auth.currentUser;
+    const user = auth?.currentUser;
     if (user) {
       const token = await user.getIdToken();
       cb({ token });
@@ -46,10 +46,10 @@ api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
       // Get Firebase user with timeout protection
-      const user = auth.currentUser;
+      const user = auth?.currentUser;
       
-      if (!user) {
-        console.warn('[API Interceptor] No user logged in, skipping token injection');
+      if (!isFirebaseEnabled || !user) {
+        console.warn('[API Interceptor] Firebase auth disabled or no user logged in, skipping token injection');
         return config;
       }
 
