@@ -360,3 +360,4 @@ When adding new background jobs, async callbacks, or Firestore listeners:
 3. **Test Staging Environment**: Run error handling tests before production
    
 4. **Verify Alerting**: Confirm Sentry alerts fire for unhandled rejections
+ 

@@ -48,19 +48,48 @@ async function refreshTDSDeviceState(device) {
   }
 
   try {
-    const latestData = await fetchLatestData(channel, apiKey);
+    const response = await fetchLatestData(channel, apiKey);
+    const latestData = response.feeds ? response.feeds[0] : response;
     
     if (!latestData) {
       return buildOfflineState(id, metadata, "No data from ThingSpeak");
     }
 
-    // Resolve field mappings
-    const mapping = metadata.sensor_field_mapping || metadata.configuration?.sensor_field_mapping || {};
-    const tdsField = resolveFieldKey(mapping, ["tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature"], "field3");
+    const channelMetadata = response.channel || {};
+    
+    // FUNCTION: Find field key by matching keywords in metadata names
+    const findFieldByKeyword = (keywords, fallback) => {
+      for (const [key, name] of Object.entries(channelMetadata)) {
+        if (!key.startsWith('field')) continue;
+        const lowerName = String(name).toLowerCase();
+        if (keywords.some(kw => lowerName.includes(kw.toLowerCase()))) {
+          console.log(`[TDS Resolution] Found match for keywords [${keywords}] in ${key} ("${name}")`);
+          return key;
+        }
+      }
+      return fallback;
+    };
+
+    // Resolve fields by inspecting metadata names (Highest Priority)
+    let tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    let tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
+    let voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    // SYSTEM OVERRIDE FOR BAKUL RO PLANT (Private Channel Fix)
+    if (channel === '2709204') {
+      console.log(`[TDS Resolution] Applying Hardcoded Override for Bakul RO (2709204)`);
+      tdsField = 'field2';
+      tempField = 'field3';
+      voltageField = 'field1';
+    }
+
+    console.log(`[TDS Resolution] ID: ${id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
+    const voltage = parseFloat(latestData[voltageField]);
+
+    console.log(`[TDS Resolution] Raw Values: TDS=${latestData[tdsField]} | Temp=${latestData[tempField]} | Volt=${latestData[voltageField]}`);
 
     // Quality calculation
     let quality = "Good";
@@ -72,23 +101,34 @@ async function refreshTDSDeviceState(device) {
       else quality = "Critical";
     }
 
-    // Status calculation
+    // Status calculation - more lenient thresholds for TDS devices
     const lastUpdated = new Date(latestData.created_at || Date.now());
     const timeSinceUpdate = Date.now() - lastUpdated.getTime();
+    
+    // Use slightly larger thresholds for TDS (40 mins offline, 20 mins recent)
+    const TDS_OFFLINE_THRESHOLD = 40 * 60 * 1000; 
+    
     let status = DEVICE_STATUS.ONLINE;
-    if (timeSinceUpdate > STATUS_THRESHOLD_MS) status = DEVICE_STATUS.OFFLINE;
-    else if (timeSinceUpdate > STATUS_THRESHOLD_MS / 2) status = DEVICE_STATUS.OFFLINE_RECENT;
+    if (timeSinceUpdate > TDS_OFFLINE_THRESHOLD) status = DEVICE_STATUS.OFFLINE;
+    else if (timeSinceUpdate > TDS_OFFLINE_THRESHOLD / 2) status = DEVICE_STATUS.OFFLINE_RECENT;
 
     const state = {
       id,
-      tdsValue: isNaN(tdsValue) ? null : tdsValue,
-      temperature: isNaN(temperature) ? null : temperature,
+      status,
+      tdsValue: isNaN(tdsValue) ? 0 : tdsValue,
+      temperature: isNaN(temperature) ? 0 : temperature,
+      voltage: isNaN(voltage) ? 0 : voltage,
       quality,
       waterQualityRating: quality,
-      status,
-      lastUpdated: lastUpdated.toISOString(),
-      timestamp: latestData.created_at,
-      unit: metadata.configuration?.unit || "ppm"
+      lastUpdated,
+      timestamp: lastUpdated.toISOString(),
+      last_seen: lastUpdated.toISOString(),
+      metadata: {
+        tdsField,
+        tempField,
+        voltageField,
+        channelName: channelMetadata.name
+      }
     };
 
     // Update Firestore background update
@@ -145,7 +185,7 @@ function buildOfflineState(id, metadata, error) {
  * Fetches historical data for a TDS device.
  * Falls back to last_telemetry if ThingSpeak is unreachable.
  */
-async function getTDSHistory(device, limit = 60) {
+async function getTDSHistory(device, limit = 1000) {
   const id = device.id;
   const channel = (device.thingspeak_channel_id || device.configuration?.thingspeak_channel_id)?.trim();
   const apiKey = (device.thingspeak_read_api_key || device.configuration?.thingspeak_read_api_key)?.trim();
@@ -168,14 +208,39 @@ async function getTDSHistory(device, limit = 60) {
       throw new Error("Invalid response from ThingSpeak");
     }
 
-    const mapping = device.sensor_field_mapping || device.configuration?.sensor_field_mapping || {};
-    // Correctly resolve field keys using the mapping from Firestore
-    // Support both camelCase and snake_case internal keys
-    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field3");
+    const channelMetadata = response.data.channel || {};
+    
+    // FUNCTION: Find field key by matching keywords in metadata names
+    const findFieldByKeyword = (keywords, fallback) => {
+      for (const [key, name] of Object.entries(channelMetadata)) {
+        if (!key.startsWith('field')) continue;
+        const lowerName = String(name).toLowerCase();
+        if (keywords.some(kw => lowerName.includes(kw.toLowerCase()))) {
+          return key;
+        }
+      }
+      return fallback;
+    };
+
+    // Resolve fields by inspecting metadata names
+    let tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    let tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
+    let voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    // SYSTEM OVERRIDE FOR BAKUL RO PLANT (Private Channel Fix)
+    if (channel === '2709204') {
+      tdsField = 'field2';
+      tempField = 'field3';
+      voltageField = 'field1';
+    }
+
+    console.log(`[TDS History Resolution] ID: ${device.id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
 
     return response.data.feeds.map(feed => {
       const tdsValue = parseFloat(feed[tdsField]);
+      const tempValue = parseFloat(feed[tempField]);
+      const voltageValue = parseFloat(feed[voltageField]);
+      
       let quality = "Good";
       if (!isNaN(tdsValue)) {
         if (tdsValue < 300) quality = "Good";
@@ -188,7 +253,8 @@ async function getTDSHistory(device, limit = 60) {
       return {
         timestamp: feed.created_at,
         value: isNaN(tdsValue) ? null : tdsValue,
-        temperature: parseFloat(feed[tempField]) || null,
+        temperature: isNaN(tempValue) ? null : tempValue,
+        voltage: isNaN(voltageValue) ? null : voltageValue,
         quality
       };
     });

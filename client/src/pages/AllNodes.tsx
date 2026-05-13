@@ -37,8 +37,8 @@ type NodeCategory =
   | 'FlowMeter'
   | 'flow'
   | 'EvaraTDS'
-  | 'EvaraTDS';
-type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
+  | 'EvaraMotor';
+type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor';
 
 
 // ─── Category config ─────────────────────────────────────────────────────────
@@ -142,6 +142,14 @@ export const CATEGORY_CONFIG: Record<
     badge: "bg-blue-100 text-blue-700",
     dot: "bg-blue-500",
   },
+  EvaraMotor: {
+    label: "EvaraMotor",
+    icon: <img src="/ops.png" className="w-8 h-8 object-contain drop-shadow-sm" alt="EvaraMotor" />,
+    color: "text-violet-600",
+    bg: "bg-violet-50",
+    badge: "bg-violet-100 text-violet-700",
+    dot: "bg-violet-500",
+  },
 };
 
 
@@ -162,19 +170,19 @@ const ANALYTICS_CONFIG: Record<
     label: "EvaraTank",
     desc: "OHTs & Sumps",
     icon: <img src="/tank.png" className="w-6 h-6 object-contain" />,
-    activeBg: "bg-indigo-600",
+    activeBg: "bg-[#0000CD]",
     activeText: "text-white",
-    activeBorder: "border-indigo-600",
-    badge: "bg-indigo-50 text-indigo-600 border border-indigo-200",
-    dot: "bg-indigo-500",
+    activeBorder: "border-[#0000CD]",
+    badge: "bg-slate-50 text-slate-700 border border-slate-200",
+    dot: "bg-slate-500",
   },
   EvaraDeep: {
     label: "EvaraDeep",
     desc: "Borewells",
     icon: <img src="/borewell.png" className="w-6 h-6 object-contain" />,
-    activeBg: "bg-sky-600",
+    activeBg: "bg-sky-500",
     activeText: "text-white",
-    activeBorder: "border-sky-600",
+    activeBorder: "border-sky-500",
     badge: "bg-sky-50 text-sky-700 border border-sky-200",
     dot: "bg-sky-500",
   },
@@ -182,9 +190,9 @@ const ANALYTICS_CONFIG: Record<
     label: "EvaraFlow",
     desc: "Pump Houses",
     icon: <img src="/meter.png" className="w-6 h-6 object-contain" />,
-    activeBg: "bg-cyan-600",
+    activeBg: "bg-[#191970]",
     activeText: "text-white",
-    activeBorder: "border-cyan-600",
+    activeBorder: "border-[#191970]",
     badge: "bg-cyan-50 text-cyan-700 border border-cyan-200",
     dot: "bg-cyan-500",
   },
@@ -192,16 +200,150 @@ const ANALYTICS_CONFIG: Record<
     label: "EvaraTDS",
     desc: "Water Quality",
     icon: <img src="/tds.png" className="w-6 h-6 object-contain" alt="EvaraTDS" />,
-    activeBg: "bg-blue-600",
+    activeBg: "bg-blue-700",
     activeText: "text-white",
-    activeBorder: "border-blue-600",
+    activeBorder: "border-blue-700",
     badge: "bg-blue-50 text-blue-700 border border-blue-200",
     dot: "bg-blue-500",
+  },
+  EvaraMotor: {
+    label: "EvaraMotor",
+    desc: "Phase Monitor",
+    icon: <img src="/ops.png" className="w-6 h-6 object-contain" alt="EvaraMotor" />,
+    activeBg: "bg-[#0E7490]",
+    activeText: "text-white",
+    activeBorder: "border-[#0E7490]",
+    badge: "bg-violet-50 text-violet-700 border border-violet-200",
+    dot: "bg-violet-500",
   },
 };
 
 
-const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
+// ─── Gauge Component for Voltage ─────────────────────────────────────────────
+const VoltageGauge = ({ value, max = 500 }: { value: number; max?: number }) => {
+  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+  const radius = 35;
+  const cx = 50;
+  const cy = 45;
+  
+  // SVG path for a semi-circle arc
+  const arcPath = `M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`;
+  const circumference = Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
+      <svg viewBox="0 0 100 65" className="w-full h-full">
+        {/* Background Arc */}
+        <path
+          d={arcPath}
+          fill="none"
+          stroke="rgba(139, 92, 246, 0.1)"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+        
+        {/* Progress Arc */}
+        <path
+          d={arcPath}
+          fill="none"
+          stroke="#8B5CF6"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+        />
+
+        {/* Ticks */}
+        {[...Array(13)].map((_, i) => {
+          const angle = 180 + (i * 180) / 12;
+          const rad = (angle * Math.PI) / 180;
+          const innerR = radius - 10;
+          const outerR = radius - 4;
+          return (
+            <line
+              key={i}
+              x1={cx + innerR * Math.cos(rad)}
+              y1={cy + innerR * Math.sin(rad)}
+              x2={cx + outerR * Math.cos(rad)}
+              y2={cy + outerR * Math.sin(rad)}
+              stroke="#CBD5E0"
+              strokeWidth="0.8"
+            />
+          );
+        })}
+
+        {/* Labels */}
+        <text x={cx - radius - 2} y={cy + 8} fontSize="4.5" fontWeight="900" fill="#64748B" textAnchor="middle">0</text>
+        <text x={cx} y={cy - radius - 5} fontSize="4.5" fontWeight="900" fill="#64748B" textAnchor="middle">{max/2}</text>
+        <text x={cx + radius + 2} y={cy + 8} fontSize="4.5" fontWeight="900" fill="#64748B" textAnchor="middle">{max}</text>
+        
+        {/* Setpoint Arrows */}
+        <polygon points="12,30 15,33 15,27" fill="#8B5CF6" />
+        <polygon points="88,30 85,33 85,27" fill="#F59E0B" />
+
+        {/* Value Text */}
+        <text x={cx} y={cy + 5} fontSize="11" fontWeight="900" fill="#1E293B" textAnchor="middle">
+          {value}/{max}
+        </text>
+      </svg>
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600 absolute bottom-1.5">Voltage</span>
+    </div>
+  );
+};
+
+
+// ─── Waveform Component for Current ──────────────────────────────────────────
+const CurrentWaveform = ({ value }: { value: number }) => {
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center pt-2">
+      <svg viewBox="0 0 100 50" className="w-full h-[60px]">
+        {/* Baseline Grid */}
+        <line x1="0" y1="25" x2="100" y2="25" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2 2" />
+        
+        {/* The Waveform Path (Starting Flat -> Transient Spike -> Settling) */}
+        <path
+          d="M 0 25 L 20 25 L 25 22 L 30 28 L 35 15 L 40 40 L 45 5 L 50 45 L 55 20 L 60 30 L 65 24 L 70 26 L 100 25"
+          fill="none"
+          stroke="#2563EB"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="waveform-animate"
+        />
+        
+        {/* Annotations (Simplified Arrows from the image) */}
+        <g opacity="0.5">
+          <path d="M 15 35 L 15 28" fill="none" stroke="#64748B" strokeWidth="0.5" markerEnd="url(#arrow)" />
+          <text x="15" y="42" fontSize="3" fill="#64748B" textAnchor="middle" fontWeight="bold">START</text>
+          
+          <path d="M 75 15 A 15 15 0 0 1 90 25" fill="none" stroke="#64748B" strokeWidth="0.5" strokeDasharray="1 1" />
+          <text x="85" y="12" fontSize="3" fill="#64748B" textAnchor="middle" fontWeight="bold">STABLE</text>
+        </g>
+
+        {/* Arrow Marker Definition */}
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B" />
+          </marker>
+        </defs>
+      </svg>
+      
+      <div className="flex flex-col items-center mt-1">
+        <div className="flex items-baseline gap-1">
+          <span className="text-[18px] font-black text-blue-600 leading-none">{value}</span>
+          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Amps</span>
+        </div>
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 mt-0.5">Current</span>
+      </div>
+    </div>
+  );
+};
+
+
+const NodeCardItem = ({ 
+node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
   const cfg = CATEGORY_CONFIG[(node.category as NodeCategory) || "OHT"] || CATEGORY_CONFIG["OHT"];
 
   const realtimeSnapshot = realtimeStatuses[node.id];
@@ -228,15 +370,20 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
   const isOnline = currentStatus === "Online";
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
   const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
+  const isMotor = node.analytics_template === 'EvaraMotor' || (node.category || "").toString() === 'EvaraMotor' || (node.category || "").toString() === 'EvaraOps' || (node.category || "").toString() === 'phase';
 
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
   const motorRunning = lastTel.isRunning ?? lastTel.motor_status ?? true;
 
-  // DRIVER FIX: Use the backend's authoritative smoothed level for absolute parity. 
   const pct = lastTel.level_percentage ?? getTankLevel(node, lastTel);
 
-  if (node.analytics_template === 'EvaraTDS' || (node.category || node.asset_type || '').toString().toLowerCase().includes('tds')) {
+  // Determine which analytics config to use
+  const analyticsType = (node.analytics_template as AnalyticsType) || 
+                       (isTank ? "EvaraTank" : isFlow ? "EvaraFlow" : isMotor ? "EvaraMotor" : "EvaraTank");
+  const analyticsCfg = ANALYTICS_CONFIG[analyticsType] || ANALYTICS_CONFIG["EvaraTank"];
+
+  if (analyticsType === 'EvaraTDS' || (node.category || node.asset_type || '').toString().toLowerCase().includes('tds')) {
     return <TDSCard node={node} realtimeStatus={realtimeSnapshot} />;
   }
 
@@ -379,13 +526,25 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
               </div>
             </div>
           </div>
+        ) : isMotor ? (
+          <div className="flex-1 flex flex-col gap-3 px-1 mb-2">
+            {/* Top Tiles */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col items-center justify-center min-h-[110px]">
+                <VoltageGauge value={415} max={500} />
+              </div>
+              <div className="flex flex-col justify-center min-h-[110px]">
+                <CurrentWaveform value={6.2} />
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 mt-2"></div>
         )}
 
 
         {/* Bottom Metadata (Only for Tanks/Generic) */}
-        {!isFlow && (
+        {!isFlow && !isMotor && (
           <div className="mt-auto flex items-center justify-between pt-3 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />
@@ -398,7 +557,7 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         )}
 
         {/* Location for Flow Devices (Same as TDS) */}
-        {isFlow && (
+        {(isFlow || isMotor) && (
           <div className="mt-auto flex items-center justify-between pt-1 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />
@@ -408,9 +567,13 @@ const NodeCardItem = ({ node, realtimeStatuses }: { node: any, realtimeStatuses:
         )}
       </div>
 
-      {/* Footer Nav Button - Harmonized with TDSCard */}
+      {/* Footer Nav Button - Dynamic category colors */}
       <div
-        className="relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 group-hover:bg-[#001845] min-h-[48px] bg-[#0F3096]/70 backdrop-blur-xl border-t border-white/20"
+        className={clsx(
+          "relative overflow-hidden px-5 py-[12px] text-center text-[11px] font-[900] tracking-[0.2em] transition-all uppercase w-full flex items-center justify-center gap-1.5 min-h-[48px] backdrop-blur-xl border-t border-white/20",
+          analyticsCfg.activeBg,
+          "hover:brightness-110"
+        )}
         style={{
           color: 'var(--liquid-button-text)',
           boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
@@ -668,7 +831,9 @@ const AllNodes = () => {
                 ? "btn-liquid-glass-indigo"
                 : key === "EvaraDeep"
                   ? "btn-liquid-glass-sky"
-                  : "btn-liquid-glass-cyan";
+                  : key === "EvaraMotor"
+                    ? "btn-liquid-glass-indigo"
+                    : "btn-liquid-glass-cyan";
 
             return (
                 <button

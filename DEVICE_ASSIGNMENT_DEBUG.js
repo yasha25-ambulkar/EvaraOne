@@ -74,3 +74,4 @@ console.log("");
 console.log("❌ Issue 4: UI not showing customer information");
 console.log("   → Check if customer_id/customer_name props exist on device objects");
 console.log("   → Add customer info display in AllNodes card if not present");
+ 

@@ -203,3 +203,4 @@ function setupMultipleDeviceListeners(socket, deviceIds) {
   5. firestoreListeners array cleared
   6. process.exit(0)
 */
+ 

@@ -212,3 +212,4 @@ console.log(`[NodesController] filterCustomerId=${filterCustomerId}`);
 console.log(`[NodesController] Query condition: customer_id == ${filterCustomerId || req.user.customer_id}`);
 console.log(`[NodesController] Final nodes returned: ${nodes.length}`);
 ```
+ 

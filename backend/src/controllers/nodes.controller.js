@@ -240,7 +240,7 @@ exports.getNodeAnalytics = async (req, res) => {
 
     if (type === 'evaratds' || type === 'tds') {
       const { getTDSHistory } = require('../services/tdsStateService');
-      const history = await getTDSHistory({ id: state.id, ...device }, 60);
+      const history = await getTDSHistory({ id: state.id, ...device }, 1000);
 
       return res.status(200).json({
         success: true,

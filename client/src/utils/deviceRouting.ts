@@ -31,7 +31,7 @@ export function getDeviceAnalyticsRoute(device: Device): string {
     if (template.includes('deep')) return `/evaradeep/${hId}`;
     if (template.includes('flow')) return `/evaraflow/${hId}`;
     if (template.includes('tds')) return `/evaratds/${hId}`;
-
+    if (template.includes('phase') || template.includes('ops') || template.includes('motor')) return `/evaramotor/${hId}`;
   }
 
   // 2. Fall back to device_type

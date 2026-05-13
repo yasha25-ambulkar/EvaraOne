@@ -10,14 +10,14 @@ export interface Device {
   longitude?: number;
   is_active: boolean;
   community_id?: string;
-  analytics_template?: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
+  analytics_template?: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor';
   last_seen?: string | null;
   telemetry_snapshot?: TelemetrySnapshot | null;
   created_at?: string;
   updated_at?: string;
 
   displayName?: string;
-  category?: 'tank' | 'flow' | 'deep' | 'tds' | 'unknown';
+  category?: 'tank' | 'flow' | 'deep' | 'tds' | 'phase' | 'unknown';
   thingspeakChannelId?: string;
   thingspeakReadKey?: string;
   channelId?: string | number;
@@ -30,7 +30,7 @@ export interface Device {
 export interface DeviceCreate {
   node_key: string;
   label: string;
-  analytics_template: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
+  analytics_template: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor';
   asset_type?: string;
   latitude?: number;
   longitude?: number;
@@ -204,7 +204,7 @@ export interface TelemetryHistory {
 export interface DeviceFormData {
   node_key: string;
   label: string;
-  analytics_template: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS';
+  analytics_template: 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor';
   asset_type?: string;
   latitude?: string;
   longitude?: string;

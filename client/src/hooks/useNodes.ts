@@ -42,10 +42,32 @@ export const useNodes = (searchQuery: string = "") => {
         isSuperAdmin ? undefined : user?.customer_id,
       );
 
-      if (!searchQuery) return mappedNodes;
+      // Add mock EvaraMotor device for testing (frontend only)
+      const mockMotorDevice = {
+        id: "mock-motor-01",
+        hardwareId: "PHASE-TEST-001",
+        node_key: "PHASE-TEST-001",
+        displayName: "EvaraMotor",
+        label: "EvaraMotor",
+        category: "EvaraMotor",
+        analytics_template: "EvaraMotor",
+        online_status: false,
+        status: "Offline",
+        last_online_at: null,
+        location_name: "Mock Environment",
+        last_telemetry: {
+          voltage: 415,
+          current: 6.2,
+          motor_status: false
+        }
+      };
+
+      const finalNodes = [...mappedNodes, mockMotorDevice];
+
+      if (!searchQuery) return finalNodes;
 
       const searchLower = searchQuery.toLowerCase();
-      return mappedNodes.filter(
+      return finalNodes.filter(
         (n: any) =>
           (n.displayName || "").toLowerCase().includes(searchLower) ||
           (n.hardwareId || "").toLowerCase().includes(searchLower) ||
