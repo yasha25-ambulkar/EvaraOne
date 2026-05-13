@@ -48,21 +48,30 @@ async function refreshTDSDeviceState(device) {
   }
 
   try {
-    const latestData = await fetchLatestData(channel, apiKey);
+    const response = await fetchLatestData(channel, apiKey);
+    const latestData = response.feeds ? response.feeds[0] : response;
     
     if (!latestData) {
       return buildOfflineState(id, metadata, "No data from ThingSpeak");
     }
 
-    // Resolve field mappings
+    const channelMetadata = response.channel || {};
     const mapping = metadata.sensor_field_mapping || metadata.configuration?.sensor_field_mapping || {};
-    // Use the exact internal keys from our Firestore standardization: tdsValue, temperature
-    // Fallback to field2 (TDS) and field3 (Temp) per ThingSpeak channel metadata
-    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field3");
+
+    // 1. ADVANCED RESOLUTION: Try to resolve by name first (Stable Anchor Architecture)
+    // We look for common names if the mapping doesn't explicitly tell us
+    const tdsField = resolveFieldByName(channelMetadata, mapping, "tdsValue") || 
+                     resolveFieldKey(mapping, ["tdsValue", "tds_value", "TDS"], "field2");
+    
+    const tempField = resolveFieldByName(channelMetadata, mapping, "temperature") || 
+                      resolveFieldKey(mapping, ["temperature", "temp", "Temperature"], "field3");
+    
+    const voltageField = resolveFieldByName(channelMetadata, mapping, "voltage") || 
+                         resolveFieldKey(mapping, ["voltage", "volt", "Voltage"], "field1");
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
+    const voltage = parseFloat(latestData[voltageField]);
 
     // Quality calculation
     let quality = "Good";
@@ -87,14 +96,21 @@ async function refreshTDSDeviceState(device) {
 
     const state = {
       id,
-      tdsValue: isNaN(tdsValue) ? null : tdsValue,
-      temperature: isNaN(temperature) ? null : temperature,
+      status,
+      tdsValue: isNaN(tdsValue) ? 0 : tdsValue,
+      temperature: isNaN(temperature) ? 0 : temperature,
+      voltage: isNaN(voltage) ? 0 : voltage,
       quality,
       waterQualityRating: quality,
-      status,
-      lastUpdated: lastUpdated.toISOString(),
-      timestamp: latestData.created_at,
-      unit: metadata.configuration?.unit || "ppm"
+      lastUpdated,
+      timestamp: lastUpdated.toISOString(),
+      last_seen: lastUpdated.toISOString(),
+      metadata: {
+        tdsField,
+        tempField,
+        voltageField,
+        channelName: channelMetadata.name
+      }
     };
 
     // Update Firestore background update
@@ -174,14 +190,24 @@ async function getTDSHistory(device, limit = 1000) {
       throw new Error("Invalid response from ThingSpeak");
     }
 
+    const channelMetadata = response.data.channel || {};
     const mapping = device.sensor_field_mapping || device.configuration?.sensor_field_mapping || {};
-    // Correctly resolve field keys using the mapping from Firestore
-    // For Bakul RO: field2 is TDS, field3 is Temp
-    const tdsField = resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
-    const tempField = resolveFieldKey(mapping, ["temperature", "temp"], "field3");
+
+    // Use name-based resolution as primary, fall back to key mapping
+    const tdsField = resolveFieldByName(channelMetadata, mapping, "tdsValue") || 
+                     resolveFieldKey(mapping, ["tdsValue", "tds_value"], "field2");
+    
+    const tempField = resolveFieldByName(channelMetadata, mapping, "temperature") || 
+                      resolveFieldKey(mapping, ["temperature", "temp"], "field3");
+
+    const voltageField = resolveFieldByName(channelMetadata, mapping, "voltage") || 
+                         resolveFieldKey(mapping, ["voltage", "volt"], "field1");
 
     return response.data.feeds.map(feed => {
       const tdsValue = parseFloat(feed[tdsField]);
+      const tempValue = parseFloat(feed[tempField]);
+      const voltageValue = parseFloat(feed[voltageField]);
+      
       let quality = "Good";
       if (!isNaN(tdsValue)) {
         if (tdsValue < 300) quality = "Good";
@@ -194,7 +220,8 @@ async function getTDSHistory(device, limit = 1000) {
       return {
         timestamp: feed.created_at,
         value: isNaN(tdsValue) ? null : tdsValue,
-        temperature: parseFloat(feed[tempField]) || null,
+        temperature: isNaN(tempValue) ? null : tempValue,
+        voltage: isNaN(voltageValue) ? null : voltageValue,
         quality
       };
     });
