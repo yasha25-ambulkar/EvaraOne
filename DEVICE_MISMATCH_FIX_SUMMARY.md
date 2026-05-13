@@ -283,3 +283,4 @@ Reason: Correct filtering applied via proper customer_id
 - `client/src/pages/AllNodes.tsx` - No changes needed
 - Database structure - No changes needed
 - API endpoint `/nodes` - No breaking changes
+ 
