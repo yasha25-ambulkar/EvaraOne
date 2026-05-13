@@ -6,9 +6,14 @@ import axios, {
 import { io } from 'socket.io-client';
 import { auth } from "../lib/firebase";
 
-// HARDCODED PRODUCTION URLS (Pick up where env vars failed)
 // API Configuration
-const VITE_API_URL = import.meta.env.VITE_API_URL || "https://evaraone-production-511c.up.railway.app/api/v1";
+// Use environment variable if provided, otherwise fallback to the current origin in production
+// or localhost in development. This prevents "not showing data" errors after deployment.
+const VITE_API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD 
+    ? `${window.location.origin}/api/v1` 
+    : "http://localhost:5002/api/v1");
+
 const API_BASE_URL = VITE_API_URL.split('/api/v1')[0];
 const SOCKET_URL = API_BASE_URL;
 
