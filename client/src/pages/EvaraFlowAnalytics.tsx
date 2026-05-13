@@ -15,7 +15,7 @@ import { useDeviceAnalytics } from '../hooks/useDeviceAnalytics';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { useFirestoreFlowData } from '../hooks/useFirestoreFlowData';
 import type { NodeInfoData } from '../hooks/useDeviceAnalytics';
-import { computeOnlineStatus } from '../utils/telemetryPipeline';
+import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
 import type { FlowConfig } from '../hooks/useDeviceConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -751,31 +751,9 @@ const EvaraFlowAnalytics = () => {
         const diffMin = diffMs / 60000;
         const offline = diffMin > 30;
 
-        // IST Formatting (21 Mar 2026, 14:44 IST)
-        const formatOptions: Intl.DateTimeFormatOptions = {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Kolkata'
-        };
-        
-        let istLabel = 'Syncing...';
-        try {
-            istLabel = new Intl.DateTimeFormat('en-IN', formatOptions).format(lastSeenDate).replace(',', '') + ' IST';
-        } catch (e) {
-            console.error('[Flow] Date formatting failed:', e);
-        }
+        const { label, istTime } = formatOfflineMessage(tsCreatedAt);
 
-        // Duration Formatting
-        const hoursAgo = Math.floor(diffMin / 60);
-        const durationLabel = hoursAgo > 0
-            ? `Device offline · Last seen ${hoursAgo} hours ago`
-            : `Device offline · Last seen ${Math.max(0, Math.floor(diffMin))} minutes ago`;
-
-        return { isTSOffline: offline, tsIstLabel: istLabel, tsDurationLabel: durationLabel };
+        return { isTSOffline: offline, tsIstLabel: istTime, tsDurationLabel: label };
     }, [tsCreatedAt]);
 
     const effectiveIsOffline = isOffline || isTSOffline;

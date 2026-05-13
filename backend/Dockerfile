@@ -48,19 +48,11 @@ COPY --chown=node:node package.json ./
 
 EXPOSE 8000
 
-# Health check — Railway uses this to determine if the instance is alive.
-# If /api/v1/health returns non-200 three times in a row, Railway restarts the container.
-HEALTHCHECK \
-    --interval=30s \
-    --timeout=5s \
-    --start-period=10s \
-    --retries=3 \
-    CMD node -e "\
-        require('http').get('http://localhost:8000/api/v1/health', (r) => { \
-            process.exit(r.statusCode === 200 ? 0 : 1); \
-        }).on('error', () => process.exit(1));"
+# ✅ Health check — Railway uses this to determine if the instance is alive
+# If /api/v1/health returns non-200 three times in a row, Railway restarts the container
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Single Node.js process.
-# Horizontal scaling = deploy multiple Railway replicas.
-# Socket.io state is shared via Redis adapter (configured in server.js).
+# ✅ Single Node.js process
+# Horizontal scaling = deploy multiple Railway replicas
+# Socket.io state is shared via Redis adapter (configured in server.js)
 CMD ["node", "src/server.js"]

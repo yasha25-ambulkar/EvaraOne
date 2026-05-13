@@ -15,6 +15,7 @@ import {
 import api from '../services/api';
 import clsx from 'clsx';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
+import { formatOfflineMessage } from '../utils/telemetryPipeline';
 
 // Constants for Water Quality
 const QUALITY_CONFIG = {
@@ -102,6 +103,13 @@ const EvaraTDSAnalytics = () => {
         await refetch();
         setIsRefreshing(false);
     };
+
+    // Derived Offline Message
+    const { offlineMessage } = useMemo(() => {
+        if (!mergedDevice || mergedDevice.status === 'Online') return { offlineMessage: '' };
+        const { label } = formatOfflineMessage(mergedDevice.lastTimestamp);
+        return { offlineMessage: label };
+    }, [mergedDevice]);
 
     const handleDelete = async () => {
         if (!id) return;
@@ -212,6 +220,11 @@ const EvaraTDSAnalytics = () => {
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
                             <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
+                            {mergedDevice?.status !== 'Online' && offlineMessage && (
+                                <p className="text-xs font-bold text-red-500 m-0">
+                                    {offlineMessage}
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
