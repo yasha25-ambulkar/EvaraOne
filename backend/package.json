@@ -8,7 +8,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "dev": "nodemon src/server.js",
-    "start": "node --openssl-legacy-provider src/server.js"
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
