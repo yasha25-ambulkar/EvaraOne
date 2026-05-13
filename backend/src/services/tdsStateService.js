@@ -71,12 +71,19 @@ async function refreshTDSDeviceState(device) {
     };
 
     // Resolve fields by inspecting metadata names (Highest Priority)
-    const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
-    const tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
-    const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+    let tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    let tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
+    let voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    // SYSTEM OVERRIDE FOR BAKUL RO PLANT (Private Channel Fix)
+    if (channel === '2709204') {
+      console.log(`[TDS Resolution] Applying Hardcoded Override for Bakul RO (2709204)`);
+      tdsField = 'field2';
+      tempField = 'field3';
+      voltageField = 'field1';
+    }
 
     console.log(`[TDS Resolution] ID: ${id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
-    console.log(`[TDS Resolution] Metadata Names:`, JSON.stringify(channelMetadata));
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
@@ -216,9 +223,16 @@ async function getTDSHistory(device, limit = 1000) {
     };
 
     // Resolve fields by inspecting metadata names
-    const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
-    const tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
-    const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+    let tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
+    let tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
+    let voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    // SYSTEM OVERRIDE FOR BAKUL RO PLANT (Private Channel Fix)
+    if (channel === '2709204') {
+      tdsField = 'field2';
+      tempField = 'field3';
+      voltageField = 'field1';
+    }
 
     console.log(`[TDS History Resolution] ID: ${device.id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
 
