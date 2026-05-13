@@ -63,6 +63,7 @@ async function refreshTDSDeviceState(device) {
         if (!key.startsWith('field')) continue;
         const lowerName = String(name).toLowerCase();
         if (keywords.some(kw => lowerName.includes(kw.toLowerCase()))) {
+          console.log(`[TDS Resolution] Found match for keywords [${keywords}] in ${key} ("${name}")`);
           return key;
         }
       }
@@ -71,12 +72,17 @@ async function refreshTDSDeviceState(device) {
 
     // Resolve fields by inspecting metadata names (Highest Priority)
     const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
-    const tempField = findFieldByKeyword(['temp', 'celsius'], 'field3');
+    const tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
     const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    console.log(`[TDS Resolution] ID: ${id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
+    console.log(`[TDS Resolution] Metadata Names:`, JSON.stringify(channelMetadata));
 
     const tdsValue = parseFloat(latestData[tdsField]);
     const temperature = parseFloat(latestData[tempField]);
     const voltage = parseFloat(latestData[voltageField]);
+
+    console.log(`[TDS Resolution] Raw Values: TDS=${latestData[tdsField]} | Temp=${latestData[tempField]} | Volt=${latestData[voltageField]}`);
 
     // Quality calculation
     let quality = "Good";
@@ -211,8 +217,10 @@ async function getTDSHistory(device, limit = 1000) {
 
     // Resolve fields by inspecting metadata names
     const tdsField = findFieldByKeyword(['tds', 'ppm'], 'field2');
-    const tempField = findFieldByKeyword(['temp', 'celsius'], 'field3');
+    const tempField = findFieldByKeyword(['temp', 'celsius', 'degree'], 'field3');
     const voltageField = findFieldByKeyword(['volt', 'battery'], 'field1');
+
+    console.log(`[TDS History Resolution] ID: ${device.id} | TDS: ${tdsField} | Temp: ${tempField} | Voltage: ${voltageField}`);
 
     return response.data.feeds.map(feed => {
       const tdsValue = parseFloat(feed[tdsField]);
