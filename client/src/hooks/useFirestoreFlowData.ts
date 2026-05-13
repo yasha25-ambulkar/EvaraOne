@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isFirebaseEnabled } from '../lib/firebase';
 
 export interface FirestoreFlowData {
     /** Total volume reading (e.g. 7958.17) */
@@ -49,6 +49,19 @@ export const useFirestoreFlowData = (
     useEffect(() => {
         if (!deviceId || !deviceType) {
             setData(prev => ({ ...prev, isLoading: false }));
+            return;
+        }
+
+        if (!isFirebaseEnabled || !db) {
+            setData({
+                volume: null,
+                flowRate: null,
+                timestamp: null,
+                status: null,
+                rawData: null,
+                isLoading: false,
+                error: 'Firebase Firestore is not configured in this environment',
+            });
             return;
         }
 

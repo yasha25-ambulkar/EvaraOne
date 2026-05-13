@@ -14,7 +14,7 @@
     "dev": "concurrently \"cd backend && npm run dev\" \"cd client && npm run dev\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   },
   "dependencies": {
     "driver.js": "^1.4.0"

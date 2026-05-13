@@ -17,16 +17,22 @@ const REQUIRED_VARS = [
 
 function validateEnv() {
     const isProd = process.env.NODE_ENV === 'production';
-    
-    // Always required
+
+    // In development, Firebase can come from ADC, emulator config, or local auth.
+    // Only hard-fail in production where explicit credentials are required.
     const missing = REQUIRED_VARS.filter(v => !process.env[v]);
-    
+
     if (missing.length > 0) {
-        console.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
-        missing.forEach(v => console.error(`   - ${v}`));
-        logger.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
-        missing.forEach(v => logger.error(`   - ${v}`));
-        process.exit(1);
+        if (isProd) {
+            console.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
+            missing.forEach(v => console.error(`   - ${v}`));
+            logger.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
+            missing.forEach(v => logger.error(`   - ${v}`));
+            logger.error('Tip: For production provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.');
+            process.exit(1);
+        }
+
+        logger.debug('Missing FIREBASE_* env vars in development; continuing with Firebase ADC or emulator config if available.');
     }
 
 
