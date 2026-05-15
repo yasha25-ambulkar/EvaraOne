@@ -25,6 +25,7 @@ const AdminDashboard = () => {
   const totalDevices = stats?.total_nodes || 0;
   const activeAlerts = stats?.alerts_active || 0;
   const totalCustomers = stats?.total_customers || 0;
+  const totalZones = stats?.total_zones || 0;
 
   const healthPercentage = stats?.system_health || 100;
 
@@ -105,11 +106,17 @@ const AdminDashboard = () => {
       </div>
 
       {/* ─── STATS ROW ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <AdminStatItem
           label="Total Nodes"
           value={totalDevices.toString()}
           trend="+2% this week"
+          trendUp
+        />
+        <AdminStatItem
+          label="Total Zones"
+          value={totalZones.toString()}
+          trend={totalZones > 0 ? "Geographic" : "No zones"}
           trendUp
         />
         <AdminStatItem
@@ -147,7 +154,7 @@ const AdminDashboard = () => {
             description="Define new geographic zones and operational zones."
             icon={MapPin}
             color="indigo"
-            stats={`${totalDevices} Active`}
+            stats={`${totalZones} Zones`}
             onClick={() => handleAction("zone")}
           />
           <ActionCard
