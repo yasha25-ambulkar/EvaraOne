@@ -66,7 +66,8 @@ export const useFirestoreFlowData = (
         }
 
         // Normalize the device_type to match Firestore collection name
-        const collectionName = deviceType.toLowerCase();
+        const normalizedType = deviceType.toLowerCase();
+        const collectionName = normalizedType === 'flow_meter' ? 'evaraflow' : normalizedType;
         
         console.log(`[FirestoreFlow] Subscribing to ${collectionName}/${deviceId}`);
 
@@ -115,6 +116,10 @@ export const useFirestoreFlowData = (
                     flowRate = parseFloat(docData.flow_rate);
                 } else if (telemetrySnapshot.flow_rate != null && !isNaN(parseFloat(telemetrySnapshot.flow_rate))) {
                     flowRate = parseFloat(telemetrySnapshot.flow_rate);
+                } else if (docData.fields?.flow_rate && !isNaN(parseFloat(docData.fields.flow_rate))) {
+                    flowRate = parseFloat(docData.fields.flow_rate);
+                } else if (rawData.field4 && !isNaN(parseFloat(rawData.field4))) {
+                    flowRate = parseFloat(rawData.field4);
                 } else if (rawData.field3 && !isNaN(parseFloat(rawData.field3))) {
                     flowRate = parseFloat(rawData.field3);
                 }
