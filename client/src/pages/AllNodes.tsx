@@ -13,6 +13,7 @@ import {
   MapPin,
   X,
   Activity,
+  Settings2,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
@@ -37,8 +38,9 @@ type NodeCategory =
   | 'FlowMeter'
   | 'flow'
   | 'EvaraTDS'
-  | 'EvaraMotor';
-type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor';
+  | 'EvaraMotor'
+  | 'EvaraValve';
+type AnalyticsType = 'EvaraTank' | 'EvaraFlow' | 'EvaraDeep' | 'EvaraTDS' | 'EvaraMotor' | 'EvaraValve';
 
 
 // ─── Category config ─────────────────────────────────────────────────────────
@@ -150,6 +152,14 @@ export const CATEGORY_CONFIG: Record<
     badge: "bg-violet-100 text-violet-700",
     dot: "bg-violet-500",
   },
+  EvaraValve: {
+    label: "EvaraValve",
+    icon: <img src="/evaravalve.png" className="w-8 h-8 object-contain drop-shadow-sm" alt="EvaraValve" />,
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    badge: "bg-blue-100 text-blue-700",
+    dot: "bg-blue-500",
+  },
 };
 
 
@@ -215,6 +225,16 @@ const ANALYTICS_CONFIG: Record<
     activeBorder: "border-[#0E7490]",
     badge: "bg-violet-50 text-violet-700 border border-violet-200",
     dot: "bg-violet-500",
+  },
+  EvaraValve: {
+    label: "EvaraValve",
+    desc: "Smart Control",
+    icon: <img src="/evaravalve.png" className="w-6 h-6 object-contain" alt="EvaraValve" />,
+    activeBg: "bg-blue-600",
+    activeText: "text-white",
+    activeBorder: "border-blue-600",
+    badge: "bg-blue-50 text-blue-700 border border-blue-200",
+    dot: "bg-blue-500",
   },
 };
 
@@ -371,6 +391,7 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
   const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
   const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
   const isMotor = node.analytics_template === 'EvaraMotor' || (node.category || "").toString() === 'EvaraMotor' || (node.category || "").toString() === 'EvaraOps' || (node.category || "").toString() === 'phase';
+  const isValve = node.analytics_template === 'EvaraValve' || (node.category || "").toString() === 'EvaraValve' || (node.category || "").toString().toLowerCase().includes('valve');
 
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
@@ -380,7 +401,7 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
 
   // Determine which analytics config to use
   const analyticsType = (node.analytics_template as AnalyticsType) || 
-                       (isTank ? "EvaraTank" : isFlow ? "EvaraFlow" : isMotor ? "EvaraMotor" : "EvaraTank");
+                       (isTank ? "EvaraTank" : isFlow ? "EvaraFlow" : isMotor ? "EvaraMotor" : isValve ? "EvaraValve" : "EvaraTank");
   const analyticsCfg = ANALYTICS_CONFIG[analyticsType] || ANALYTICS_CONFIG["EvaraTank"];
 
   if (analyticsType === 'EvaraTDS' || (node.category || node.asset_type || '').toString().toLowerCase().includes('tds')) {
@@ -538,6 +559,35 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
               </div>
             </div>
           </div>
+        ) : isValve ? (
+          <div className="flex-1 flex flex-col justify-center px-1 mb-2">
+             <div className="bg-[var(--glass-accent-subtle)] backdrop-blur-md rounded-[20px] p-4 border border-[var(--glass-accent-subtle)] flex items-center justify-between shadow-sm relative overflow-hidden group/valve">
+                <div className="flex flex-col gap-1 relative z-10">
+                  <span className="text-[10px] font-black uppercase tracking-widest leading-none card-label">Consumption</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-[24px] font-black leading-none tracking-tight card-value">
+                      {Math.round(lastTel.total_liters || 4280)}
+                    </span>
+                    <span className="text-[10px] font-bold card-muted uppercase">Liters</span>
+                  </div>
+                </div>
+                <div className="relative z-10 flex flex-col items-end">
+                   <div className={clsx(
+                     "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest mb-2 shadow-sm",
+                     isOnline ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                   )}>
+                     {isOnline ? 'Active' : 'Standby'}
+                   </div>
+                   <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Settings2 size={16} className="text-blue-600" />
+                   </div>
+                </div>
+                {/* Background Pattern */}
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover/valve:opacity-10 transition-opacity">
+                   <img src="/evaravalve.png" className="w-20 h-20 object-contain rotate-12" />
+                </div>
+             </div>
+          </div>
         ) : (
           <div className="flex-1 mt-2"></div>
         )}
@@ -557,7 +607,7 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
         )}
 
         {/* Location for Flow Devices (Same as TDS) */}
-        {(isFlow || isMotor) && (
+        {(isFlow || isMotor || isValve) && (
           <div className="mt-auto flex items-center justify-between pt-1 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />

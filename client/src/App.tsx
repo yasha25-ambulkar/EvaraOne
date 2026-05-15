@@ -26,6 +26,7 @@ const EvaraDeepAnalytics = React.lazy(() => import('./pages/EvaraDeepAnalytics')
 const EvaraFlowAnalytics = React.lazy(() => import('./pages/EvaraFlowAnalytics'));
 const EvaraTDSAnalytics = React.lazy(() => import('./pages/EvaraTDSAnalytics'));
 const EvaraMotorAnalytics = React.lazy(() => import('./pages/EvaraMotorAnalytics'));
+const EvaraValveAnalytics = React.lazy(() => import('./pages/EvaraValveAnalytics'));
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminCustomers = React.lazy(() => import('./pages/admin/AdminCustomers'));
 const ConfigureNode = React.lazy(() => import('./pages/ConfigureNode'));
@@ -132,6 +133,7 @@ function App() {
                                                     <Route path="/evaraflow/:hardwareId" element={<EvaraFlowAnalytics />} />
                                                     <Route path="/evaratds/:id" element={<EvaraTDSAnalytics />} />
                                                     <Route path="/evaramotor/:hardwareId" element={<EvaraMotorAnalytics />} />
+                                                    <Route path="/evaravalve/:hardwareId" element={<EvaraValveAnalytics />} />
 
                                                     <Route path="/admin" element={<Admin />} />
                                                 </Route>

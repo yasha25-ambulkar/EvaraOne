@@ -4,9 +4,9 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Info, Settings } from 'lucide-react';
+import { Info, Settings, Droplets, Bell, Timer } from 'lucide-react';
 import {
-    ComposedChart, Area,
+    ComposedChart, Area, AreaChart,
     XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer
 } from 'recharts';
@@ -63,12 +63,9 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
     const [period, setPeriod] = useState<'1H' | '24H' | '1W' | '1M' | 'RANGE'>('1H');
     const [rangeStart, setRangeStart] = useState<string>('');
     const [rangeEnd, setRangeEnd] = useState<string>('');
-    const [isHovered, setIsHovered] = useState(false);
 
     const chartData = useMemo(() => {
-        if (history.length === 0) {
-            return [];
-        }
+        if (history.length === 0) return [];
 
         if (period === '1H') {
             const now = new Date();
@@ -118,7 +115,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
 
             const now = Date.now();
             const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-            const startBoundary = latestBoundary - (24 * 60 * 60000); // 24 hours window
+            const startBoundary = latestBoundary - (24 * 60 * 60000);
 
             const interpolated = [];
             for (let t = startBoundary; t <= latestBoundary; t += 60000) {
@@ -146,233 +143,123 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                 }
                 interpolated.push(point);
             }
-
-            interpolated.push({
-                timestampMs: latestBoundary + (5 * 60000),
-                label: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
-                current: null // Buffer element
-            });
-
             return interpolated;
-        } else if (period === '1W') {
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const today = new Date();
-            const result = [];
-
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(today);
-                d.setDate(d.getDate() - i);
-
-                const dayData = history.filter(h => h.date && h.date.getDate() === d.getDate() && h.date.getMonth() === d.getMonth());
-
-                let val: number | null = null;
-                if (dayData.length > 0) {
-                    val = dayData.reduce((sum, item) => sum + item.value, 0) / dayData.length;
-                }
-
-                result.push({
-                    label: days[d.getDay()],
-                    current: val
-                });
-            }
-            return result;
-        } else if (period === '1M') {
-            const result = [];
-            const today = new Date();
-
-            for (let i = 3; i >= 0; i--) {
-                const targetDate = new Date(today);
-                targetDate.setDate(targetDate.getDate() - (i * 7));
-
-                const weekData = history.filter(h => {
-                    if (!h.date) return false;
-                    const diffTime = targetDate.getTime() - h.date.getTime();
-                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                    return diffDays >= 0 && diffDays < 7;
-                });
-
-                let val: number | null = null;
-                if (weekData.length > 0) {
-                    val = weekData.reduce((sum, item) => sum + item.value, 0) / weekData.length;
-                }
-
-                result.push({
-                    label: `Week ${4 - i}`,
-                    current: val
-                });
-            }
-            return result;
+        } else if (period === '1W' || period === '1M') {
+            return history.map(d => ({ label: d.time, current: d.value }));
         } else if (period === 'RANGE') {
-            if (!rangeStart || !rangeEnd) {
-                return history.slice(-7).map(d => ({
-                    label: d.time,
-                    current: d.value
-                }));
-            }
-
+            if (!rangeStart || !rangeEnd) return [];
             const start = new Date(rangeStart);
             const end = new Date(rangeEnd);
             end.setHours(23, 59, 59);
-
             return history
                 .filter(d => d.date && d.date >= start && d.date <= end)
-                .map(d => ({
-                    label: d.time,
-                    current: d.value
-                }));
+                .map(d => ({ label: d.time, current: d.value }));
         }
-
         return [];
     }, [history, period, rangeStart, rangeEnd]);
-
 
     const peakUsage = useMemo(() => {
         if (chartData.length === 0) return 0;
         return Math.max(...chartData.map(d => d.current || 0));
     }, [chartData]);
 
-
     return (
-        <div className="apple-glass-card rounded-[2rem] p-6 flex flex-col h-full relative overflow-hidden">
-            {/* Header Flex Container */}
-            <div className="flex items-start justify-between mb-8 z-10 w-full relative">
-
-                {/* Left: Icon, Title, Subtitle */}
-                <div className="flex gap-4 items-center">
-                    <div className="w-10 h-10 rounded-[0.8rem] bg-[#e0f2fe] dark:bg-white/10 flex items-center justify-center shrink-0 shadow-sm border border-blue-100/20">
-                        <svg className="fill-[#004F94] dark:fill-blue-400" width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5 10h3v10H5zm5-4h3v14h-3zm5 7h3v7h-3z" />
-                            <circle cx="6.5" cy="5.5" r="1.5" />
-                        </svg>
-                    </div>
-                    <div className="flex flex-col">
-                        <h2 className="text-[20px] font-bold tracking-tight text-[var(--text-primary)] m-0 leading-tight mb-0.5 uppercase">Consumption Pattern</h2>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Peak Usage</span>
-                            <span className="text-[26px] font-black tracking-tight text-[var(--text-primary)]">{formatKPIValue(peakUsage, false)} L/min</span>
+        <div className="apple-glass-card p-6 flex flex-col w-full flex-grow" style={{ 
+            background: "var(--card-bg)", 
+            border: '1px solid var(--card-border)', 
+            minHeight: '350px',
+            borderRadius: '2.5rem'
+        }}>
+            <div className="flex flex-row justify-between items-start mb-6">
+        <div className="flex flex-col">
+                    <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em', textTransform: 'uppercase' }}>Consumption Pattern</h3>
+                    <div className="flex items-center gap-4 mt-1">
+                        <div className="flex flex-col">
+                            <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Peak Usage</span>
+                            <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{peakUsage.toFixed(1)} <span style={{ fontSize: '11px', fontWeight: 700 }}>L/min</span></span>
                         </div>
                     </div>
                 </div>
-
-                {/* Mode Selector and Date Range */}
-                <div className="flex flex-col items-end gap-3 shrink-0">
-                    <div className="flex items-center gap-3">
-                        {/* Time Range Selector */}
-                        <div className="flex bg-[#f8fafc] dark:bg-white/5 p-1 rounded-full border border-slate-100/50 dark:border-white/10 relative overflow-hidden shrink-0 shadow-inner backdrop-blur-md">
-                            {(['1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => {
-                                const active = period === p;
-                                return (
-                                    <button
-                                        key={p}
-                                        onClick={() => setPeriod(p)}
-                                        className={`relative z-10 px-5 py-2 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[#64748b] hover:text-[#334155]'
-                                            }`}
-                                        style={{
-                                            border: 'none',
-                                            background: active ? '#004F94' : 'transparent',
-                                            borderStyle: 'none',
-                                            boxShadow: active ? '0 4px 12px rgba(0, 79, 148, 0.25)' : 'none'
-                                        }}
-                                    >
-                                        {p}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Date Inputs - Integrated inside the header for visual parity */}
-                        {period === 'RANGE' && (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-300">
-                                <input
-                                    type="date"
-                                    value={rangeStart}
-                                    onChange={(e) => setRangeStart(e.target.value)}
-                                    className="bg-[var(--bg-secondary)] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-[var(--text-primary)] focus:ring-1 focus:ring-black outline-none shadow-sm"
-                                />
-                                <span className="text-[10px] text-[var(--text-muted)] font-black tracking-widest">TO</span>
-                                <input
-                                    type="date"
-                                    value={rangeEnd}
-                                    onChange={(e) => setRangeEnd(e.target.value)}
-                                    className="bg-[var(--bg-secondary)] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-[var(--text-primary)] focus:ring-1 focus:ring-black outline-none shadow-sm"
-                                />
-                            </div>
-                        )}
+                
+                <div className="flex flex-col items-end gap-3">
+                    <div className="flex p-1 rounded-full border relative overflow-hidden shrink-0 shadow-inner" style={{ background: 'var(--bg-primary)', borderColor: 'var(--card-border)' }}>
+                        {(['1H', '24H', '1W', '1M', 'RANGE'] as const).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setPeriod(r)}
+                                className={`relative z-10 px-4 py-1.5 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${period === r ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                                style={{
+                                    border: 'none',
+                                    background: period === r ? '#004F94' : 'transparent',
+                                    boxShadow: period === r ? '0 4px 12px rgba(0, 79, 148, 0.25)' : 'none'
+                                }}
+                            >
+                                {r}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            {/* Chart Area */}
-            <div className="flex-1 w-full relative min-h-[220px]"
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}>
-
-                {/* Hover Legend */}
-                <div className={`absolute top-[-35px] right-0 z-20 flex items-center gap-4 transition-all duration-300 pointer-events-none ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#004F94]" />
-                        <span className="text-[10px] font-black tracking-widest text-[var(--text-primary)] uppercase">CURRENT</span>
-                    </div>
-                </div>
+            <div className="flex-grow w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
-                        {/* Use dynamic CSS variable for grid lines to ensure visibility across themes */}
-                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="var(--chart-grid-color)" />
-
-                        <YAxis
-                            orientation="right"
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="usageGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#34C759" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#34C759" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
+                        <XAxis 
+                            dataKey="label" 
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
-                            tickFormatter={(v) => v === 0 ? '0' : `${Math.round(v)}L/m`}
-                            domain={['auto', 'auto']}
+                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 600 }}
+                            minTickGap={30}
                         />
-
-                        <XAxis
-                            dataKey={period === '24H' ? 'label' : 'label'}
-                            minTickGap={40}
-                            axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                        <YAxis 
+                            axisLine={false}
                             tickLine={false}
-                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
+                            tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 600 }}
+                            tickFormatter={(val) => `${val}L/m`}
                         />
-
-                        <Tooltip
+                        <Tooltip 
                             content={(props: any) => {
                                 const { active, payload } = props;
                                 if (!active || !payload || payload.length === 0) return null;
-                                const dataPoint = payload[0]?.payload;
                                 return (
                                     <div style={{
-                                        borderRadius: '14px',
+                                        borderRadius: '12px',
                                         background: 'var(--bg-secondary)',
                                         border: '1px solid var(--card-border)',
                                         padding: '12px 16px',
-                                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                                        backdropFilter: 'blur(10px)'
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                                        backdropFilter: 'blur(20px)'
                                     }}>
                                         <p style={{ margin: '0 0 4px 0', fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                            {dataPoint.fullTime || dataPoint.label}
+                                            {payload[0].payload.fullTime || payload[0].payload.label}
                                         </p>
                                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                                            <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-primary)' }}>{Math.max(0, payload[0].value).toFixed(2)}</span>
-                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0ea5e9' }}>L/min</span>
+                                            <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-primary)' }}>{payload[0].value.toFixed(2)}</span>
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#34C759' }}>L/min</span>
                                         </div>
                                     </div>
                                 );
                             }}
-                            cursor={{ stroke: '#0ea5e9', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }}
                         />
-
-                        {chartData.some(d => d.current != null) && (
-                            <Area type="monotone" dataKey="current" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth={2} />
-                        )}
-                    </ComposedChart>
+                        <Area 
+                            type="monotone" 
+                            dataKey="current" 
+                            stroke="#34C759" 
+                            strokeWidth={3}
+                            fillOpacity={1} 
+                            fill="url(#usageGradient)" 
+                            isAnimationActive={false}
+                        />
+                    </AreaChart>
                 </ResponsiveContainer>
             </div>
-
-
-
         </div>
     );
 };
@@ -380,36 +267,28 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
 /** System Dynamics (formerly Avg Flow Rate / Peak Flow) */
 const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?: string }) => {
     return (
-        <div className={`apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden ${className}`}>
-            {/* Header: HYDROLOGICAL LENS / System Dynamics */}
-            <div className="flex justify-between items-start mb-2 h-11">
-                <div className="flex flex-col justify-center h-full">
-                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>FLOW RATE</h2>
+        <div className={`apple-glass-card rounded-2xl p-5 flex flex-col justify-between w-full min-h-[160px] relative overflow-hidden ${className}`} style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(10,132,255,0.15)' }}>
+                    <Droplets size={18} color="#0A84FF" />
                 </div>
-                {/* Top Right Water Drop Icon */}
-                <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
-                    <svg className="fill-[#004F94] dark:fill-blue-400" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.477 2 2 17.523 2 12c0-4.478 4.477-8 10-10 5.522 2 10 5.522 10 10 0 5.523-4.478 10-10 10zm-1.125-5.996c1.32-.4 1.838-1.536 1.838-3.085 0-.448-.363-.811-.812-.811s-.812.363-.812.81c0 .756-.168 1.53-1.076 1.805-.427.13-.672.58-.55.1 0 0 .193-.76-.023-1.312-.224-.575-.98-1.34-1.38-2.586-.135-.423-.74-.287-.698.156.096.994.499 2.146 1.344 3.256.621.815 1.373 1.48 2.169 1.667z" />
-                    </svg>
+                <div className="flex items-center gap-2">
+                    <button className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                        <Info size={14} color="var(--text-primary)" />
+                    </button>
                 </div>
             </div>
 
-            {/* Avg Flow Rate */}
-            <div className="flex items-center gap-3 w-full overflow-hidden">
-                <div className="w-8 h-8 rounded-lg bg-[#f1f5f9] flex items-center justify-center shrink-0">
-                    {/* Speedometer SVG */}
-                    <svg className="fill-[#004F94] dark:fill-blue-400" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v4l3.5 3.5-1.42 1.42L11 12.5V7z" />
-                    </svg>
-                </div>
-                <div className="flex flex-col min-w-0">
-                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Avg Flow Rate</span>
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-[26px] font-black tracking-tight text-[#004F94] leading-tight">
-                            {formatMeterValue(Math.abs(avgFlow))}
-                        </span>
-                        <span className="text-[13px] font-bold tracking-tight text-[var(--text-muted)]">L/min</span>
-                    </div>
+            <div className="flex flex-col mt-auto pt-1 gap-2">
+                <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>FLOW RATE</p>
+                <div className="flex items-baseline">
+                    {Math.abs(avgFlow) > 0 ? (
+                        <p className="m-0 tracking-tight" style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                            {formatMeterValue(Math.abs(avgFlow))} <span style={{ fontSize: '13px', fontWeight: 700, color: "var(--text-muted)", marginLeft: '1px' }}>L/min</span>
+                        </p>
+                    ) : (
+                        <p className="m-0 tracking-tight" style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1.1, color: "var(--text-primary)" }}>Stable</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -419,29 +298,21 @@ const FlowKPICard = ({ avgFlow, className = "" }: { avgFlow: number; className?:
 /** Alerts Card - Leak Detection, Status Pills, Thresholds */
 const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number; className?: string }) => {
     return (
-        <div className={`apple-glass-card rounded-[2rem] p-5 flex flex-col relative overflow-hidden ${className}`}>
-            {/* Header: ALERT MONITOR / Alerts */}
-            <div className="flex justify-between items-start mb-2 h-11">
-                <div className="flex flex-col justify-center h-full">
-                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>ALERTS</h2>
+        <div className={`apple-glass-card rounded-2xl p-5 flex flex-col justify-between w-full min-h-[160px] relative overflow-hidden ${className}`} style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(175,82,222,0.15)' }}>
+                    <Bell size={18} color="#AF52DE" />
                 </div>
-                {/* Top Right Red Exclamation Icon */}
-                <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-slate-50 dark:border-white/10">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M11.139 3.564c.394-.682 1.328-.682 1.722 0l8.383 14.5c.395.683-.098 1.54-.861 1.54H3.617c-.763 0-1.256-.857-.861-1.54l8.383-14.5Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="1.5" strokeLinejoin="round" />
-                        <path d="M12 9v4" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-                        <circle cx="12" cy="16.5" r="1.5" fill="#FFFFFF" />
-                    </svg>
+                <div className="flex items-center gap-2">
+                    <button className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                        <Info size={14} color="var(--text-primary)" />
+                    </button>
                 </div>
             </div>
 
-            {/* Bottom Content: "0 Active" */}
-            <div className="mt-auto flex items-center justify-between">
-                {/* Active Alerts Count */}
-                <div className="flex items-baseline gap-1.5">
-                    <span className="text-[26px] font-black text-[var(--text-primary)] leading-none">0</span>
-                    <span className="text-[13px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Active</span>
-                </div>
+            <div className="flex flex-col mt-auto pt-1 gap-2">
+                <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>ALERTS</p>
+                <p className="m-0 tracking-tight" style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1.1, color: "var(--text-primary)" }}>Stable</p>
             </div>
         </div>
     );
@@ -449,116 +320,45 @@ const AlertsCard = ({ className = "" }: { flowRate: number; maxFlowRate: number;
 
 /** Total Flow Rate Card - with Time Filter */
 const TotalFlowRateCard = ({ history, flowRate, maxFlowRate, className = "" }: { history: { date?: Date, time: string; value: number }[]; flowRate: number; maxFlowRate: number; className?: string }) => {
-    const [period, setPeriod] = useState<'1H' | '24H' | '1W' | '1M' | 'RANGE'>('1H');
-    const [startDate, setStartDate] = useState(() => {
-        const d = new Date();
-        d.setHours(d.getHours() - 24);
-        return d.toISOString().slice(0, 16);
-    });
-    const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 16));
-
     const isNoFlow = flowRate === 0;
     const isSpike = flowRate > maxFlowRate;
-    let statusLabel = "Continuous Flow";
+    let statusLabel = "Stable";
     let dotColor = "bg-blue-500";
 
     if (isNoFlow) {
-        statusLabel = "No Flow";
-        dotColor = "bg-red-400";
+        statusLabel = "Stable";
+        dotColor = "bg-blue-500";
     } else if (isSpike) {
-        statusLabel = "Unusual Spike";
-        dotColor = "bg-yellow-400";
+        statusLabel = "Warning";
+        dotColor = "bg-red-500";
     }
 
     const totalValue = useMemo(() => {
         if (history.length === 0) return 0;
-        const now = new Date();
-        let filtered = history;
-
-        if (period === '1H') {
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            filtered = history.filter(h => h.date && h.date >= oneHourAgo);
-        } else if (period === '24H') {
-            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            filtered = history.filter(h => h.date && h.date >= yesterday);
-        } else if (period === '1W') {
-            const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            filtered = history.filter(h => h.date && h.date >= lastWeek);
-        } else if (period === '1M') {
-            const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            filtered = history.filter(h => h.date && h.date >= lastMonth);
-        } else if (period === 'RANGE') {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            filtered = history.filter(h => h.date && h.date >= start && h.date <= end);
-        }
-
-        return filtered.reduce((sum, item) => sum + item.value, 0);
-    }, [history, period]);
+        return history.reduce((sum, item) => sum + item.value, 0);
+    }, [history]);
 
     return (
-        <div className={`apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden h-full ${className}`}>
-            <div className="flex justify-between items-start mb-1 h-11">
-                <div className="flex flex-col justify-center h-full">
-                    <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1.25 }}>TOTAL FLOW RATE</h2>
+        <div className={`apple-glass-card rounded-2xl p-5 flex flex-col justify-between w-full min-h-[160px] relative overflow-hidden h-full ${className}`} style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                    <Timer size={18} color="#6366f1" />
                 </div>
-                <div className="w-8 h-8 rounded-[10px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                    </svg>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${dotColor} shadow-[0_0_8px_${dotColor === 'bg-blue-500' ? 'rgba(59,130,246,0.5)' : 'rgba(239,68,68,0.5)'}]`}></div>
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tight" style={{ lineHeight: 1 }}>{statusLabel}</span>
                 </div>
             </div>
 
-            {/* Status Indicator - Placed 'a bit up' */}
-            <div className="flex items-center gap-1.5 mb-1 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                <div className={`w-1.5 h-1.5 rounded-full ${dotColor} shadow-[0_0_8px_${dotColor === 'bg-blue-500' ? 'rgba(59,130,246,0.5)' : 'rgba(239,68,68,0.5)'}]`}></div>
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tight">{statusLabel}</span>
-            </div>
-
-            <div className="flex items-baseline gap-1 mt-auto">
-                <span className="text-[26px] font-black tracking-tight text-[#6366f1] leading-none tabular-nums truncate">
-                    {formatMeterValue(totalValue)}
-                </span>
-                <span className="text-[13px] font-bold tracking-tight text-[var(--text-muted)]">L</span>
-            </div>
-
-            <div className="mt-3 flex bg-[#f8fafc]/50 p-0.5 rounded-lg border border-slate-100/30 w-fit">
-                {(['1H', '24H', '1W', '1M', 'RANGE'] as const).map(p => (
-                    <button
-                        key={p}
-                        onClick={() => setPeriod(p)}
-                        className={`px-2 py-0.5 text-[8px] font-black tracking-tight uppercase rounded-md transition-all duration-200 ${period === p ? 'bg-[#6366f1] text-white shadow-sm' : 'text-[#64748b] hover:text-[#334155]'
-                            }`}
-                        style={{ border: 'none' }}
-                    >
-                        {p}
-                    </button>
-                ))}
-            </div>
-
-            {/* Custom Range Selection UI (only show if RANGE is selected) */}
-            {period === 'RANGE' && (
-                <div className="mt-4 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[7.5px] font-black uppercase text-[var(--text-muted)] ml-1 tracking-wider">From</label>
-                        <input
-                            type="datetime-local"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="bg-white/40 border border-slate-200/40 rounded-md px-1 py-1 text-[8px] font-bold text-[var(--text-primary)] outline-none focus:border-[#6366f1]/40 transition-all shadow-sm apple-glass"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[7.5px] font-black uppercase text-[var(--text-muted)] ml-1 tracking-wider">To</label>
-                        <input
-                            type="datetime-local"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="bg-white/40 border border-slate-200/40 rounded-md px-1 py-1 text-[8px] font-bold text-[var(--text-primary)] outline-none focus:border-[#6366f1]/40 transition-all shadow-sm apple-glass"
-                        />
-                    </div>
+            <div className="flex flex-col mt-auto pt-1 gap-2">
+                <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>TOTAL FLOW</p>
+                <div className="flex items-baseline">
+                    <span className="tracking-tight tabular-nums truncate" style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                        {formatMeterValue(totalValue)}
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: "var(--text-muted)", marginLeft: '1px' }}>L</span>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
@@ -1015,84 +815,92 @@ const EvaraFlowAnalytics = () => {
     return (
         <div className="min-h-screen font-sans relative overflow-x-hidden bg-transparent" style={{ color: '#1C1C1E' }}>
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
-                <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
 
-                    {/* Breadcrumb + title */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
-                                <button onClick={() => navigate('/')} className="hover:text-[#0077ff] transition-colors bg-transparent border-none cursor-pointer p-0">Home</button>
+                    {/* Breadcrumb + Page Heading row */}
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                        <div className="flex flex-col gap-2">
+                            <nav className="flex items-center gap-1 text-[12px] font-normal" style={{ color: "var(--text-muted)" }}>
+                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
+                                    Home
+                                </button>
                                 <span className="material-icons" style={{ fontSize: '16px', color: "var(--text-muted)" }}>chevron_right</span>
-                                <button onClick={() => navigate('/nodes')} className="hover:text-[#0077ff] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: "var(--text-muted)" }}>All Nodes</button>
+                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: "var(--text-muted)" }}>
+                                    All Nodes
+                                </button>
                                 <span className="material-icons" style={{ fontSize: '16px', color: "var(--text-muted)" }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: "var(--text-primary)", fontWeight: '700' }}>{deviceName}</span>
                             </nav>
-                            <div className="flex items-center gap-2">
-                                <div className={clsx(
-                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
-                                    effectiveIsOffline
-                                        ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
-                                        : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
-                                )}>
-                                    <div className={clsx(
-                                        "w-1.5 h-1.5 rounded-full",
-                                        effectiveIsOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
-                                    )} />
-                                    {effectiveIsOffline ? 'Offline' : 'Online'}
-                                </div>
 
-                                <button
-                                    onClick={() => refetch()}
-                                    disabled={analyticsFetching}
-                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
-                                >
-                                    <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
-                                        {analyticsFetching ? 'sync' : 'refresh'}
-                                    </span>
-                                    {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
-                                </button>
+                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
+                                {deviceName} Analytics
+                            </h2>
 
-                                <button
-                                    onClick={() => setShowNodeInfo(true)}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
-                                >
-                                    <Info size={12} className="stroke-[2.5px]" />
-                                    Node Info
-                                </button>
-
-                                <button
-                                    onClick={() => setShowParams(true)}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
-                                >
-                                    <Settings size={12} className="stroke-[2.5px]" />
-                                    Parameters
-                                </button>
-
-                                {/* Delete Button */}
-                                {user?.role === 'superadmin' && (
-                                    <button
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95"
-                                    >
-                                        <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
-                                        Delete Node
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <h1 className="text-[20px] font-bold tracking-tight m-0" style={{ color: "var(--text-primary)" }}>
-                                {deviceName} Flow Analytics
-                            </h1>
                             {effectiveIsOffline && tsDurationLabel && (
-                                <p className="text-xs font-bold text-red-500 m-0">
+                                <p className="text-xs font-bold text-red-500 m-0 mt-1">
                                     {tsDurationLabel}
                                 </p>
                             )}
                             {zoneName && (
-                                <p className="text-xs text-slate-400 m-0">
+                                <p className="text-xs text-slate-400 m-0 mt-1">
                                     {zoneName}
                                 </p>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                            {/* Status Button (Pill Style) */}
+                            <div className={clsx(
+                                "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                effectiveIsOffline
+                                    ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                    : "bg-emerald-50 dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                            )}>
+                                <div className={clsx(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    effectiveIsOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                )} />
+                                {effectiveIsOffline ? 'Offline' : 'Online'}
+                            </div>
+
+                            {/* Node Info Button */}
+                            <button
+                                onClick={() => refetch()}
+                                disabled={analyticsFetching}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
+                            >
+                                <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
+                                    {analyticsFetching ? 'sync' : 'refresh'}
+                                </span>
+                                {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
+                            </button>
+
+                            <button
+                                onClick={() => setShowNodeInfo(true)}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                            >
+                                <Info size={12} className="stroke-[2.5px]" />
+                                Node Info
+                            </button>
+
+                            {/* Parameters Button */}
+                            <button
+                                onClick={() => setShowParams(true)}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                            >
+                                <Settings size={12} className="stroke-[2.5px]" />
+                                Parameters
+                            </button>
+
+                            {/* Delete Button */}
+                            {user?.role === 'superadmin' && (
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                >
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
+                                    Delete Node
+                                </button>
                             )}
                         </div>
                     </div>
@@ -1281,11 +1089,11 @@ const EvaraFlowAnalytics = () => {
                     )}
 
                     {/* ── DASHBOARD GRID: Left Column (Meter) | Right Column (Others) ── */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
                         {/* LEFT COLUMN: Analog Brass Meter */}
-                        <div className="lg:col-span-1 apple-glass-card rounded-[2.5rem] p-3 flex flex-col relative overflow-hidden h-full">
-                            <div className="flex justify-between items-center mb-2 z-10 w-full px-2 mt-2">
+                        <div className="lg:col-span-1 apple-glass-card rounded-[2.5rem] p-4 flex flex-col relative overflow-hidden h-full">
+                            <div className="flex justify-between items-center mb-2 z-10 w-full">
                                 <div>
                                     <h3 className="text-xl font-semibold m-0 leading-tight" style={{ color: 'var(--text-primary)' }}>{deviceName}</h3>
                                 </div>
@@ -1355,20 +1163,20 @@ const EvaraFlowAnalytics = () => {
                                         </g>
                                     </svg>
                                     <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 pointer-events-none">
-                                        <div className="text-[2.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums">
+                                        <div className="text-[16px] font-bold text-[var(--text-primary)] leading-none tabular-nums">
                                             {totalRaw >= 1000 ? (totalRaw / 1000).toFixed(1) : formatKPI(totalRaw)}
                                         </div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">
                                             {totalRaw >= 1000 ? 'KL' : 'Liters'}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="text-center mt-2 mb-4">
-                                    <p className="text-xs font-bold uppercase tracking-widest m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
-                                    <h3 className="text-[2.5rem] font-black text-[var(--text-primary)] m-0 mt-1 tabular-nums leading-none">
+                                    <p className="text-[13px] font-bold uppercase tracking-widest m-0" style={{ color: '#8E8E93' }}>Flow Rate</p>
+                                    <h3 className="text-[30px] font-black m-0 mt-1 tabular-nums leading-none" style={{ color: '#000080' }}>
                                         {formatMeterValue(flowRate)}
-                                        <span className="text-2xl font-medium text-slate-400 ml-1">L/min</span>
+                                        <span className="text-[18px] font-medium ml-1" style={{ color: 'rgba(0, 0, 128, 0.6)' }}>L/min</span>
                                     </h3>
                                     <p className="text-xs font-medium m-0 mt-2" style={{ color: '#8E8E93' }}>
                                         {effectiveIsOffline && tsIstLabel ? `Offline (${tsIstLabel})` : staleLabel}
@@ -1383,45 +1191,28 @@ const EvaraFlowAnalytics = () => {
                             <div className="grid gap-[1rem] w-full" style={{ gridTemplateColumns: `repeat(${[showWaterSecurityParam, showSystemDynamicsParam, showAlertsParam, true].filter(Boolean).length}, 1fr)` }}>
                                 {/* Water Security Monitoring */}
                                 {showWaterSecurityParam && (
-                                    <div className="apple-glass-card rounded-[2rem] p-4 flex flex-col relative overflow-hidden h-full w-full min-h-[160px] max-h-[45vh]">
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between mb-4 h-11">
-                                            <div className="flex flex-col justify-center h-full">
-                                                <h2 className="text-[17px] font-black tracking-tight text-[var(--text-primary)] m-0">WATER USAGE</h2>
-                                                {isSuperAdmin && customerConfig.showWaterSecurity === false && (
-                                                    <span className="text-[9px] font-bold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full uppercase w-fit mt-1">HIDDEN FROM CUSTOMER</span>
-                                                )}
-                                            </div>
-                                            {/* Top Right Box Icon */}
-                                            <div className="w-9 h-9 rounded-[12px] bg-white dark:bg-white/10 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-white/10">
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                            </div>
+                                <div className="apple-glass-card rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden h-full w-full min-h-[160px] max-h-[45vh]" style={{ background: "var(--card-bg)", border: '1px solid var(--card-border)' }}>
+                                    <div className="flex justify-between items-center w-full">
+                                        <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: 'rgba(52,199,89,0.2)' }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#34C759"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
                                         </div>
-
-                                        {/* KPI row: horizontal constraint to guarantee two-column layout */}
-                                        <div className="flex flex-row items-end justify-between gap-4 w-full mb-auto flex-nowrap overflow-hidden">
-
-                                            {/* LEFT: USAGE */}
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-1">
-                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#3A7AFE"><path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z" /></svg>
-                                                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>USAGE</span>
-                                                </div>
-                                                <span className="text-[1.3rem] lg:text-[1.5rem] font-black text-[var(--text-primary)] leading-none tabular-nums truncate">
-                                                    {formatMeterValue(deltaVolumeLitres > 0 ? deltaVolumeLitres : totalRaw)}
-                                                    <span className="text-[0.8rem] font-black text-[#94a3b8] ml-0.5">L</span>
-                                                </span>
-                                            </div>
-
-                                            {/* RIGHT: FLOW */}
-                                            <div className="flex flex-col gap-1 flex-shrink-0 text-right items-end">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /></svg>
-                                                    <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>FLOW</span>
-                                                </div>
-                                            </div>
+                                        <div className="flex items-center gap-2">
+                                            <button className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                                                <Info size={14} color="var(--text-primary)" />
+                                            </button>
                                         </div>
                                     </div>
+
+                                    <div className="flex flex-col mt-auto pt-1 gap-2">
+                                        <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>WATER USAGE</p>
+                                        <div className="flex items-baseline">
+                                            <span className="tracking-tight tabular-nums truncate" style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                                                {formatMeterValue(deltaVolumeLitres > 0 ? deltaVolumeLitres : totalRaw)}
+                                                <span style={{ fontSize: '13px', fontWeight: 700, color: "var(--text-muted)", marginLeft: '1px' }}>L</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                                 )}
 
                                 {/* System Dynamics (FlowKPI) */}
@@ -1452,7 +1243,7 @@ const EvaraFlowAnalytics = () => {
 
                             {/* Bottom row — capped so it doesn't balloon on large screens */}
                             {showConsumptionPatternParam && (
-                                <div className="flex-1 min-h-[420px] overflow-hidden relative">
+                                <div className="flex-1 overflow-hidden relative">
                                     {isSuperAdmin && customerConfig.showConsumptionPattern === false && (
                                         <span className="absolute top-4 right-20 z-20 text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
                                     )}

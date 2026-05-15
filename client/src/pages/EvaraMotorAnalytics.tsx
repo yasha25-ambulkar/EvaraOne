@@ -35,10 +35,70 @@ const EvaraMotorAnalytics = () => {
   if (!hardwareId) return <Navigate to="/nodes" replace />;
 
   return (
-    <div className="min-h-screen bg-transparent text-[#1A202C] font-sans pt-[85px] pb-6 px-6 overflow-x-hidden relative">
+    <div className="min-h-screen bg-transparent font-sans relative overflow-x-hidden" style={{ color: 'var(--text-primary)' }}>
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-emerald-50/40 via-blue-50/40 to-indigo-50/40 pointer-events-none" />
-      <div className="relative z-10 max-w-[1440px] mx-auto flex flex-col">
-      {/* Header removed as requested */}
+      <main className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8 flex flex-col">
+                    {/* Breadcrumb + Page Heading row */}
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                        <div className="flex flex-col gap-2">
+                            <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                                <button onClick={() => window.location.href = '/'} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
+                                    Home
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
+                                <button onClick={() => window.location.href = '/nodes'} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: 'var(--text-muted)' }}>
+                                    All Nodes
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
+                                <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{hardwareId}</span>
+                            </nav>
+
+                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
+                                {hardwareId} Analytics
+                            </h2>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                            {/* Status Button (Pill Style) */}
+                            <div className={clsx(
+                                "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                !isRunning
+                                    ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                    : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                            )}>
+                                <div className={clsx(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    !isRunning ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                )} />
+                                {isRunning ? 'Online' : 'Offline'}
+                            </div>
+
+                            {/* Node Info Button */}
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10"
+                            >
+                                <span className="material-icons" style={{ fontSize: '14px' }}>refresh</span>
+                                Refresh Data
+                            </button>
+
+                            <button className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>info</span> Node Info
+                            </button>
+
+                            <button className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>settings</span> Parameters
+                            </button>
+
+                            {/* Delete Button */}
+                            <button
+                                className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                            >
+                                <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
+                                Delete Node
+                            </button>
+                        </div>
+                    </div>
 
 
       {/* ── Main Dashboard Grid ── */}
@@ -206,14 +266,14 @@ const EvaraMotorAnalytics = () => {
                     <rect x="-4" y="23" width="8" height="5" fill="#1A202C" />
                     <text x="25" y="18" className="text-[10px] font-black fill-slate-500 uppercase tracking-widest">Water Level Sensor</text>
                     {/* Restored Green Dashed line to water */}
-                    <line x1="0" y1="30" x2="0" y2="145" stroke="#48BB78" strokeWidth="2" strokeDasharray="6 4" />
+                    <line x1="-2" y1="30" x2="-2" y2="145" stroke="#48BB78" strokeWidth="2" strokeDasharray="6 4" />
                   </g>
 
 
 
                   {/* Main Pumping Pipe - Border Layer (Curved) */}
                   <path 
-                    d="M 60 490 L 60 100 Q 60 80 80 80 L 170 80 Q 190 80 190 100" 
+                    d="M 30 490 L 30 100 Q 30 80 50 80 L 170 80 Q 190 80 190 100" 
                     fill="none" 
                     stroke="#2D3748" 
                     strokeWidth="15" 
@@ -222,17 +282,32 @@ const EvaraMotorAnalytics = () => {
                   />
                   {/* Main Pumping Pipe - Fill Layer (Curved) */}
                   <path 
-                    d="M 60 490 L 60 100 Q 60 80 80 80 L 170 80 Q 190 80 190 100" 
+                    d="M 30 490 L 30 100 Q 30 80 50 80 L 170 80 Q 190 80 190 100" 
                     fill="none" 
                     stroke="url(#pipeGradient)" 
                     strokeWidth="11" 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
                   />
+ 
+                  {/* Flow Animation (Dotted Line) - Now integrated for perfect alignment */}
+                  {isRunning && (
+                    <path 
+                      d="M 33 490 L 33 100 Q 33 80 53 80 L 173 80 Q 193 80 193 110" 
+                      fill="none" 
+                      stroke="white" 
+                      strokeWidth="4" 
+                      strokeDasharray="10 20" 
+                      strokeLinecap="round"
+                      className="animate-flow-path"
+                      opacity="0.6"
+                    />
+                  )}
+
 
                   {/* Decorative Pipe Rings for Realism */}
-                  <rect x="52" y="105" width="16" height="4" rx="1" fill="#4A5568" />
-                  <rect x="85" y="77" width="4" height="6" rx="1" fill="#4A5568" />
+                  <rect x="22" y="105" width="16" height="4" rx="1" fill="#4A5568" />
+                  <rect x="55" y="77" width="4" height="6" rx="1" fill="#4A5568" />
                   <rect x="165" y="77" width="4" height="6" rx="1" fill="#4A5568" />
                 </g>
 
@@ -255,7 +330,7 @@ const EvaraMotorAnalytics = () => {
 
               {/* High-Fidelity 3D Industrial Motor */}
               <div className={clsx(
-                "absolute left-[45px] bottom-[50px] z-30 scale-[0.9] origin-bottom transition-all duration-500",
+                "absolute left-[15px] bottom-[50px] z-30 scale-[0.9] origin-bottom transition-all duration-500",
                 isRunning && "animate-motor-shake"
               )}>
                 <img 
@@ -267,25 +342,7 @@ const EvaraMotorAnalytics = () => {
 
 
               {/* Realistic Curved Flow Animation (Following the pipe path) */}
-              {isRunning && (
-                <svg 
-                  className="absolute inset-0 w-full h-full pointer-events-none z-20"
-                  viewBox="0 0 500 600"
-                >
-                  <g transform="translate(30, 0)">
-                    <path 
-                      d="M 68 490 L 68 110 Q 68 90 88 90 L 178 90 Q 198 90 198 110" 
-                      fill="none" 
-                      stroke="white" 
-                      strokeWidth="4" 
-                      strokeDasharray="10 20" 
-                      strokeLinecap="round"
-                      className="animate-flow-path"
-                      opacity="0.6"
-                    />
-                  </g>
-                </svg>
-              )}
+
 
 
 
@@ -521,9 +578,9 @@ const EvaraMotorAnalytics = () => {
         </div>
 
       </div>
+      </main>
     </div>
-  </div>
-);
+  );
 };
 
 

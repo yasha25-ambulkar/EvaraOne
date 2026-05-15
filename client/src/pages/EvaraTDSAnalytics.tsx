@@ -201,20 +201,34 @@ const EvaraTDSAnalytics = () => {
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
                 <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
-                    {/* ── Heading + Actions ── */}
+                    {/* Breadcrumb + Page Heading row */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
                         <div className="flex flex-col gap-2">
                             <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
-                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">Home</button>
-                                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
-                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: 'var(--text-muted)' }}>All Nodes</button>
-                                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
+                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
+                                    Home
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
+                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: 'var(--text-muted)' }}>
+                                    All Nodes
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
-                            <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
+
+                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
+                                {deviceName} Analytics
+                            </h2>
+
+                            {device?.location_name && (
+                                <p className="text-xs text-slate-400 m-0 mt-1">
+                                    {device.location_name}
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
+                            {/* Status Button (Pill Style) */}
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
                                 (mergedDevice.status === 'Online')
@@ -229,18 +243,33 @@ const EvaraTDSAnalytics = () => {
                                 )} />
                                 {mergedDevice.status || 'Offline'}
                             </div>
-                            <button onClick={handleRefresh} disabled={isRefreshing} className={clsx("flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95", isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10")}>
-                                <RefreshCw size={12} className={clsx('stroke-[2.5px]', isRefreshing && 'animate-spin')} />
+
+                            {/* Node Info Button */}
+                            <button
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className={clsx(
+                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95",
+                                    isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10"
+                                )}
+                            >
+                                <span className={clsx('material-icons', isRefreshing && 'animate-spin')} style={{ fontSize: '14px' }}>
+                                    {isRefreshing ? 'sync' : 'refresh'}
+                                </span>
                                 {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
                             </button>
-                            <button onClick={() => setShowNodeInfo(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Info size={12} className="stroke-[2.5px]" /> Node Info
+
+                            <button onClick={() => setShowNodeInfo(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>info</span> Node Info
                             </button>
-                            <button onClick={() => setShowParams(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Settings size={12} className="stroke-[2.5px]" /> Parameters
+
+                            <button onClick={() => setShowParams(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>settings</span> Parameters
                             </button>
-                            <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Trash2 size={12} className="stroke-[2.5px]" /> Delete Node
+
+                            {/* Delete Button */}
+                            <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span> Delete Node
                             </button>
                         </div>
                     </div>
@@ -266,19 +295,19 @@ const EvaraTDSAnalytics = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/10">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80 mb-1">Water Quality</p>
-                                    <p className="text-lg font-black text-emerald-500">{quality.toUpperCase()}</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgb(16 185 129 / 0.8)', margin: '0 0 4px 0' }}>Water Quality</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 900, color: '#10b981', margin: 0 }}>{quality.toUpperCase()}</p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/10">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-orange-500/80 mb-1">Temperature</p>
-                                    <p className="text-lg font-black text-orange-500">{mergedDevice.temperature || 0}°C</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgb(249 115 22 / 0.8)', margin: '0 0 4px 0' }}>Temperature</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 900, color: '#f97316', margin: 0 }}>{mergedDevice.temperature || 0}°C</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Right: Stats Grid + Chart */}
                         <div className="flex flex-col gap-4">
-                            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
                                 <MiniStatCard title="TDS Monitor" value={mergedDevice.tdsValue || 0} unit="ppm" icon={Droplets} accentColor="#3b82f6" iconBg="rgba(59,130,246,0.1)" />
                                 <MiniStatCard title="Temperature" value={mergedDevice.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
                                 <MiniStatCard title="Voltage" value={mergedDevice.voltage || 0} unit="V" icon={Activity} accentColor="#8b5cf6" iconBg="rgba(139,92,246,0.1)" />
@@ -286,36 +315,55 @@ const EvaraTDSAnalytics = () => {
                             </div>
 
                             {/* Chart Card */}
-                            <div className="flex-1 rounded-2xl p-6 flex flex-col" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                    <div>
-                                        <h3 className="text-[20px] font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                                            <Activity size={18} className="text-blue-500" /> TDS Level Trends
-                                        </h3>
-                                        <p className="text-[10px] font-black uppercase tracking-widest mt-0.5" style={{ color: 'var(--text-muted)' }}>24-Hour Dissolved Solids Analysis</p>
-                                    </div>
-                                    <div className="flex p-1 rounded-xl border gap-0.5" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--card-border)' }}>
-                                        {(['24H', '1W', '1M', 'RANGE'] as const).map(range => (
-                                            <button key={range} onClick={() => setChartRange(range)} className={clsx('px-4 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all', chartRange === range ? 'bg-[#0077ff] text-white shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]')}>{range}</button>
-                                        ))}
+                            <div className="apple-glass-card flex flex-col items-stretch justify-between relative overflow-hidden flex-grow" style={{
+                                background: "var(--card-bg)",
+                                backdropFilter: "var(--card-blur)",
+                                WebkitBackdropFilter: "var(--card-blur)",
+                                borderRadius: '2.5rem',
+                                border: '1px solid var(--card-border)',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+                                padding: '24px',
+                                minHeight: '350px'
+                            }}>
+                                <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
+                                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight m-0 leading-tight">TDS LEVEL TRENDS</h2>
+
+                                    <div className="flex p-1 rounded-full border relative overflow-hidden shrink-0 shadow-inner" style={{ background: 'var(--bg-primary)', borderColor: 'var(--card-border)' }}>
+                                        {(['24H', '1W', '1M', 'RANGE'] as const).map((r) => {
+                                            const active = chartRange === r;
+                                            return (
+                                                <button
+                                                    key={r}
+                                                    onClick={() => setChartRange(r)}
+                                                    className={`relative z-10 px-4 py-1.5 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                                                    style={{
+                                                        border: 'none',
+                                                        background: active ? '#004F94' : 'transparent',
+                                                        boxShadow: active ? '0 4px 12px rgba(0, 79, 148, 0.25)' : 'none'
+                                                    }}
+                                                >
+                                                    {r}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
-                                <div className="flex-1 min-h-[400px]">
+                                <div className="flex-1">
                                     {tdsHistory.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height={450}>
+                                        <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={tdsHistory}>
                                                 <defs>
                                                     <linearGradient id="tdsGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
                                                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                                     </linearGradient>
                                                 </defs>
-                                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.04)" />
-                                                <XAxis dataKey="timestampMs" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={chartTicks} tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} dy={10} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-                                                <Tooltip content={<PremiumTooltip />} cursor={{ stroke: 'var(--text-muted)', strokeDasharray: '3 3' }} />
-                                                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
+                                                <XAxis dataKey="timestampMs" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={chartTicks} tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 500 }} dy={10} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }} />
+                                                <Tooltip content={<PremiumTooltip />} cursor={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }} />
+                                                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     ) : (
@@ -422,19 +470,27 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
 // ─── UI Atomic Components ────────────────────────────────────────────────────
 
 const MiniStatCard = ({ title, value, unit, icon: Icon, accentColor, iconBg }: any) => (
-    <div className="rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden group hover:scale-[1.015] transition-all duration-300"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-        <div className="flex items-center justify-between">
-            <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>{title}</span>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: iconBg }}><Icon size={16} style={{ color: accentColor }} /></div>
+    <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between w-full min-h-[160px] max-h-[45vh] transition-all duration-300"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+        
+        {/* Top Row: Icons */}
+        <div className="flex justify-between items-center w-full">
+            <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: iconBg }}>
+                <Icon size={18} style={{ color: accentColor }} />
+            </div>
+            <button className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                <Info size={14} color="#1C1C1E" />
+            </button>
         </div>
-        <div className="mt-auto">
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[26px] font-black tracking-tight" style={{ color: accentColor }}>{value}</span>
-                {unit && <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)' }}>{unit}</span>}
+
+        {/* Bottom Row: Text */}
+        <div className="flex flex-col mt-auto pt-1 gap-0.5">
+            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>{title}</p>
+            <div className="flex items-baseline gap-1.5">
+                <span className="text-[20px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: accentColor }}>{value}</span>
+                {unit && <span className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>{unit}</span>}
             </div>
         </div>
-        <div className="absolute -bottom-4 -right-4 opacity-[0.04] transition-transform group-hover:scale-110" style={{ color: accentColor }}><Icon size={64} /></div>
     </div>
 );
 
