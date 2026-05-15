@@ -15,6 +15,7 @@ import {
 import { Modal } from "../../../components/ui/Modal";
 import { AddCustomerForm } from "../../../components/admin/forms/AddCustomerForm";
 import { useToast } from "../../../components/ToastProvider";
+import { useConfirm } from '../../../components/ui/ConfirmProvider';
 import type {
   Zone as RegionRow,
 
@@ -34,6 +35,7 @@ const RegionCustomers = () => {
   const { regionId } = useParams(); // regionId is the zone name
   const navigate = useNavigate();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [customers, setCustomers] = useState<CustomerWithDevices[]>([]);
   const [regionData, setRegionData] = useState<RegionRow | null>(null);
   const [_loading, setLoading] = useState(true);
@@ -85,12 +87,14 @@ const RegionCustomers = () => {
     customerId: string,
   ) => {
     e.stopPropagation();
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this customer? This will remove their access and all assigned devices.",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: 'Delete this Customer?',
+      description: 'Are you sure you want to delete this customer? This will remove their access and all assigned devices.',
+      confirmText: 'Yes, Delete Customer',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       await adminService.deleteCustomer(customerId);
@@ -249,25 +253,27 @@ const RegionCustomers = () => {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {user?.role === "superadmin" && (
-                          <div className="flex items-center gap-1 mr-2 invisible group-hover:visible">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingCustomer(customer);
-                              }}
-                              className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              onClick={(e) =>
-                                handleDeleteCustomer(e, customer.id)
-                              }
-                              className="p-1.5 hover:bg-red-50 rounded-lg text-red-600 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                          <div className="flex items-center gap-2 mr-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCustomer(customer);
+                                }}
+                                className="px-3 py-1 rounded-lg text-[12px] font-[700] bg-[#3A7AFE] text-white hover:bg-[#2563EB] transition-all shadow-sm"
+                                aria-label={`Edit ${customer.full_name || 'customer'}`}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={(e) =>
+                                  handleDeleteCustomer(e, customer.id)
+                                }
+                                className="px-3 py-1 rounded-lg text-[12px] font-[700] text-[#EF4444] bg-[rgba(239,68,68,0.06)] hover:bg-[rgba(239,68,68,0.12)] transition-all"
+                                aria-label={`Delete ${customer.full_name || 'customer'}`}
+                              >
+                                Delete
+                              </button>
+                            </div>
                         )}
                         <ChevronRight
                           size={18}

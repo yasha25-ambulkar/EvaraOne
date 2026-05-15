@@ -32,7 +32,7 @@ export default function CustomerDeviceTable() {
                 <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-sm border-b border-[var(--card-border)] z-10">
                         <tr>
-                            {['Customer', 'Location', 'Devices', 'Status', 'Last Seen', 'Actions'].map(h =>
+                            {['Customer', 'Zone', 'Devices', 'Status', 'Last Seen', 'Actions'].map(h =>
                                 <th key={h} className="px-4 py-3 font-[800] text-[var(--text-primary)] opacity-80 uppercase tracking-wider whitespace-nowrap">{h}</th>
                             )}
                         </tr>
@@ -46,35 +46,35 @@ export default function CustomerDeviceTable() {
                         )}
                         {!isLoading && rows.map((row: any, i: number) => (
                             <tr key={row.id ?? i} className="border-b border-[var(--card-border)] hover:bg-[var(--glass-accent-subtle)] transition-colors">
-                                <td className="px-4 py-3 font-[700] text-[var(--text-primary)] whitespace-nowrap">{row.full_name ?? row.display_name ?? row.email ?? '—'}</td>
-                                <td className="px-4 py-3 text-[var(--text-muted)] whitespace-nowrap">{row.communityName ?? row.zoneName ?? '—'}</td>
+                                <td className="px-4 py-3 text-[13px] font-[800] leading-tight text-[var(--text-primary)] whitespace-nowrap">{row.full_name ?? row.display_name ?? row.email ?? '—'}</td>
+                                <td className="px-4 py-3 text-[13px] font-[800] leading-tight text-[var(--text-primary)] whitespace-nowrap">{row.zoneName ?? row.communityName ?? '—'}</td>
                                 <td className="px-4 py-3 font-[800] text-[var(--text-primary)]">{row.deviceCount ?? 0}</td>
                                 <td className="px-4 py-3">
-                                    {(row.deviceCount ?? 0) === 0 ? (
-                                        <span className="text-[var(--text-muted)] text-[10px]">—</span>
-                                    ) : row.isActive !== false ? (
+                                    {String(row.status || (row.isActive ? 'Online' : 'Offline')).toLowerCase() === 'online' ? (
                                         <span className="flex items-center gap-1.5">
-                                            <span 
-                                                className="w-2 h-2 rounded-full bg-[var(--chart-bar-green)]" 
-                                                style={{ boxShadow: '0 0 6px var(--chart-bar-green)' }} 
+                                            <span
+                                                className="w-2 h-2 rounded-full bg-[var(--chart-bar-green)]"
+                                                style={{ boxShadow: '0 0 6px var(--chart-bar-green)' }}
                                             />
-                                            <span className="text-[10px] font-[800] text-[var(--text-muted)]">Active</span>
+                                            <span className="text-[10px] font-[800] text-[var(--text-muted)]">Online</span>
                                         </span>
                                     ) : (
                                         <span className="flex items-center gap-1.5">
-                                            <span 
-                                                className="w-2 h-2 rounded-full bg-[var(--chart-bar-red)]" 
-                                                style={{ boxShadow: '0 0 6px var(--chart-bar-red)' }} 
+                                            <span
+                                                className="w-2 h-2 rounded-full bg-[var(--chart-bar-red)]"
+                                                style={{ boxShadow: '0 0 6px var(--chart-bar-red)' }}
                                             />
-                                            <span className="text-[10px] font-[800] text-[var(--text-muted)]">Inactive</span>
+                                            <span className="text-[10px] font-[800] text-[var(--text-muted)]">Offline</span>
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-4 py-3 text-[var(--text-muted)] text-[10px] whitespace-nowrap">
-                                    {row.updated_at ? new Date(row.updated_at).toLocaleDateString() !== 'Invalid Date' 
-                                      ? new Date(row.updated_at).toLocaleDateString() 
-                                      : 'Never' 
-                                      : 'Never'}
+                                <td className="px-4 py-3 text-[13px] font-[700] leading-tight text-[var(--text-primary)] whitespace-nowrap">
+                                    {(() => {
+                                        const value = row.last_seen || row.updated_at || row.lastSeen || row.lastUpdated;
+                                        if (!value) return 'Never';
+                                        const parsed = new Date(value);
+                                        return Number.isNaN(parsed.getTime()) ? 'Never' : parsed.toLocaleString();
+                                    })()}
                                 </td>
                                 <td className="px-4 py-3">
                                     <div className="flex gap-2">

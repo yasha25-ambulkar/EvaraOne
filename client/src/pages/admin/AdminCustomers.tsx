@@ -2,19 +2,24 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { adminService } from "../../services/admin";
-import { User, Search, MapPin, Filter, Plus } from "lucide-react";
+import { User, Search, MapPin, Filter, Plus, PencilLine, Trash2 } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { AddCustomerForm } from "../../components/admin/forms/AddCustomerForm";
+import { useToast } from "../../components/ToastProvider";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 
 const AdminCustomers = () => {
   const navigate = useNavigate();
   const { role, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [clients, setClients] = useState<any[]>([]);
 
   const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingClient, setEditingClient] = useState<any | null>(null);
 
   const fetchClients = async () => {
     try {
@@ -51,6 +56,26 @@ const AdminCustomers = () => {
       email.includes(search.toLowerCase())
     );
   });
+
+  const handleDeleteCustomer = async (customer: any) => {
+    const ok = await confirm({
+      title: "Delete this Customer?",
+      description: `Are you sure you want to delete ${customer?.display_name || customer?.full_name || "this customer"}? This action will remove their profile and access permanently.`,
+      confirmText: "Yes, Delete Customer",
+      cancelText: "Cancel",
+      danger: true,
+    });
+
+    if (!ok) return;
+
+    try {
+      await adminService.deleteCustomer(customer.id);
+      showToast("Customer deleted successfully", "success");
+      fetchClients();
+    } catch (error: any) {
+      showToast(error?.message || "Failed to delete customer", "error");
+    }
+  };
 
 
   if (loading || authLoading) {
@@ -154,13 +179,44 @@ const AdminCustomers = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-[13px] font-[600] customer-badge bg-[rgba(255,255,255,0.4)] dark:bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.5)] dark:border-[rgba(255,255,255,0.2)] px-2.5 py-1 rounded-[8px] shadow-sm">
-                      {client?.devices?.length || 0}
+                      {typeof client?.deviceCount === 'number' ? client.deviceCount : (client?.devices?.length || 0)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-[12px] font-[600] customer-btn border border-current/20 bg-[rgba(58,122,254,0.1)] px-3 py-1.5 rounded-[8px] hover:bg-[rgba(58,122,254,0.15)] hover:shadow-md transition-all shadow-sm">
-                      Manage Profile
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      {role === "superadmin" ? (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingClient(client);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3A7AFE] text-white text-[12px] font-[700] shadow-sm hover:bg-[#2563EB] transition-all"
+                          >
+                            <PencilLine size={14} /> Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCustomer(client);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#EF4444] bg-[rgba(239,68,68,0.06)] text-[12px] font-[700] hover:bg-[rgba(239,68,68,0.12)] transition-all"
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/superadmin/customers/${client?.id}`);
+                          }}
+                          className="text-[12px] font-[600] customer-btn border border-current/20 bg-[rgba(58,122,254,0.1)] px-3 py-1.5 rounded-[8px] hover:bg-[rgba(58,122,254,0.15)] hover:shadow-md transition-all shadow-sm"
+                        >
+                          View
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -190,6 +246,21 @@ const AdminCustomers = () => {
             fetchClients();
           }}
           onCancel={() => setShowAddModal(false)}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={!!editingClient}
+        onClose={() => setEditingClient(null)}
+        title={`Edit Customer${editingClient ? `: ${editingClient.display_name || editingClient.full_name || ''}` : ''}`}
+      >
+        <AddCustomerForm
+          initialData={editingClient}
+          onSubmit={() => {
+            setEditingClient(null);
+            fetchClients();
+          }}
+          onCancel={() => setEditingClient(null)}
         />
       </Modal>
     </div>
