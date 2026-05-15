@@ -33,7 +33,7 @@ export const useTelemetry = (nodeId: string | undefined) => {
                     deviceId: nodeId,
                     level_percentage: payload.level_percentage ?? null,
                     depth_value: payload.distance ?? null,
-                    flow_rate: payload.flow_rate ?? payload.flowRate ?? payload.waterFlow ?? payload.raw_data?.[payload.flow_rate_field] ?? payload.raw_data?.field3 ?? null,
+                    flow_rate: payload.flow_rate ?? payload.flowRate ?? payload.waterFlow ?? payload.raw_data?.[payload.flow_rate_field] ?? payload.raw_data?.field4 ?? payload.raw_data?.field3 ?? null,
                     temperature: payload.temperature ?? payload.temp ?? null,
                     tdsValue: payload.tdsValue ?? payload.tds_value ?? null,
                     total_liters: payload.volume ?? payload.total_liters ?? payload.raw_data?.[payload.meter_reading_field] ?? payload.raw_data?.field1 ?? null,

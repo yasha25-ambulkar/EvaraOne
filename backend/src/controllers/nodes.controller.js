@@ -35,6 +35,11 @@ async function loadState(hardwareId, options = {}) {
     const { getTDSDeviceState } = require('../services/tdsStateService');
     return { device, state: await getTDSDeviceState(device) };
   }
+
+  if (type === 'evaraflow' || type === 'flow') {
+    const { getFlowDeviceState } = require('../services/flowStateService');
+    return { device, state: await getFlowDeviceState(device, options) };
+  }
   
   // Default to Tank state service
   return { device, state: await getDeviceState(device, options) };

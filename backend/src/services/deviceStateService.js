@@ -21,6 +21,7 @@ const {
   computeDailyConsumption,
   computeCapacity,
 } = require('../utils/tankMath');
+const { getFlowDeviceState } = require('./flowStateService');
 
 /**
  * Helper to convert range strings to day counts for ThingSpeak
@@ -57,6 +58,11 @@ const _midnightSnapshots = new Map();
  */
 async function getDeviceState(device, options = { light: false }) {
   const id = device.id || device.hardware_id || device.device_id;
+  const type = (device.device_type || device.deviceType || '').toLowerCase();
+
+  if (type === 'evaraflow' || type === 'flow') {
+    return getFlowDeviceState(device, options);
+  }
 
   // Return cached state if available AND it has enough history to cover the requested range
   if (_cache.has(id)) {
@@ -100,6 +106,12 @@ async function getDeviceState(device, options = { light: false }) {
  */
 async function refreshDeviceState(device, options = { light: false }) {
   const id   = device.id || device.hardware_id || device.device_id;
+  const type = (device.device_type || device.deviceType || '').toLowerCase();
+
+  if (type === 'evaraflow' || type === 'flow') {
+    return getFlowDeviceState(device, options);
+  }
+
   const dims = resolveDimensions(device);
   const isLight = options.light || false;
 
@@ -281,6 +293,35 @@ async function refreshDeviceState(device, options = { light: false }) {
 
   // Update cache
   _cache.set(id, state);
+
+  // Persist last-seen / status to Firestore (best-effort, non-blocking)
+  try {
+    const { db } = require('../config/firebase');
+    const { sanitizeForFirestore } = require('../utils/firestoreSanitize');
+    const deviceType = (device.device_type || device.deviceType || 'devices').toString().toLowerCase();
+    const typedRef = db.collection(deviceType).doc(id);
+    const registryRef = db.collection('devices').doc(id);
+    const lastUpdatedISO = new Date(latest.timestampMs).toISOString();
+    const status = isOnline ? 'ONLINE' : 'OFFLINE';
+    const updateObj = {
+      last_updated_at: lastUpdatedISO,
+      last_seen: lastUpdatedISO,
+      status,
+      last_value: metrics.percentage
+    };
+
+    // Fire-and-forget transaction: update both typed metadata and registry if documents exist
+    const cleaned = sanitizeForFirestore(updateObj);
+    db.runTransaction(async (tx) => {
+      const [typedDoc, regDoc] = await Promise.all([tx.get(typedRef), tx.get(registryRef)]);
+      if (typedDoc.exists) tx.update(typedRef, cleaned);
+      if (regDoc.exists) tx.update(registryRef, cleaned);
+    }).catch(err => {
+      console.error(`[deviceStateService] Failed to persist last_seen for ${id}:`, err.message);
+    });
+  } catch (err) {
+    console.error('[deviceStateService] Persist last_seen error:', err.message);
+  }
 
   return state;
 }

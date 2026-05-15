@@ -395,8 +395,52 @@ exports.getCustomers = async (req, res) => {
         }
 
         logger.debug(`[AdminController] Successfully fetched ${customers.length} customers`);
-        await cache.set(cacheKey, customers, 600); // 10 min
-        res.status(200).json(customers);
+
+        // ✅ ENRICHMENT: Add device count and last seen for each customer
+        const enrichedCustomers = await Promise.all(
+            customers.map(async (customer) => {
+                try {
+                    // Count devices for this customer
+                    const deviceCountSnapshot = await db.collection("devices")
+                        .where("customer_id", "==", customer.id)
+                        .count()
+                        .get();
+                    
+                    const deviceCount = deviceCountSnapshot.data().count || 0;
+
+                    // Get most recent device timestamp (last seen)
+                    let lastTimestamp = customer.updated_at || null;
+                    if (deviceCount > 0) {
+                        const latestDeviceSnapshot = await db.collection("devices")
+                            .where("customer_id", "==", customer.id)
+                            .orderBy("updatedAt", "desc")
+                            .limit(1)
+                            .get();
+                        
+                        if (!latestDeviceSnapshot.empty) {
+                            const latestDevice = latestDeviceSnapshot.docs[0].data();
+                            lastTimestamp = latestDevice.updatedAt || latestDevice.lastSeen || customer.updated_at || null;
+                        }
+                    }
+
+                    return {
+                        ...customer,
+                        deviceCount,
+                        updated_at: lastTimestamp
+                    };
+                } catch (err) {
+                    logger.warn(`[AdminController] Failed to enrich customer ${customer.id}:`, err.message);
+                    return {
+                        ...customer,
+                        deviceCount: 0,
+                        updated_at: customer.updated_at || null
+                    };
+                }
+            })
+        );
+
+        await cache.set(cacheKey, enrichedCustomers, 600); // 10 min
+        res.status(200).json(enrichedCustomers);
     } catch (error) {
         logger.error("[AdminController] getCustomers CRITICAL ERROR:", error);
         res.status(500).json({ error: "Failed to get customers" });
