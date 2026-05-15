@@ -152,32 +152,36 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
           <Lock size={16} className="text-slate-400" /> Auth & Role
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            label="Password"
-            required
-            icon={Lock}
-            error={errors.password?.message}
-          >
-            <input
-              {...register("password")}
-              type="password"
-              placeholder="Min 8 characters"
-              className={inputClass(errors.password)}
-            />
-          </FormField>
-          <FormField
-            label="Confirm Password"
-            required
-            icon={Lock}
-            error={errors.confirmPassword?.message}
-          >
-            <input
-              {...register("confirmPassword")}
-              type="password"
-              placeholder="Repeat password"
-              className={inputClass(errors.confirmPassword)}
-            />
-          </FormField>
+          {!isEdit && (
+            <>
+              <FormField
+                label="Password"
+                required
+                icon={Lock}
+                error={errors.password?.message}
+              >
+                <input
+                  {...register("password", { required: !isEdit })}
+                  type="password"
+                  placeholder="Min 8 characters"
+                  className={inputClass(errors.password)}
+                />
+              </FormField>
+              <FormField
+                label="Confirm Password"
+                required
+                icon={Lock}
+                error={errors.confirmPassword?.message}
+              >
+                <input
+                  {...register("confirmPassword", { required: !isEdit })}
+                  type="password"
+                  placeholder="Repeat password"
+                  className={inputClass(errors.confirmPassword)}
+                />
+              </FormField>
+            </>
+          )}
           <FormField
             label="User Role"
             required
@@ -253,7 +257,7 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
           ) : (
             <CheckCircle size={16} />
           )}
-          {isSubmitting ? "Creating User..." : "Add Customer Account"}
+          {isSubmitting ? (isEdit ? "Saving Changes..." : "Creating User...") : (isEdit ? "Save Changes" : "Add Customer Account")}
         </motion.button>
       </div>
     </form>

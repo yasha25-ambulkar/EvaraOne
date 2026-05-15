@@ -64,7 +64,14 @@ const Navbar = () => {
                 }}
             >
                 {/* Logo Section */}
-                <div className="flex items-center gap-[8px] flex-shrink-0">
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate('/dashboard')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/dashboard'); }}
+                    className="flex items-center gap-[8px] flex-shrink-0 cursor-pointer"
+                    aria-label="Go to dashboard"
+                >
                     <img src="/evara-logo.png" alt="EvaraTech" className="w-[42px] h-[42px] object-contain" />
                     <span
                         className="text-[22px] font-black hidden lg:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#0E79C1] via-[#00A3A6] to-[#2BC872]"

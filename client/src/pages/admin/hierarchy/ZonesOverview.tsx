@@ -14,7 +14,9 @@ import {
   Edit2,
   Trash2,
 } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 import { useToast } from "../../../components/ToastProvider";
+import { useConfirm } from '../../../components/ui/ConfirmProvider';
 import type { Zone as RegionRow } from "../../../types/entities";
 
 interface RegionStat {
@@ -36,6 +38,8 @@ const RegionsOverview = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingZone, setEditingZone] = useState<RegionRow | null>(null);
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const fetchData = async () => {
     try {
@@ -83,12 +87,14 @@ const RegionsOverview = () => {
 
   const handleDeleteZone = async (e: React.MouseEvent, zoneId: string) => {
     e.stopPropagation();
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this zone? All communities within it will lose their geographic assignment.",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: 'Delete this Zone?',
+      description: 'Are you sure you want to delete this zone? All communities within it will lose their geographic assignment.',
+      confirmText: 'Yes, Delete Zone',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       await adminService.deleteRegion(zoneId);
@@ -242,33 +248,42 @@ const RegionsOverview = () => {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-[4px] text-[11px] font-[700] zone-manage uppercase tracking-wider opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-[6px] text-[11px] font-[700] zone-manage uppercase tracking-wider opacity-80 group-hover:opacity-100 transition-opacity">
                       {user?.role === "superadmin" && (
-                        <div className="flex items-center gap-2 mr-4">
+                        <div className="flex items-center gap-1 mr-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingZone(zone);
                             }}
-                            className="p-1.5 hover:bg-blue-50/50 rounded-lg zone-icon transition-colors"
+                            className="px-3 py-1 rounded-lg text-[13px] font-[700] bg-[#3A7AFE] text-white hover:bg-[#2563EB] transition-all shadow-sm"
                             title="Edit Zone"
+                            aria-label={`Edit ${zone?.zoneName || 'zone'}`}
                           >
-                            <Edit2 size={14} />
+                            Edit
                           </button>
                           <button
                             onClick={(e) => handleDeleteZone(e, zone.id)}
-                            className="p-1.5 hover:bg-red-50/50 rounded-lg zone-icon transition-colors"
+                            className="px-3 py-1 rounded-lg text-[13px] font-[700] text-[#EF4444] bg-[rgba(239,68,68,0.06)] hover:bg-[rgba(239,68,68,0.12)] transition-all"
                             title="Delete Zone"
+                            aria-label={`Delete ${zone?.zoneName || 'zone'}`}
                           >
-                            <Trash2 size={14} />
+                            Delete
                           </button>
                         </div>
                       )}
-                      <span>Manage</span>
-                      <ArrowRight
-                        size={14}
-                        className="transform group-hover:translate-x-1 transition-transform"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/superadmin/zones/${zone.id}/customers`)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#3A7AFE] text-white text-[12px] font-[800] shadow-sm border border-[rgba(58,122,254,0.25)] hover:bg-[#2563EB] hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                        aria-label={`Manage ${zone?.zoneName || 'zone'}`}
+                      >
+                        <span>Manage</span>
+                        <ArrowRight
+                          size={14}
+                          className="transform transition-transform group-hover:translate-x-1"
+                        />
+                      </button>
                     </div>
                   </div>
                 </div>
