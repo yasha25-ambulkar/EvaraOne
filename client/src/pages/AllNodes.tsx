@@ -364,7 +364,18 @@ const CurrentWaveform = ({ value }: { value: number }) => {
 
 const NodeCardItem = ({ 
 node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
-  const cfg = CATEGORY_CONFIG[(node.category as NodeCategory) || "OHT"] || CATEGORY_CONFIG["OHT"];
+  const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
+  const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
+  const isMotor = node.analytics_template === 'EvaraMotor' || (node.category || "").toString() === 'EvaraMotor' || (node.category || "").toString() === 'EvaraOps' || (node.category || "").toString() === 'phase';
+  const isValve = node.analytics_template === 'EvaraValve' || (node.category || "").toString() === 'EvaraValve' || (node.category || "").toString().toLowerCase().includes('valve');
+
+  // Determine which analytics config to use
+  const analyticsType = (node.analytics_template as AnalyticsType) || 
+                       (isTank ? "EvaraTank" : isFlow ? "EvaraFlow" : isMotor ? "EvaraMotor" : isValve ? "EvaraValve" : "EvaraTank");
+  const analyticsCfg = ANALYTICS_CONFIG[analyticsType] || ANALYTICS_CONFIG["EvaraTank"];
+
+  // Use the specific Evara config if identified, otherwise fallback to category config
+  const cfg = isValve ? CATEGORY_CONFIG.EvaraValve : (CATEGORY_CONFIG[(node.category as NodeCategory) || "OHT"] || CATEGORY_CONFIG["OHT"]);
 
   const realtimeSnapshot = realtimeStatuses[node.id];
   const base = realtimeSnapshot || node.last_telemetry || {};
@@ -388,21 +399,11 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
     ? (node.online_status ? "Online" : "Offline")
     : computeDeviceStatus(effectiveTs);
   const isOnline = currentStatus === "Online";
-  const isTank = ["evaratank", "EvaraTank", "tank", "sump", "OHT", "Sump"].includes((node.category || node.asset_type || "").toString());
-  const isFlow = node.analytics_template === 'EvaraFlow' || (node.category || "").toString() === 'EvaraFlow' || (node.category || "").toString() === 'flow' || (node.category || "").toString() === 'FlowMeter';
-  const isMotor = node.analytics_template === 'EvaraMotor' || (node.category || "").toString() === 'EvaraMotor' || (node.category || "").toString() === 'EvaraOps' || (node.category || "").toString() === 'phase';
-  const isValve = node.analytics_template === 'EvaraValve' || (node.category || "").toString() === 'EvaraValve' || (node.category || "").toString().toLowerCase().includes('valve');
-
 
   const lastTel = realtimeSnapshot || node.last_telemetry || {};
   const motorRunning = lastTel.isRunning ?? lastTel.motor_status ?? true;
 
   const pct = lastTel.level_percentage ?? getTankLevel(node, lastTel);
-
-  // Determine which analytics config to use
-  const analyticsType = (node.analytics_template as AnalyticsType) || 
-                       (isTank ? "EvaraTank" : isFlow ? "EvaraFlow" : isMotor ? "EvaraMotor" : isValve ? "EvaraValve" : "EvaraTank");
-  const analyticsCfg = ANALYTICS_CONFIG[analyticsType] || ANALYTICS_CONFIG["EvaraTank"];
 
   if (analyticsType === 'EvaraTDS' || (node.category || node.asset_type || '').toString().toLowerCase().includes('tds')) {
     return <TDSCard node={node} realtimeStatus={realtimeSnapshot} />;
@@ -594,7 +595,7 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
 
 
         {/* Bottom Metadata (Only for Tanks/Generic) */}
-        {!isFlow && !isMotor && (
+        {!isFlow && !isMotor && !isValve && (
           <div className="mt-auto flex items-center justify-between pt-3 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />
@@ -606,8 +607,18 @@ node, realtimeStatuses }: { node: any, realtimeStatuses: any }) => {
           </div>
         )}
 
+        {/* Location for Valves (Just location, no capacity) */}
+        {isValve && (
+          <div className="mt-auto flex items-center justify-between pt-1 px-1">
+            <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
+              <MapPin size={14} className="shrink-0 card-location" />
+              <span className="truncate uppercase card-location">{node.location_name || "Main Site"}</span>
+            </div>
+          </div>
+        )}
+
         {/* Location for Flow Devices (Same as TDS) */}
-        {(isFlow || isMotor || isValve) && (
+        {(isFlow || isMotor) && (
           <div className="mt-auto flex items-center justify-between pt-1 px-1">
             <div className="flex items-center gap-1.5 text-[12px] font-[800] card-location truncate pr-2">
               <MapPin size={14} className="shrink-0 card-location" />
