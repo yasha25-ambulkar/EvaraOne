@@ -32,6 +32,7 @@ export function getDeviceAnalyticsRoute(device: Device): string {
     if (template.includes('flow')) return `/evaraflow/${hId}`;
     if (template.includes('tds')) return `/evaratds/${hId}`;
     if (template.includes('phase') || template.includes('ops') || template.includes('motor')) return `/evaramotor/${hId}`;
+    if (template.includes('valve')) return `/evaravalve/${hId}`;
   }
 
   // 2. Fall back to device_type
@@ -43,6 +44,7 @@ export function getDeviceAnalyticsRoute(device: Device): string {
       return `/evaradeep/${hId}`;
     if (type.includes('flow') || type.includes('pump') || type.includes('meter'))
       return `/evaraflow/${hId}`;
+    if (type.includes('valve')) return `/evaravalve/${hId}`;
   }
 
   // 3. Fall back to asset_type (legacy/common field)
@@ -54,6 +56,7 @@ export function getDeviceAnalyticsRoute(device: Device): string {
       return `/evaradeep/${hId}`;
     if (asset.includes('flow') || asset.includes('pump') || asset.includes('meter'))
       return `/evaraflow/${hId}`;
+    if (asset.includes('valve')) return `/evaravalve/${hId}`;
   }
 
   // Default fallback to node details page (uses Firestore original ID)
