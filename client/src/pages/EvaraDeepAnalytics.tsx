@@ -215,11 +215,11 @@ const EvaraDeepAnalytics = () => {
                 className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8"
                 style={{ zIndex: 1 }}
             >
-                <div className="max-w-[1440px] mx-auto flex flex-col gap-6">
+                <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
-                    {/* ── Breadcrumb row ─────────────────────────────────────────── */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                    {/* Breadcrumb + Page Heading row */}
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                        <div className="flex flex-col gap-2">
                             <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
                                 <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
                                     Home
@@ -231,43 +231,57 @@ const EvaraDeepAnalytics = () => {
                                 <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => refetch()}
-                                    disabled={analyticsFetching}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md apple-glass-card active:scale-95 ${analyticsFetching ? 'bg-black/5 dark:bg-white/5 text-gray-400 cursor-not-allowed' : 'bg-[#0077ff]/10 hover:bg-[#0077ff]/20 text-[#0077ff] border border-[#0077ff]/30'}`}
-                                >
-                                    <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
-                                        {analyticsFetching ? 'sync' : 'refresh'}
-                                    </span>
-                                    {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
-                                </button>
 
-                                {/* Delete Button */}
-                                {user?.role === 'superadmin' && (
-                                    <button
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-600 border border-red-500/40 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200 shadow-md active:scale-95"
-                                    >
-                                        <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
-                                        Delete Node
-                                    </button>
-                                )}
+                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
+                                {deviceName} Analytics
+                            </h2>
 
-                                <div className={clsx(
-                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
-                                    isOffline
-                                        ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
-                                        : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
-                                )}>
-                                    <div className={clsx(
-                                        "w-1.5 h-1.5 rounded-full",
-                                        isOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
-                                    )} />
-                                    {isOffline ? 'Offline' : 'Online'}
-                                </div>
-                            </div>
+                            {zoneName && (
+                                <p className="text-xs text-slate-400 m-0 mt-1">
+                                    {zoneName}
+                                </p>
+                            )}
                         </div>
+
+                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                            {/* Status Button (Pill Style) */}
+                            <div className={clsx(
+                                "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
+                                isOffline
+                                    ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20"
+                                    : "bg-[#ecfdf5] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 border border-[#10b981]/50 dark:border-emerald-500/40"
+                            )}>
+                                <div className={clsx(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isOffline ? "bg-red-500" : "bg-[#10b981] animate-pulse"
+                                )} />
+                                {isOffline ? 'Offline' : 'Online'}
+                            </div>
+
+                            {/* Node Info Button */}
+                            <button
+                                onClick={() => refetch()}
+                                disabled={analyticsFetching}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 ${analyticsFetching ? 'bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none' : 'bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10'}`}
+                            >
+                                <span className={`material-icons ${analyticsFetching ? 'animate-spin' : ''}`} style={{ fontSize: '14px' }}>
+                                    {analyticsFetching ? 'sync' : 'refresh'}
+                                </span>
+                                {analyticsFetching ? 'Refreshing...' : 'Refresh Data'}
+                            </button>
+
+                            {/* Delete Button */}
+                            {user?.role === 'superadmin' && (
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95"
+                                >
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span>
+                                    Delete Node
+                                </button>
+                            )}
+                        </div>
+<<<<<<< HEAD
                         <h1 className="text-3xl font-black m-0" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
                             {deviceName} Deep Analytics
                         </h1>
@@ -276,6 +290,8 @@ const EvaraDeepAnalytics = () => {
                                 {offlineMessage}
                             </p>
                         )}
+=======
+>>>>>>> dd3e8cf1992109852d5742cf3471f27d1eaf75fa
                     </div>
 
                     {isConfigMissing && (
