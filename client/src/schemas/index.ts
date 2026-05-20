@@ -45,13 +45,16 @@ export const customerSchema = z
     display_name: z.string().min(2, "Display name is required"),
     full_name: z.string().optional(),
     email: z.string().email("Invalid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
+    password: z.string().min(8, "Password must be at least 8 characters").optional(),
+    confirmPassword: z.string().optional(),
     phone_number: z.string().optional(),
     role: z.enum(["customer", "distributor", "operator", "viewer"]),
     status: z.enum(["active", "pending", "suspended", "inactive"]),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => {
+    if (!data.password && !data.confirmPassword) return true;
+    return data.password === data.confirmPassword;
+  }, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
   });

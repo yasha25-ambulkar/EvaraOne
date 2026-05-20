@@ -65,7 +65,7 @@ class TelemetryService {
         temperature_value: data.temperature ?? data.temp ?? null,
         temperature: data.temperature ?? data.temp ?? null,
         tdsValue: data.tdsValue ?? data.tds_value ?? null,
-        flow_rate: data.flow_rate ?? data.flowRate ?? data.waterFlow ?? data.raw_data?.[data.flow_rate_field] ?? data.raw_data?.field3 ?? null,
+        flow_rate: data.flow_rate ?? data.flowRate ?? data.waterFlow ?? data.raw_data?.[data.flow_rate_field] ?? data.raw_data?.field4 ?? data.raw_data?.field3 ?? null,
         total_liters: data.volume ?? data.total_liters ?? data.raw_data?.[data.meter_reading_field] ?? data.raw_data?.field1 ?? null,
         distance: data.distance,
         waterLevel: data.level_percentage,

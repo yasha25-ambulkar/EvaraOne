@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { getAuth } from 'firebase/auth';
+import { auth, isFirebaseEnabled } from '../lib/firebase';
 import realtimeSync from '../services/RealtimeSyncService';
 
 interface UseRealtimeSyncOptions {
@@ -75,9 +75,8 @@ export const useRealtimeSync = (options: UseRealtimeSyncOptions = {}): UseRealti
   // Connect to real-time sync
   const connect = useCallback(async (): Promise<boolean> => {
     try {
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        console.warn('[RealtimeSync] No authenticated user');
+      if (!isFirebaseEnabled || !auth?.currentUser) {
+        console.warn('[RealtimeSync] Firebase auth is disabled or no authenticated user is available');
         return false;
       }
 

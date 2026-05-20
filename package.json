@@ -10,11 +10,11 @@
     "install:client": "cd client && npm install",
     "build:client": "cd client && npm run build",
     "build": "npm install && cd client && npm install && npm run build && cd ../backend && npm install --production",
-    "start": "cd backend && NODE_ENV=production node src/server.js",
+    "start": "cd backend && npx cross-env NODE_ENV=production node src/server.js",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd client && npm run dev\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   },
   "dependencies": {
     "driver.js": "^1.4.0"

@@ -21,7 +21,7 @@ import {
 
 import api from '../services/api';
 import { useStaleDataAge } from '../hooks/useStaleDataAge';
-import { computeOnlineStatus } from '../utils/telemetryPipeline';
+import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
 import { useDeviceAnalytics, type NodeInfoData } from '../hooks/useDeviceAnalytics';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { useAnalyticsLogger } from '../utils/analyticsLogger';
@@ -401,6 +401,14 @@ const EvaraTankAnalytics = () => {
 
 
     const isOffline = onlineStatus === 'Offline';
+
+    // Derived Offline Message
+    const { offlineMessage } = useMemo(() => {
+        if (!isOffline) return { offlineMessage: '' };
+        const bestTimestamp = (activeTelemetry?.timestamp ?? deviceInfo?.last_seen) ?? null;
+        const { label } = formatOfflineMessage(bestTimestamp);
+        return { offlineMessage: label };
+    }, [isOffline, activeTelemetry?.timestamp, deviceInfo?.last_seen]);
 
 
 
@@ -849,6 +857,12 @@ const EvaraTankAnalytics = () => {
 
                                 {deviceName} Analytics
                             </h2>
+
+                            {isOffline && offlineMessage && (
+                                <p className="text-xs font-bold text-red-500 m-0 mt-1">
+                                    {offlineMessage}
+                                </p>
+                            )}
 
                             {zoneName && (
                                 <p className="text-xs text-slate-400 m-0 mt-1">

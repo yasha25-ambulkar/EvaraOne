@@ -1,12 +1,16 @@
 [build]
-buildCommand = "npm run build"
+# Build both client and backend
+buildCommand = "cd client && npm install && npm run build && cd ../backend && npm install"
 
 [deploy]
-startCommand = "npm start"
+# Start only the backend (client is served as static assets)
+startCommand = "cd backend && npm start"
 healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 5
 
 [variables]
 NODE_ENV = "production"
+PORT = "8000"
 
  
  

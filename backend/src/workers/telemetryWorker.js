@@ -12,6 +12,8 @@
 
 const { refreshDeviceState } = require('../services/deviceStateService');
 const { refreshTDSDeviceState } = require('../services/tdsStateService');
+const { refreshFlowDeviceState } = require('../services/flowStateService');
+const { getNodeDetails } = require('../services/deviceLookupService');
 const { db } = require("../config/firebase.js");
 const logger = require("../utils/logger.js");
 
@@ -150,12 +152,22 @@ async function _tick(getDevices) {
   
   for (const device of _devices) {
     try {
-      await _pollDevice(device);
+      // Ensure we have enriched registry + typed metadata so services can
+      // read ThingSpeak credentials stored in typed collections (e.g. evaraflow)
+      let enriched = device;
+      try {
+        const details = await getNodeDetails(device.id || device.hardware_id || device.device_id);
+        if (details) enriched = details;
+      } catch (e) {
+        // fall back to the registry-only document if metadata resolution fails
+      }
+
+      await _pollDevice(enriched);
       ok++;
     } catch (err) {
       failed++;
     }
-    
+
     if (STAGGER_DELAY_MS > 0) {
       await new Promise(resolve => setTimeout(resolve, STAGGER_DELAY_MS));
     }
@@ -179,6 +191,21 @@ async function _pollDevice(device) {
       });
       
       // EMIT real-time update for Socket.io
+      telemetryEvents.emit('device:update', {
+        deviceId: id,
+        device_id: id,
+        node_id: id,
+        ...state
+      });
+    } else if (type === 'evaraflow' || type === 'flow') {
+      const state = await refreshFlowDeviceState(device, { light: true });
+      logger.info(`[telemetryWorker] Flow ${id} → ${state.totalLiters}L | ${state.flowRate} L/min`, {
+        category: 'telemetry',
+        deviceId: id,
+        type: 'flow',
+        ...state
+      });
+
       telemetryEvents.emit('device:update', {
         deviceId: id,
         device_id: id,

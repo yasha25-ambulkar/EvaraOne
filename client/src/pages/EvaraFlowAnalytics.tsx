@@ -15,7 +15,7 @@ import { useDeviceAnalytics } from '../hooks/useDeviceAnalytics';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { useFirestoreFlowData } from '../hooks/useFirestoreFlowData';
 import type { NodeInfoData } from '../hooks/useDeviceAnalytics';
-import { computeOnlineStatus } from '../utils/telemetryPipeline';
+import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
 import type { FlowConfig } from '../hooks/useDeviceConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -371,7 +371,7 @@ const EvaraFlowAnalytics = () => {
     const queryClient = useQueryClient();
 
     const [fieldTotal, setFieldTotal] = useState('field1');
-    const [fieldFlow, setFieldFlow] = useState('field3');
+    const [fieldFlow, setFieldFlow] = useState('field4');
 
     const [showParams, setShowParams] = useState(false);
     const [showNodeInfo, setShowNodeInfo] = useState(false);
@@ -453,29 +453,23 @@ const EvaraFlowAnalytics = () => {
     const historyFeeds = (unifiedData?.history as any)?.feeds || [];
     const maxFlowRate = deviceConfig?.max_flow_rate ?? 30;
 
-    const snapshotTs = telemetryData?.timestamp ?? null;
-    const deviceLastSeen = deviceInfo?.last_seen ?? null;
-    const bestTimestamp = snapshotTs ?? deviceLastSeen;
-    
-    // Authoritative status from backend
-    const onlineStatus = (typeof (deviceInfo as any)?.online_status === 'boolean')
-        ? ((deviceInfo as any).online_status ? 'Online' : 'Offline')
-        : (typeof (telemetryData as any)?.online === 'boolean')
-            ? ((telemetryData as any).online ? 'Online' : 'Offline')
-            : computeOnlineStatus(bestTimestamp);
-
     useEffect(() => {
         // High Priority: Use fields discovered by the Smart-Scan backend
         const activeFields = (unifiedData as any)?.active_fields;
-        if (activeFields) {
-            if (activeFields.total_liters) setFieldTotal(activeFields.total_liters);
-            if (activeFields.flow_rate) setFieldFlow(activeFields.flow_rate);
+        const configFields = (deviceConfig as any)?.fields || {};
+
+        if (Array.isArray(activeFields)) {
+            if (activeFields.includes('total_liters')) setFieldTotal(configFields.total_liters || deviceConfig?.meter_reading_field || 'field1');
+            if (activeFields.includes('flow_rate')) setFieldFlow(configFields.flow_rate || deviceConfig?.flow_rate_field || 'field4');
+        } else if (activeFields) {
+            if ((activeFields as any).total_liters) setFieldTotal((activeFields as any).total_liters);
+            if ((activeFields as any).flow_rate) setFieldFlow((activeFields as any).flow_rate);
         } else if (deviceConfig) {
             // Low Priority: DB configuration fallback
-            if (deviceConfig.meter_reading_field) setFieldTotal(deviceConfig.meter_reading_field);
-            if (deviceConfig.flow_rate_field) setFieldFlow(deviceConfig.flow_rate_field);
+            if (configFields.total_liters || deviceConfig.meter_reading_field) setFieldTotal(configFields.total_liters || deviceConfig.meter_reading_field || 'field1');
+            if (configFields.flow_rate || deviceConfig.flow_rate_field) setFieldFlow(configFields.flow_rate || deviceConfig.flow_rate_field || 'field4');
         }
-        console.log('[Flow] activeFields:', activeFields, 'deviceConfig:', { meter: deviceConfig?.meter_reading_field, flow: deviceConfig?.flow_rate_field });
+        console.log('[Flow] activeFields:', activeFields, 'deviceConfig:', { meter: deviceConfig?.meter_reading_field, flow: deviceConfig?.flow_rate_field, fields: configFields });
     }, [deviceConfig, unifiedData]);
 
     // Debug: Log data source info
@@ -499,17 +493,13 @@ const EvaraFlowAnalytics = () => {
 
     const isConfigMissing = !deviceConfig?.thingspeak_channel_id;
     const isDataMissing = !telemetryData;
-    const isOffline = onlineStatus === 'Offline';
-
-    // ── Stale age ─────────────────────────────────────────────────────────────
-    const { label: staleLabel } = useStaleDataAge(telemetryData?.timestamp ?? null);
 
     // ── Firestore Real-time Subscription (replaces direct ThingSpeak fetch) ──
     // The backend TelemetryWorker polls ThingSpeak every 60s, processes the data,
     // and writes to Firestore. We subscribe to that document for live updates.
     const deviceDocId = deviceInfo?.id || hardwareId;
     const configId = deviceConfig?.id || (unifiedData as any)?.config?.id;
-    const deviceType = deviceConfig?.device_type || (unifiedData as any)?.config?.config?.device_type || 'flow_meter';
+    const deviceType = deviceConfig?.device_type || (unifiedData as any)?.config?.config?.device_type || 'evaraflow';
     const firestoreFlow = useFirestoreFlowData(deviceDocId, deviceType);
 
     // Derive tsMeterReading and tsCreatedAt from Firestore data
@@ -518,6 +508,60 @@ const EvaraFlowAnalytics = () => {
     const firestoreFlowRate = firestoreFlow.flowRate;
 
     console.log('[FirestoreFlow] volume:', tsMeterReading, 'flowRate:', firestoreFlowRate, 'timestamp:', tsCreatedAt, 'status:', firestoreFlow.status);
+
+    // Build a single authoritative "freshest timestamp" across all available sources.
+    const resolvedTimestamp = useMemo(() => {
+        const candidates = [
+            telemetryData?.timestamp,
+            (telemetryData as any)?.created_at,
+            tsCreatedAt,
+            (deviceInfo as any)?.last_updated_at,
+            deviceInfo?.last_seen,
+            (deviceInfo as any)?.last_online_at,
+        ].filter(Boolean);
+
+        let latestRaw: any = null;
+        let latestMs = -Infinity;
+
+        for (const c of candidates) {
+            const d = safeParseDate(c);
+            const ms = d.getTime();
+            if (!isNaN(ms) && ms > latestMs) {
+                latestMs = ms;
+                latestRaw = c;
+            }
+        }
+
+        return latestRaw;
+    }, [telemetryData, tsCreatedAt, deviceInfo]);
+
+    // Resolve online/offline from freshest timestamp first, booleans only as fallback.
+    const onlineStatus: 'Online' | 'Offline' = useMemo(() => {
+        if (resolvedTimestamp) {
+            return computeOnlineStatus(resolvedTimestamp);
+        }
+
+        if (typeof (telemetryData as any)?.online === 'boolean') {
+            return (telemetryData as any).online ? 'Online' : 'Offline';
+        }
+
+        if (typeof (deviceInfo as any)?.online_status === 'boolean') {
+            return (deviceInfo as any).online_status ? 'Online' : 'Offline';
+        }
+
+        if (typeof firestoreFlow.status === 'string') {
+            const s = firestoreFlow.status.toUpperCase();
+            if (s === 'ONLINE') return 'Online';
+            if (s === 'OFFLINE' || s === 'OFFLINE_STOPPED' || s === 'UNKNOWN') return 'Offline';
+        }
+
+        return 'Offline';
+    }, [resolvedTimestamp, telemetryData, deviceInfo, firestoreFlow.status]);
+
+    const isOffline = onlineStatus === 'Offline';
+
+    // ── Stale age ─────────────────────────────────────────────────────────────
+    const { label: staleLabel } = useStaleDataAge(resolvedTimestamp ?? null);
 
     // Build a tsFeeds-compatible array from historyFeeds (backend analytics API)
     // This is used by the delta calculations and charts below
@@ -538,47 +582,20 @@ const EvaraFlowAnalytics = () => {
     }, [historyFeeds, fieldTotal, fieldFlow]);
 
     // Derived Offline Logic
-    const { isTSOffline, tsIstLabel, tsDurationLabel } = useMemo(() => {
-        if (!tsCreatedAt) return { isTSOffline: false, tsIstLabel: '', tsDurationLabel: '' };
+    const { tsIstLabel, tsDurationLabel } = useMemo(() => {
+        if (!resolvedTimestamp) return { tsIstLabel: '', tsDurationLabel: '' };
 
-        const lastSeenDate = safeParseDate(tsCreatedAt);
+        const lastSeenDate = safeParseDate(resolvedTimestamp);
         if (isNaN(lastSeenDate.getTime())) {
-            return { isTSOffline: true, tsIstLabel: 'Unknown', tsDurationLabel: 'Syncing data...' };
+            return { tsIstLabel: 'Unknown', tsDurationLabel: 'Syncing data...' };
         }
 
-        const now = new Date();
-        const diffMs = now.getTime() - lastSeenDate.getTime();
-        const diffMin = diffMs / 60000;
-        const offline = diffMin > 30;
+        const { label, istTime } = formatOfflineMessage(resolvedTimestamp);
 
-        // IST Formatting (21 Mar 2026, 14:44 IST)
-        const formatOptions: Intl.DateTimeFormatOptions = {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Kolkata'
-        };
-        
-        let istLabel = 'Syncing...';
-        try {
-            istLabel = new Intl.DateTimeFormat('en-IN', formatOptions).format(lastSeenDate).replace(',', '') + ' IST';
-        } catch (e) {
-            console.error('[Flow] Date formatting failed:', e);
-        }
+        return { tsIstLabel: istTime, tsDurationLabel: label };
+    }, [resolvedTimestamp]);
 
-        // Duration Formatting
-        const hoursAgo = Math.floor(diffMin / 60);
-        const durationLabel = hoursAgo > 0
-            ? `Device offline · Last seen ${hoursAgo} hours ago`
-            : `Device offline · Last seen ${Math.max(0, Math.floor(diffMin))} minutes ago`;
-
-        return { isTSOffline: offline, tsIstLabel: istLabel, tsDurationLabel: durationLabel };
-    }, [tsCreatedAt]);
-
-    const effectiveIsOffline = isOffline || isTSOffline;
+    const effectiveIsOffline = isOffline;
 
     const deviceName = deviceInfo?.name ?? 'Flow Meter';
     const zoneName = deviceInfo?.zone_name ?? deviceInfo?.community_name ?? '';

@@ -61,9 +61,22 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       "https://evara-iot-platform-production.up.railway.app",
       "https://app.evaratech.com",
+      "http://localhost:8081",
       "http://localhost:5173",
       "http://localhost:3000"
     ];
+
+const isLocalDevOrigin = (origin) => {
+  try {
+    const url = new URL(origin);
+    return (
+      process.env.NODE_ENV !== "production" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    );
+  } catch {
+    return false;
+  }
+};
 
 // ✅ FIX: Remove .railway.app wildcard, use only explicit origins
 const corsOptions = {
@@ -72,7 +85,7 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     // Check against explicit list only (no wildcards)
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
       return callback(null, true);
     }
     
@@ -175,7 +188,13 @@ const server = http.createServer(app);
 
 const io = new Server(server, { 
     cors: { 
-        origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
+        return callback(null, true);
+      }
+      callback(null, false);
+    },
         credentials: true
     } 
 });
@@ -677,7 +696,7 @@ if (process.env.NODE_ENV === "production") {
 // All controllers should use next(err) or throw AppError
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5002;
 
 try {
     server.on("error", (err) => {

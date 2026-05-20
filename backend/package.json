@@ -8,7 +8,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "dev": "nodemon src/server.js",
-    "start": "node --openssl-legacy-provider src/server.js"
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +19,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.13.6",
     "cors": "^2.8.6",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
@@ -40,4 +41,3 @@
     "nodemon": "^3.1.14"
   }
 }
- 

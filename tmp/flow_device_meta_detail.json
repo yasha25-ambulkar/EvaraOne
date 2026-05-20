@@ -1,0 +1,62 @@
+{
+  "fields": {
+    "flow_rate": "field4",
+    "total_liters": "field1"
+  },
+  "sensor_field_mapping": {
+    "field4": "flow_rate",
+    "field1": "current_reading"
+  },
+  "configuration": {},
+  "telemetry_snapshot": {
+    "flow_rate": 0,
+    "total_liters": 72927.2,
+    "percentage": 0,
+    "level_percentage": 0,
+    "tds_value": 0,
+    "temperature": 0,
+    "water_quality": "Good",
+    "timestamp": "2026-05-13T11:40:44Z",
+    "status": "Offline",
+    "waterState": "STABLE",
+    "rateLitresPerMin": 0,
+    "consumedTodayLitres": 0,
+    "refilledTodayLitres": 0,
+    "estMinutesToEmpty": null,
+    "estMinutesToFull": null,
+    "raw_data": {
+      "created_at": "2026-05-13T11:40:44Z",
+      "entry_id": 1094,
+      "field1": "72927.2",
+      "field2": null,
+      "field3": "72927.26",
+      "field4": "0.0"
+    }
+  },
+  "telemetrySnapshot": {
+    "timestamp": "2026-05-11T16:10:49Z",
+    "flow_rate": 0,
+    "total_liters": 1291.24,
+    "status": "ONLINE"
+  },
+  "last_telemetry_fetch": "2026-05-14T13:51:59.734Z",
+  "lastTelemetryFetch": "2026-05-14T15:36:55.453Z",
+  "online": true,
+  "status": "Offline",
+  "last_seen": "2026-05-13T11:40:44Z",
+  "last_updated_at": "2026-05-13T11:40:44Z",
+  "last_online_at": {
+    "_seconds": 1778766719,
+    "_nanoseconds": 731000000
+  },
+  "flow_rate": 0,
+  "total_liters": 72927.2,
+  "raw_data": {
+    "created_at": "2026-05-13T11:40:44Z",
+    "entry_id": 1094,
+    "field1": "72927.2",
+    "field2": null,
+    "field3": "72927.26",
+    "field4": "0.0"
+  }
+}

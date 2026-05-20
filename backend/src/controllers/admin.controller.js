@@ -4,6 +4,7 @@ const cache = require("../config/cache.js");
 const telemetryCache = require("../services/cacheService.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
 const logger = require("../utils/logger.js");
+const { calculateDeviceStatus } = require("../services/deviceStateService.js");
 // ✅ PHASE 2: Cache versioning (Task #11)
 const { getVersionKey, incrementCacheVersion } = require("../utils/cacheVersioning.js");
 // ✅ PHASE 2: Audit logging (Task #12)
@@ -18,6 +19,36 @@ const { updateZoneSchema } = require("../schemas/zone.schema.js");
 function parseNumberSafely(val) {
   const parsed = parseFloat(val);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeStatus(value) {
+    if (!value) return "";
+    return String(value).trim().toUpperCase();
+}
+
+function resolveDeviceTimestamp(device) {
+    return (
+        device.last_seen ||
+        device.lastSeen ||
+        device.last_updated_at ||
+        device.lastUpdatedAt ||
+        device.lastUpdated ||
+        device.updated_at ||
+        device.updatedAt ||
+        device.timestamp ||
+        null
+    );
+}
+
+function isDeviceOnline(device) {
+    const status = normalizeStatus(device.status || device.online_status || device.operational_status);
+    if (status === "ONLINE") return true;
+    if (status === "OFFLINE") return false;
+
+    const resolvedTimestamp = resolveDeviceTimestamp(device);
+    if (!resolvedTimestamp) return false;
+
+    return calculateDeviceStatus(resolvedTimestamp) === "ONLINE";
 }
 
 exports.createZone = async (req, res) => {
@@ -395,8 +426,88 @@ exports.getCustomers = async (req, res) => {
         }
 
         logger.debug(`[AdminController] Successfully fetched ${customers.length} customers`);
-        await cache.set(cacheKey, customers, 600); // 10 min
-        res.status(200).json(customers);
+
+        const [zonesSnap, devicesSnap] = await Promise.all([
+            db.collection("zones").get(),
+            db.collection("devices").get()
+        ]);
+
+        const zoneMap = zonesSnap.docs.reduce((acc, doc) => {
+            const zone = { id: doc.id, ...doc.data() };
+            acc[zone.id] = zone;
+            return acc;
+        }, {});
+
+        const devices = devicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // ✅ ENRICHMENT: Add device count and last seen for each customer
+        const enrichedCustomers = await Promise.all(
+            customers.map(async (customer) => {
+                try {
+                    const customerZoneId = customer.zone_id || customer.zoneId || customer.regionFilter || customer.community_id || customer.communityId || null;
+                    const customerZone = customerZoneId ? zoneMap[customerZoneId] : null;
+                    const customerDevices = devices.filter((device) => {
+                        const ownerId = device.customer_id || device.customerId || device.customerID || "";
+                        return ownerId === customer.id;
+                    });
+
+                    const deviceCount = customerDevices.length;
+                    const onlineDeviceCount = customerDevices.filter(isDeviceOnline).length;
+
+                    const latestDeviceTimestamp = customerDevices
+                        .map(resolveDeviceTimestamp)
+                        .filter(Boolean)
+                        .reduce((latest, timestamp) => {
+                            if (!latest) return timestamp;
+                            const latestMs = new Date(latest).getTime();
+                            const timestampMs = new Date(timestamp).getTime();
+                            if (Number.isNaN(latestMs)) return timestamp;
+                            if (Number.isNaN(timestampMs)) return latest;
+                            return timestampMs > latestMs ? timestamp : latest;
+                        }, customer.updated_at || customer.updatedAt || customer.last_seen || customer.lastSeen || null);
+
+                    const normalizedLastSeen = latestDeviceTimestamp || customer.updated_at || customer.updatedAt || customer.last_seen || customer.lastSeen || null;
+                    const status = onlineDeviceCount > 0 ? "Online" : "Offline";
+
+                    return {
+                        ...customer,
+                        devices: customerDevices.map((device) => ({
+                            id: device.id,
+                            status: device.status || device.operational_status || (isDeviceOnline(device) ? "Online" : "Offline"),
+                            analytics_template: device.analytics_template || device.device_type || device.assetType || null,
+                            node_key: device.node_key || device.hardwareId || device.device_id || device.id || null
+                        })),
+                        deviceCount,
+                        onlineDeviceCount,
+                        isActive: onlineDeviceCount > 0,
+                        status,
+                        zoneName: customerZone?.zoneName || customerZone?.name || customer.zoneName || customer.communityName || null,
+                        communityName: customerZone?.zoneName || customerZone?.name || customer.communityName || null,
+                        updated_at: normalizedLastSeen,
+                        last_seen: normalizedLastSeen,
+                        lastSeen: normalizedLastSeen,
+                        lastUpdated: normalizedLastSeen
+                    };
+                } catch (err) {
+                    logger.warn(`[AdminController] Failed to enrich customer ${customer.id}:`, err.message);
+                    return {
+                        ...customer,
+                        devices: [],
+                        deviceCount: 0,
+                        onlineDeviceCount: 0,
+                        isActive: false,
+                        status: "Offline",
+                        zoneName: customer.zoneName || customer.communityName || null,
+                        communityName: customer.communityName || null,
+                        updated_at: customer.updated_at || customer.updatedAt || customer.last_seen || customer.lastSeen || null,
+                        last_seen: customer.last_seen || customer.lastSeen || null
+                    };
+                }
+            })
+        );
+
+        await cache.set(cacheKey, enrichedCustomers, 600); // 10 min
+        res.status(200).json(enrichedCustomers);
     } catch (error) {
         logger.error("[AdminController] getCustomers CRITICAL ERROR:", error);
         res.status(500).json({ error: "Failed to get customers" });
@@ -428,11 +539,55 @@ exports.updateCustomer = async (req, res) => {
         }
         
         const safeData = updateCustomerSchema.parse(req.body);
-        await db.collection("customers").doc(req.params.id).update(safeData);
+        const customerRef = db.collection("customers").doc(req.params.id);
+        const customerDoc = await customerRef.get();
+        if (!customerDoc.exists) {
+            throw new AppError("Customer not found", 404);
+        }
+
+        const currentData = customerDoc.data() || {};
+        const normalizedData = {
+            ...safeData,
+            phone: safeData.phone || safeData.phone_number || currentData.phone || currentData.phone_number,
+            phone_number: safeData.phone_number || safeData.phone || currentData.phone_number || currentData.phone,
+            zone_id: safeData.zone_id || safeData.regionFilter || currentData.zone_id || currentData.regionFilter || "",
+            regionFilter: safeData.regionFilter || safeData.zone_id || currentData.regionFilter || currentData.zone_id || "",
+            updated_at: new Date(),
+        };
+
+        await customerRef.update(normalizedData);
+
+        const authUid = currentData.uid || currentData.firebase_uid;
+        if (authUid) {
+            const userUpdate = {
+                email: normalizedData.email,
+                display_name: normalizedData.display_name,
+                full_name: normalizedData.full_name,
+                phone_number: normalizedData.phone_number,
+                role: normalizedData.role,
+                status: normalizedData.status,
+            };
+
+            await db.collection("users").doc(authUid).set(userUpdate, { merge: true });
+
+            const authPayload = {};
+            if (normalizedData.email) authPayload.email = normalizedData.email;
+            if (normalizedData.display_name || normalizedData.full_name) {
+                authPayload.displayName = normalizedData.display_name || normalizedData.full_name;
+            }
+            if (normalizedData.status) {
+                authPayload.disabled = normalizedData.status !== "active";
+            }
+
+            if (Object.keys(authPayload).length > 0) {
+                await admin.auth().updateUser(authUid, authPayload);
+            }
+        }
+
         // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
         await incrementCacheVersion("customers");
         // ✅ PHASE 2: Task #12 - Log audit trail
-        logAudit(req.user.uid, 'UPDATE', 'customers', req.params.id, safeData);
+        logAudit(req.user.uid, 'UPDATE', 'customers', req.params.id, normalizedData);
         res.status(200).json({ success: true });
     } catch (error) {
         if (error instanceof AppError) {

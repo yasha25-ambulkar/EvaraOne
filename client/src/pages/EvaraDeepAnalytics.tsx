@@ -7,7 +7,7 @@ import api from '../services/api';
 import { useStaleDataAge } from '../hooks/useStaleDataAge';
 import { useDeviceAnalytics } from '../hooks/useDeviceAnalytics';
 import type { NodeInfoData } from '../hooks/useDeviceAnalytics';
-import { computeOnlineStatus } from '../utils/telemetryPipeline';
+import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
 import type { DeepConfig } from '../hooks/useDeviceConfig';
 import { useAuth } from '../context/AuthContext';
 
@@ -107,6 +107,14 @@ const EvaraDeepAnalytics = () => {
     const isDataMissing = historyFeeds.length === 0;
     const isConfigMissing = analyticsError === "Telemetry configuration missing";
     const isOffline = onlineStatus === 'Offline';
+
+    // Derived Offline Message
+    const { offlineMessage } = useMemo(() => {
+        if (!isOffline) return { offlineMessage: '' };
+        const bestTimestamp = (telemetryData?.timestamp ?? deviceInfo?.last_seen) ?? null;
+        const { label } = formatOfflineMessage(bestTimestamp);
+        return { offlineMessage: label };
+    }, [isOffline, telemetryData?.timestamp, deviceInfo?.last_seen]);
 
     // ── Stale age ─────────────────────────────────────────────────────────────
     const { label: staleLabel } = useStaleDataAge(telemetryData?.timestamp ?? null);
@@ -273,6 +281,17 @@ const EvaraDeepAnalytics = () => {
                                 </button>
                             )}
                         </div>
+<<<<<<< HEAD
+                        <h1 className="text-3xl font-black m-0" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+                            {deviceName} Deep Analytics
+                        </h1>
+                        {isOffline && offlineMessage && (
+                            <p className="text-xs font-bold text-red-500 m-0">
+                                {offlineMessage}
+                            </p>
+                        )}
+=======
+>>>>>>> dd3e8cf1992109852d5742cf3471f27d1eaf75fa
                     </div>
 
                     {isConfigMissing && (

@@ -74,6 +74,7 @@ class CacheProvider {
         this.memory = new MemoryCache();
         this.redis = null;
         this.isRedisReady = false;
+        this.isProd = process.env.NODE_ENV === "production";
 
         const redisUrl = process.env.REDIS_URL;
         if (redisUrl) {
@@ -85,18 +86,30 @@ class CacheProvider {
                     this.isRedisReady = true;
                 });
                 this.redis.on("error", (err) => {
-                    logger.warn("[Cache] Redis Unavailable, using memory fallback:", err.message);
+                    if (this.isProd) {
+                        logger.warn("[Cache] Redis Unavailable, using memory fallback:", err.message);
+                    } else {
+                        logger.debug("[Cache] Redis unavailable in development, using memory fallback:", err.message);
+                    }
                     this.isRedisReady = false;
                 });
                 this.redis.on("close", () => {
-                    logger.warn("[Cache] Redis connection closed");
+                    if (this.isProd) {
+                        logger.warn("[Cache] Redis connection closed");
+                    } else {
+                        logger.debug("[Cache] Redis connection closed");
+                    }
                     this.isRedisReady = false;
                 });
             } catch (err) {
                 logger.error("[Cache] Failed to initialise Redis:", err.message);
             }
         } else {
-            logger.warn("[Cache] REDIS_URL not set — using in-memory cache (not suitable for production)");
+            if (this.isProd) {
+                logger.warn("[Cache] REDIS_URL not set — using in-memory cache (not suitable for production)");
+            } else {
+                logger.debug("[Cache] REDIS_URL not set — using in-memory cache for development");
+            }
         }
     }
 

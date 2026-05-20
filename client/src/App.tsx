@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { TenancyProvider } from './context/TenancyContext';
 import { ToastProvider } from './components/ToastProvider';
 import SplashScreen from './components/ui/SplashScreen';
+import ConfirmProvider from './components/ui/ConfirmProvider';
 import { setTourNavigate } from './utils/tourNavigate';
 import { startOnboardingTour } from './utils/onboardingTour';
 
@@ -112,7 +113,8 @@ function App() {
                                 <TourNavigateRegistrar />
                                 <TourTrigger />
                                 <GlobalBackground>
-                                    <Suspense fallback={<PageLoader />}>
+                                                                    <ConfirmProvider>
+                                                                        <Suspense fallback={<PageLoader />}>
                                         <Routes>
                                             <Route path="/" element={<Navigate to="/login" replace />} />
                                             <Route path="/login" element={<Login />} />
@@ -165,8 +167,9 @@ function App() {
 
                                             {/* Catch-all redirect to Map */}
                                         </Routes>
-                                    </Suspense>
-                                </GlobalBackground>
+                                                                        </Suspense>
+                                                                    </ConfirmProvider>
+                                                                </GlobalBackground>
                             </Router>
                         </ToastProvider>
                     </TenancyProvider>
