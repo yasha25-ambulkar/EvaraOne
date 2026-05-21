@@ -223,13 +223,6 @@ const EvaraTDSAnalytics = () => {
                                 <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
-<<<<<<< HEAD
-                            <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
-                            {mergedDevice?.status !== 'Online' && offlineMessage && (
-                                <p className="text-xs font-bold text-red-500 m-0">
-                                    {offlineMessage}
-=======
-
                             <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
                                 {deviceName} Analytics
                             </h2>
@@ -237,7 +230,12 @@ const EvaraTDSAnalytics = () => {
                             {device?.location_name && (
                                 <p className="text-xs text-slate-400 m-0 mt-1">
                                     {device.location_name}
->>>>>>> dd3e8cf1992109852d5742cf3471f27d1eaf75fa
+                                </p>
+                            )}
+
+                            {mergedDevice?.status !== 'Online' && offlineMessage && (
+                                <p className="text-xs font-bold text-red-500 m-0 mt-1">
+                                    {offlineMessage}
                                 </p>
                             )}
                         </div>
