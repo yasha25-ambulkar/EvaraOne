@@ -16,7 +16,7 @@ function getDeviceTypeKey(node: any): 'evaratank' | 'evaraflow' | 'evaratds' | '
 
 function getCSVHeaders(deviceType: string): string[] {
   switch (deviceType) {
-    case 'evaratank': return ['timestamp', 'distance_cm', 'temperature_c'];
+    case 'evaratank': return ['timestamp', 'temperature_c', 'distance_cm'];
     case 'evaraflow': return ['timestamp', 'meter_reading_low', 'flow_rate', 'meter_reading_high'];
     case 'evaratds':  return ['timestamp', 'tds_ppm', 'temperature_c'];
     default:          return ['timestamp', 'field1', 'field2', 'field3', 'field4'];
