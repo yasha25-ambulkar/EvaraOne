@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNodes } from '../hooks/useNodes';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -8,6 +8,7 @@ import ReportsDownloader from '../components/dashboard/ReportsDownloader';
 import { computeDeviceStatus } from '../services/DeviceService';
 import { Link } from 'react-router-dom';
 import { getDeviceAnalyticsRoute } from '../utils/deviceRouting';
+import { useConsumptionTrend } from '../hooks/useConsumptionTrend';
 
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
@@ -101,6 +102,8 @@ export default function CustomerDashboard() {
 
   // ── Nodes for this customer ──
   const { nodes, loading: nodesLoading } = useNodes();
+  const [timeframe, setTimeframe] = useState<'24H' | '7D' | '30D'>('7D');
+  const { data: trendData, loading: trendLoading } = useConsumptionTrend(nodes as any[], timeframe);
 
   // ── Derived stats ──
   const totalDevices = (nodes as any[]).length;
@@ -217,7 +220,12 @@ export default function CustomerDashboard() {
         <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 3fr 2fr' }}>
           <div style={{ minHeight: '320px' }}>
             <ErrorBoundary>
-              <ConsumptionTrendChart isLoading={isLoading} data={[]} />
+              <ConsumptionTrendChart
+                isLoading={isLoading || trendLoading}
+                data={trendData}
+                timeframe={timeframe}
+                onTimeframe={setTimeframe}
+              />
             </ErrorBoundary>
           </div>
           <div className="apple-glass-card rounded-[20px] p-5 flex flex-col" style={{ minHeight: '320px' }}>

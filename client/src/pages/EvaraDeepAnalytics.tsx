@@ -241,6 +241,12 @@ const EvaraDeepAnalytics = () => {
                                     {zoneName}
                                 </p>
                             )}
+
+                            {isOffline && offlineMessage && (
+                                <p className="text-xs font-bold text-red-500 m-0 mt-1">
+                                    {offlineMessage}
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap pb-1">
@@ -281,17 +287,6 @@ const EvaraDeepAnalytics = () => {
                                 </button>
                             )}
                         </div>
-<<<<<<< HEAD
-                        <h1 className="text-3xl font-black m-0" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-                            {deviceName} Deep Analytics
-                        </h1>
-                        {isOffline && offlineMessage && (
-                            <p className="text-xs font-bold text-red-500 m-0">
-                                {offlineMessage}
-                            </p>
-                        )}
-=======
->>>>>>> dd3e8cf1992109852d5742cf3471f27d1eaf75fa
                     </div>
 
                     {isConfigMissing && (

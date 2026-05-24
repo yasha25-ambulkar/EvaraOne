@@ -81,6 +81,12 @@ export const useNodes = (searchQuery: string = "") => {
     retry: 1,
   });
 
+  useEffect(() => {
+    if (nodes && typeof window !== "undefined") {
+      (window as any).__nodes = nodes;
+    }
+  }, [nodes]);
+
   return {
     nodes,
     loading: isLoading,

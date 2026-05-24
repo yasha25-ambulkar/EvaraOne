@@ -288,14 +288,14 @@ const EvaraTDSAnalytics = () => {
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
                             <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
-                            {mergedDevice?.status !== 'Online' && offlineMessage && (
-                                <p className="text-xs font-bold text-red-500 m-0">
-                                    {offlineMessage}
-                                </p>
-                            )}
                             {device?.location_name && (
                                 <p className="text-xs text-slate-400 m-0 mt-1">
                                     {device.location_name}
+                                </p>
+                            )}
+                            {mergedDevice?.status !== 'Online' && offlineMessage && (
+                                <p className="text-xs font-bold text-red-500 m-0">
+                                    {offlineMessage}
                                 </p>
                             )}
                         </div>

@@ -19,6 +19,8 @@ interface DataPoint {
 interface ConsumptionTrendChartProps {
   data?: DataPoint[];
   isLoading?: boolean;
+  timeframe?: '24H' | '7D' | '30D';
+  onTimeframe?: (t: '24H' | '7D' | '30D') => void;
 }
 
 // ── Tab Button ────────────────────────────────────────────────────────────────
@@ -155,8 +157,15 @@ function TimeframeTabs({
 }
 
 // ── Main Chart ────────────────────────────────────────────────────────────────
-export default function ConsumptionTrendChart({ data, isLoading }: ConsumptionTrendChartProps) {
-  const [timeframe, setTimeframe] = useState<Timeframe>('7D');
+export default function ConsumptionTrendChart({
+  data,
+  isLoading,
+  timeframe: externalTf,
+  onTimeframe,
+}: ConsumptionTrendChartProps) {
+  const [internalTf, setInternalTf] = useState<Timeframe>('7D');
+  const timeframe = externalTf ?? internalTf;
+  const setTimeframe = onTimeframe ?? setInternalTf;
   const hasRealData = data && data.length > 0;
 
   const chartData = useMemo<DataPoint[]>(() => {

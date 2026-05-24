@@ -15,15 +15,16 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@vitejs/plugin-react": "^5.1.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
+    "@vitejs/plugin-react": "^5.1.1",
     "axios": "^1.13.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "driver.js": "^1.4.0",
     "firebase": "^12.10.0",
     "framer-motion": "^12.34.0",
     "leaflet": "^1.9.4",
@@ -64,4 +65,3 @@
     "vite": "^7.3.1"
   }
 }
- 
