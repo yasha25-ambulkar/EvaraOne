@@ -141,11 +141,8 @@ const EvaraTDSAnalytics = () => {
             return timeA - timeB;
         });
 
-        if (chartRange === '24H') {
-            filtered = filtered.slice(-1000);
-        }
-
-        const chartData = filtered.map((h: any) => {
+        // Create base chart data with proper formatting
+        const baseChartData = filtered.map((h: any) => {
             const date = h.timestamp?._seconds
                 ? new Date(h.timestamp._seconds * 1000)
                 : new Date(h.timestamp);
@@ -157,6 +154,73 @@ const EvaraTDSAnalytics = () => {
                 value: h.value
             };
         });
+
+        let chartData: any[] = [];
+
+        if (chartRange === '24H') {
+            // For 24H: Show last 1000 raw data points with proper formatting
+            chartData = baseChartData.slice(-1000);
+        } else if (chartRange === '1W') {
+            // For 1W: Group by day and calculate daily averages
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const today = new Date();
+            const result = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() - i);
+
+                const dayData = baseChartData.filter(d => {
+                    const ts = new Date(d.timestampMs);
+                    return ts.getDate() === targetDate.getDate() && ts.getMonth() === targetDate.getMonth();
+                });
+
+                let avgValue: number | null = null;
+                if (dayData.length > 0) {
+                    avgValue = dayData.reduce((sum, item) => sum + (item.value || 0), 0) / dayData.length;
+                }
+
+                result.push({
+                    timestampMs: targetDate.getTime(),
+                    time: days[targetDate.getDay()],
+                    fullTime: targetDate.toLocaleString(),
+                    value: avgValue ?? 0
+                });
+            }
+            chartData = result;
+        } else if (chartRange === '1M') {
+            // For 1M: Group by week and calculate weekly averages
+            const result = [];
+            const today = new Date();
+
+            for (let i = 3; i >= 0; i--) {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() - (i * 7));
+
+                const weekData = baseChartData.filter(d => {
+                    const ts = new Date(d.timestampMs);
+                    const diffTime = targetDate.getTime() - ts.getTime();
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    return diffDays >= 0 && diffDays < 7;
+                });
+
+                let avgValue: number | null = null;
+                if (weekData.length > 0) {
+                    avgValue = weekData.reduce((sum, item) => sum + (item.value || 0), 0) / weekData.length;
+                }
+
+                result.push({
+                    timestampMs: targetDate.getTime(),
+                    time: `Week ${4 - i}`,
+                    fullTime: targetDate.toLocaleString(),
+                    value: avgValue ?? 0
+                });
+            }
+            chartData = result;
+        } else if (chartRange === 'RANGE') {
+            // For RANGE: Use all data (can add custom date range filtering later)
+            chartData = baseChartData;
+        }
 
         const chartTicks: number[] = chartData.map((d: any) => d.timestampMs);
         return { chartData, chartTicks };
@@ -223,21 +287,15 @@ const EvaraTDSAnalytics = () => {
                                 <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
-<<<<<<< HEAD
                             <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
                             {mergedDevice?.status !== 'Online' && offlineMessage && (
                                 <p className="text-xs font-bold text-red-500 m-0">
                                     {offlineMessage}
-=======
-
-                            <h2 style={{ fontSize: '22px', fontWeight: '700', marginTop: '6px', color: "var(--text-primary)" }}>
-                                {deviceName} Analytics
-                            </h2>
-
+                                </p>
+                            )}
                             {device?.location_name && (
                                 <p className="text-xs text-slate-400 m-0 mt-1">
                                     {device.location_name}
->>>>>>> dd3e8cf1992109852d5742cf3471f27d1eaf75fa
                                 </p>
                             )}
                         </div>

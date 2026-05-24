@@ -294,34 +294,8 @@ async function refreshDeviceState(device, options = { light: false }) {
   // Update cache
   _cache.set(id, state);
 
-  // Persist last-seen / status to Firestore (best-effort, non-blocking)
-  try {
-    const { db } = require('../config/firebase');
-    const { sanitizeForFirestore } = require('../utils/firestoreSanitize');
-    const deviceType = (device.device_type || device.deviceType || 'devices').toString().toLowerCase();
-    const typedRef = db.collection(deviceType).doc(id);
-    const registryRef = db.collection('devices').doc(id);
-    const lastUpdatedISO = new Date(latest.timestampMs).toISOString();
-    const status = isOnline ? 'ONLINE' : 'OFFLINE';
-    const updateObj = {
-      last_updated_at: lastUpdatedISO,
-      last_seen: lastUpdatedISO,
-      status,
-      last_value: metrics.percentage
-    };
-
-    // Fire-and-forget transaction: update both typed metadata and registry if documents exist
-    const cleaned = sanitizeForFirestore(updateObj);
-    db.runTransaction(async (tx) => {
-      const [typedDoc, regDoc] = await Promise.all([tx.get(typedRef), tx.get(registryRef)]);
-      if (typedDoc.exists) tx.update(typedRef, cleaned);
-      if (regDoc.exists) tx.update(registryRef, cleaned);
-    }).catch(err => {
-      console.error(`[deviceStateService] Failed to persist last_seen for ${id}:`, err.message);
-    });
-  } catch (err) {
-    console.error('[deviceStateService] Persist last_seen error:', err.message);
-  }
+  // Intentionally do not write live telemetry back to Firestore.
+  // ThingSpeak remains the source of truth; Firestore stores only registry/config data.
 
   return state;
 }
@@ -390,6 +364,11 @@ async function updateMidnightSnapshot(deviceId, currentVolume) {
 async function saveMidnightSnapshotToRedis(deviceId, snapshot) {
   try {
     const redis = require('./redisClient');
+    if (!redis) {
+      // Local/dev mode without REDIS_URL: persist via Firestore fallback.
+      await saveMidnightSnapshotToFirestore(deviceId, snapshot);
+      return;
+    }
     const key = `midnight_snapshot:${deviceId}`;
     const ttl = 24 * 60 * 60; // 24 hours
 
@@ -427,6 +406,10 @@ async function loadMidnightSnapshot(deviceId) {
   // Try Redis first
   try {
     const redis = require('./redisClient');
+    if (!redis) {
+      // Redis is optional in local/dev mode.
+      throw new Error('REDIS_INACTIVE');
+    }
     const key = `midnight_snapshot:${deviceId}`;
     const data = await redis.get(key);
 
@@ -434,7 +417,9 @@ async function loadMidnightSnapshot(deviceId) {
       return JSON.parse(data);
     }
   } catch (err) {
-    console.warn(`[deviceStateService] Redis snapshot load failed for ${deviceId}:`, err.message);
+    if (err.message !== 'REDIS_INACTIVE') {
+      console.warn(`[deviceStateService] Redis snapshot load failed for ${deviceId}:`, err.message);
+    }
   }
 
   // Fallback to Firestore

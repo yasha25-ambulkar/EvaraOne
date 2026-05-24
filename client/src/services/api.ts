@@ -12,7 +12,7 @@ import { auth, isFirebaseEnabled } from "../lib/firebase";
 const VITE_API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD 
     ? `${window.location.origin}/api/v1` 
-    : "http://localhost:5002/api/v1");
+    : "http://localhost:3000/api/v1");
 
 const API_BASE_URL = VITE_API_URL.split('/api/v1')[0];
 const SOCKET_URL = API_BASE_URL;
