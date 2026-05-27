@@ -53,7 +53,7 @@ describe('deviceConstants', () => {
     test('EvaraTank config should have correct settings', () => {
       const config = constants.DEVICE_CONFIG.EvaraTank;
       expect(config.pollingEnabled).toBe(true);
-      expect(config.statusThresholdMs).toBe(30 * 60 * 1000);
+      expect(config.statusThresholdMs).toBe(60 * 60 * 1000);
       expect(config.defaultFields).toContain('water_level');
       expect(config.defaultFields).toContain('temperature');
     });

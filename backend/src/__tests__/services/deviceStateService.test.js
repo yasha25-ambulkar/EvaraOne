@@ -18,9 +18,9 @@ describe('deviceStateService - calculateDeviceStatus', () => {
       expect(calculateDeviceStatus(tenMinutesAgo)).toBe('ONLINE');
     });
 
-    test('Should return ONLINE for data from exactly 20 minutes ago (boundary)', () => {
-      const twentyMinutesAgo = new Date(Date.now() - (20 * 60 * 1000)).toISOString();
-      expect(calculateDeviceStatus(twentyMinutesAgo)).toBe('ONLINE');
+    test('Should return ONLINE for data from exactly 60 minutes ago (boundary)', () => {
+      const sixtyMinutesAgo = new Date(Date.now() - (60 * 60 * 1000)).toISOString();
+      expect(calculateDeviceStatus(sixtyMinutesAgo)).toBe('ONLINE');
     });
 
     test('Should return ONLINE for data from now', () => {
@@ -30,19 +30,19 @@ describe('deviceStateService - calculateDeviceStatus', () => {
   });
 
   describe('Valid timestamps - beyond threshold', () => {
-    test('Should return OFFLINE for data from 21 minutes ago', () => {
-      const twentyOneMinutesAgo = new Date(Date.now() - (21 * 60 * 1000)).toISOString();
-      expect(calculateDeviceStatus(twentyOneMinutesAgo)).toBe('OFFLINE');
+    test('Should return OFFLINE for data from 61 minutes ago', () => {
+      const sixtyOneMinutesAgo = new Date(Date.now() - (61 * 60 * 1000)).toISOString();
+      expect(calculateDeviceStatus(sixtyOneMinutesAgo)).toBe('OFFLINE');
     });
 
-    test('Should return OFFLINE for data from 25 minutes ago', () => {
-      const twentyFiveMinutesAgo = new Date(Date.now() - (25 * 60 * 1000)).toISOString();
-      expect(calculateDeviceStatus(twentyFiveMinutesAgo)).toBe('OFFLINE');
+    test('Should return OFFLINE for data from 75 minutes ago', () => {
+      const seventyFiveMinutesAgo = new Date(Date.now() - (75 * 60 * 1000)).toISOString();
+      expect(calculateDeviceStatus(seventyFiveMinutesAgo)).toBe('OFFLINE');
     });
 
-    test('Should return OFFLINE for data from 1 hour ago', () => {
-      const oneHourAgo = new Date(Date.now() - (60 * 60 * 1000)).toISOString();
-      expect(calculateDeviceStatus(oneHourAgo)).toBe('OFFLINE');
+    test('Should return OFFLINE for data from 90 minutes ago', () => {
+      const ninetyMinutesAgo = new Date(Date.now() - (90 * 60 * 1000)).toISOString();
+      expect(calculateDeviceStatus(ninetyMinutesAgo)).toBe('OFFLINE');
     });
 
     test('Should return OFFLINE for data from 1 day ago', () => {
@@ -101,13 +101,13 @@ describe('deviceStateService - calculateDeviceStatus', () => {
   });
 
   describe('Boundary conditions', () => {
-    test('Should handle timestamp exactly at boundary (20 min)', () => {
-      const exactlyTwentyMin = Date.now() - (20 * 60 * 1000);
-      expect(calculateDeviceStatus(exactlyTwentyMin)).toBe('ONLINE');
+    test('Should handle timestamp exactly at boundary (60 min)', () => {
+      const exactlySixtyMin = Date.now() - (60 * 60 * 1000);
+      expect(calculateDeviceStatus(exactlySixtyMin)).toBe('ONLINE');
     });
 
-    test('Should handle timestamp just beyond boundary (20m + 1s)', () => {
-      const justBeyond = Date.now() - (20 * 60 * 1000) - 1000;
+    test('Should handle timestamp just beyond boundary (60m + 1s)', () => {
+      const justBeyond = Date.now() - (60 * 60 * 1000) - 1000;
       expect(calculateDeviceStatus(justBeyond)).toBe('OFFLINE');
     });
 

@@ -259,7 +259,7 @@ async function refreshDeviceState(device, options = { light: false }) {
   };
 
   // ── Full state ─────────────────────────────────────────────
-  const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  const OFFLINE_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
   const timeSinceUpdate = Date.now() - latest.timestampMs;
   const isOnline = timeSinceUpdate <= OFFLINE_THRESHOLD_MS;
 
@@ -586,7 +586,7 @@ function clearCache(deviceId) {
  * @returns {string} - "ONLINE" | "OFFLINE" | "UNKNOWN"
  */
 function calculateDeviceStatus(lastUpdatedAt) {
-  const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  const OFFLINE_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
 
   // Handle missing or invalid timestamps
   if (!lastUpdatedAt) {

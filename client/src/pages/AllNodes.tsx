@@ -792,7 +792,7 @@ const AllNodes = () => {
 
       <div className="max-w-screen-2xl mx-auto px-8 pb-4 pt-1 space-y-6 relative z-10 w-full">
         {/* ── Search + Status filter ── */}
-        <div className="flex flex-col lg:flex-row items-center justify-start gap-4 w-full">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-start gap-4 w-full">
           <div className="relative w-full max-w-md group">
             <input
               type="text"

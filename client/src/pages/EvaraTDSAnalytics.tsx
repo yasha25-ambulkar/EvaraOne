@@ -16,6 +16,7 @@ import api from '../services/api';
 import clsx from 'clsx';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { formatOfflineMessage } from '../utils/telemetryPipeline';
+import { useAuth } from '../context/AuthContext';
 
 // Constants for Water Quality
 const QUALITY_CONFIG = {
@@ -48,6 +49,7 @@ const QUALITY_CONFIG = {
 const EvaraTDSAnalytics = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -210,7 +212,7 @@ const EvaraTDSAnalytics = () => {
                 <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
                     {/* Breadcrumb + Page Heading row */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-2">
                         <div className="flex flex-col gap-2">
                             <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
                                 <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
@@ -240,7 +242,7 @@ const EvaraTDSAnalytics = () => {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                        <div className="flex items-center gap-2 flex-wrap pb-1 md:self-end lg:self-auto">
                             {/* Status Button (Pill Style) */}
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
@@ -281,9 +283,11 @@ const EvaraTDSAnalytics = () => {
                             </button>
 
                             {/* Delete Button */}
-                            <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
-                                <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span> Delete Node
-                            </button>
+                            {user?.role === 'superadmin' && (
+                                <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span> Delete Node
+                                </button>
+                            )}
                         </div>
                     </div>
 

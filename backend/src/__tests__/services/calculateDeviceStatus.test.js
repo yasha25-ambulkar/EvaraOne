@@ -23,26 +23,26 @@ describe('deviceStateService - calculateDeviceStatus', () => {
       expect(calculateDeviceStatus(tenMinutesAgo)).toBe('ONLINE');
     });
 
-    test('should return ONLINE for data from 19:50 minutes ago', () => {
-      const almostThreshold = Date.now() - (19 * 60 * 1000 + 50 * 1000);
+    test('should return ONLINE for data from 59:50 minutes ago', () => {
+      const almostThreshold = Date.now() - (59 * 60 * 1000 + 50 * 1000);
       expect(calculateDeviceStatus(almostThreshold)).toBe('ONLINE');
     });
   });
 
   describe('Valid timestamps - beyond threshold', () => {
-    test('should return OFFLINE for data from 21 minutes ago', () => {
-      const twentyOneMinutesAgo = Date.now() - (21 * 60 * 1000);
-      expect(calculateDeviceStatus(twentyOneMinutesAgo)).toBe('OFFLINE');
+    test('should return OFFLINE for data from 61 minutes ago', () => {
+      const sixtyOneMinutesAgo = Date.now() - (61 * 60 * 1000);
+      expect(calculateDeviceStatus(sixtyOneMinutesAgo)).toBe('OFFLINE');
     });
 
-    test('should return OFFLINE for data from 30 minutes ago', () => {
-      const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
-      expect(calculateDeviceStatus(thirtyMinutesAgo)).toBe('OFFLINE');
+    test('should return OFFLINE for data from 75 minutes ago', () => {
+      const seventyFiveMinutesAgo = Date.now() - (75 * 60 * 1000);
+      expect(calculateDeviceStatus(seventyFiveMinutesAgo)).toBe('OFFLINE');
     });
 
-    test('should return OFFLINE for data from 1 hour ago', () => {
-      const oneHourAgo = Date.now() - (60 * 60 * 1000);
-      expect(calculateDeviceStatus(oneHourAgo)).toBe('OFFLINE');
+    test('should return OFFLINE for data from 2 hours ago', () => {
+      const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+      expect(calculateDeviceStatus(twoHoursAgo)).toBe('OFFLINE');
     });
 
     test('should return OFFLINE for data from 1 day ago', () => {
@@ -112,8 +112,8 @@ describe('deviceStateService - calculateDeviceStatus', () => {
     });
 
     test('multiple cron runs without data update', () => {
-      // Device last updated 25 minutes ago
-      const lastUpdate = Date.now() - (25 * 60 * 1000);
+      // Device last updated 65 minutes ago
+      const lastUpdate = Date.now() - (65 * 60 * 1000);
       expect(calculateDeviceStatus(lastUpdate)).toBe('OFFLINE');
     });
   });

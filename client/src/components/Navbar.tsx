@@ -110,7 +110,7 @@ const Navbar = () => {
                                     strokeWidth={isActive ? 3 : 2}
                                     className={clsx(isActive ? "text-white" : "opacity-70")}
                                 />
-                                <span className="hidden md:block uppercase">{item.name}</span>
+                                <span className="hidden lg:block uppercase">{item.name}</span>
                             </Link>
                         );
                     })}
@@ -143,7 +143,7 @@ const Navbar = () => {
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-3">
                                 <div
-                                    className="w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-[16px] bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm border border-white/50"
+                                    className="w-[40px] h-[40px] rounded-full flex items-center justify-center font-bold text-[16px] bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-white shadow-sm border border-white/50"
                                 >
                                     {user.displayName[0].toUpperCase()}
                                 </div>
