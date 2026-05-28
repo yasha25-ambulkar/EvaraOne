@@ -40,6 +40,11 @@ async function loadState(hardwareId, options = {}) {
     const { getFlowDeviceState } = require('../services/flowStateService');
     return { device, state: await getFlowDeviceState(device, options) };
   }
+
+  if (type === 'evaraphase' || type === 'phase') {
+    const { getPhaseDeviceState } = require('../services/phaseStateService');
+    return { device, state: await getPhaseDeviceState(device, options) };
+  }
   
   // Default to Tank state service
   return { device, state: await getDeviceState(device, options) };
@@ -211,6 +216,24 @@ exports.getNodeTelemetry = async (req, res) => {
       });
     }
 
+    if (type === 'evaraphase' || type === 'phase') {
+      return res.status(200).json({
+        success: true,
+        deviceId: state.id,
+        online: state.status === 'Online' || state.online === true,
+        status: state.status,
+        lastUpdated: state.lastUpdated,
+        voltageValue: state.voltageValue,
+        currentValue: state.currentValue,
+        powerValue: state.powerValue,
+        frequencyValue: state.frequencyValue,
+        powerFactor: state.powerFactor || 1.0,
+        timestamp: state.timestamp,
+        level_percentage: state.level_percentage,
+        telemetrySnapshot: state.telemetrySnapshot
+      });
+    }
+
     const snap = state.telemetrySnapshot || {};
     return res.status(200).json({
       success:          true,
@@ -259,6 +282,28 @@ exports.getNodeAnalytics = async (req, res) => {
         quality: state.quality,
         waterQualityRating: state.waterQualityRating,
         tdsHistory: history,
+        alertsCount: 0
+      });
+    }
+
+    if (type === 'evaraphase' || type === 'phase') {
+      const { getPhaseHistory } = require('../services/phaseStateService');
+      const history = await getPhaseHistory({ id: state.id, ...device }, 1000);
+
+      return res.status(200).json({
+        success: true,
+        deviceId: state.id,
+        deviceName: device.label || device.device_name,
+        online: state.status === 'Online' || state.online === true,
+        status: state.status,
+        lastUpdated: state.lastUpdated,
+        voltageValue: state.voltageValue,
+        currentValue: state.currentValue,
+        powerValue: state.powerValue,
+        frequencyValue: state.frequencyValue,
+        powerFactor: state.powerFactor || 1.0,
+        history: history,
+        active_fields: state.active_fields,
         alertsCount: 0
       });
     }

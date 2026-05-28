@@ -1,3 +1,12 @@
+// Load environment variables from the correct .env file based on NODE_ENV
+const path = require("path");
+const dotenv = require("dotenv");
+
+const nodeEnv = process.env.NODE_ENV || "development";
+const envFile = path.resolve(__dirname, `../../.env.${nodeEnv}`);
+// Force override: true so .env.development overrides .env
+dotenv.config({ path: envFile, override: true });
+
 const admin = require("firebase-admin");
 const { logger } = require("../config/pino.js");
 

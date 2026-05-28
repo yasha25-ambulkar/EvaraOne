@@ -6,13 +6,12 @@ import { AddZoneForm } from "../../../components/admin/forms/AddZoneForm";
 import {
   MapPin,
   Users,
+  Database,
 
   AlertTriangle,
   ArrowRight,
   Plus,
   Globe,
-  Edit2,
-  Trash2,
 } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "../../../components/ToastProvider";
@@ -194,28 +193,34 @@ const RegionsOverview = () => {
                 )}
 
                 {/* Stats */}
-                <div className="apple-glass-inner p-[16px] space-y-[12px] relative z-10 mb-[20px] flex-1">
+                <div className="apple-glass-inner w-full max-w-[360px] self-start flex-none p-[8px] rounded-[14px] border border-[rgba(255,255,255,0.45)] dark:border-white/10 shadow-sm relative z-10 mb-[12px]">
+                  <div className="space-y-[8px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_28px] items-center gap-2 text-[13px] leading-none min-h-[24px]">
+                      <span className="flex items-center gap-[8px] zone-stat-label font-[500] min-w-0">
+                        <Users size={14} className="opacity-55 shrink-0" />
+                        <span className="truncate">Customers</span>
+                      </span>
+                      <span className="font-[700] zone-stat-number tabular-nums shrink-0 text-right w-full">
+                        {rs.customers}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="flex items-center gap-[8px] zone-stat-label font-[500]">
-                      <Users size={14} className="opacity-50" /> Customers
-                    </span>
-                    <span className="font-[600] zone-stat-number">
-                      {rs.customers}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="flex items-center gap-[8px] zone-stat-label font-[500]">
-                      Devices
-                    </span>
-                    <span className="font-[600] zone-stat-number flex items-center gap-[6px]">
-                      {rs.devices}
-                      {rs.devices > 0 && (
-                        <span className="text-[10px] font-[700] text-[#1F2937] dark:text-white opacity-60 dark:opacity-80 bg-[rgba(255,255,255,0.4)] dark:bg-[rgba(255,255,255,0.1)] px-[6px] py-[2px] rounded-[4px] border border-[rgba(255,255,255,0.5)] dark:border-[rgba(255,255,255,0.2)]">
-                          {rs.online}↑ {rs.offline}↓
+                    <div className="grid grid-cols-[minmax(0,1fr)_28px] items-center gap-2 text-[13px] leading-none min-h-[24px]">
+                      <span className="flex items-center gap-[8px] zone-stat-label font-[500] min-w-0">
+                        <Database size={14} className="opacity-55 shrink-0" />
+                        <span className="truncate">Devices</span>
+                      </span>
+                      <div className="flex flex-col items-end justify-start w-full">
+                        <span className="font-[700] zone-stat-number tabular-nums shrink-0 text-right leading-none w-full">
+                          {rs.devices}
                         </span>
-                      )}
-                    </span>
+                        {rs.devices > 0 && (
+                          <span className="mt-[2px] text-[10px] font-[700] text-[#1F2937] dark:text-white opacity-60 dark:opacity-80 bg-[rgba(255,255,255,0.38)] dark:bg-[rgba(255,255,255,0.1)] px-[6px] py-[2px] rounded-[4px] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.2)]">
+                            {rs.online}↑ {rs.offline}↓
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

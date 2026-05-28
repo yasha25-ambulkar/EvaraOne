@@ -212,6 +212,22 @@ async function _pollDevice(device) {
         node_id: id,
         ...state
       });
+    } else if (type === 'evaraphase' || type === 'phase') {
+      const { refreshPhaseDeviceState } = require('../services/phaseStateService');
+      const state = await refreshPhaseDeviceState(device);
+      logger.info(`[telemetryWorker] Phase ${id} → ${state.voltageValue}V | ${state.currentValue}A | ${state.powerValue}kW`, {
+        category: 'telemetry',
+        deviceId: id,
+        type: 'phase',
+        ...state
+      });
+
+      telemetryEvents.emit('device:update', {
+        deviceId: id,
+        device_id: id,
+        node_id: id,
+        ...state
+      });
     } else {
       // Default to tank (now with light mode for 99% less overhead)
       const state = await refreshDeviceState(device, { light: true });

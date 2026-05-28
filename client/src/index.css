@@ -124,6 +124,11 @@ body {
   --sysconfig-heading-color: #000000;
   --sysconfig-subheading-color: #475569;
 
+  /* Compatibility tokens used by EvaraTank styles */
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --primary: #4F46E5;
+
   /* Status Badges */
   --online-text: #15803d;
   --online-border: #16a34a;
@@ -343,42 +348,43 @@ html:not(.dark) .modal-card-glass input:-webkit-autofill:focus,
   color: var(--card-value-color);
 }
 
-.card-subheading {
-  color: var(--card-subheading-color);
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  text-transform: uppercase;
+  border: 2px solid transparent;
+  /* inner fill then gradient border via layered backgrounds */
+  background: linear-gradient(var(--pill-inner-bg, #ffffff), var(--pill-inner-bg, #ffffff)) padding-box,
+              var(--pill-border-gradient, linear-gradient(90deg,#e5e7eb,#e5e7eb)) border-box;
+  color: var(--pill-text, #0f172a);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
+.pill-button:active { transform: scale(0.985); }
 
-.card-location {
-  color: var(--card-location-color);
-}
+/* Danger fallback (keeps same border technique) */
+.pill-button.danger { --pill-border-gradient: linear-gradient(90deg,#ef4444,#fb7185); --pill-inner-bg: rgba(239,68,68,0.06); --pill-text: #b91c1c; }
+.pill-button.green { --pill-border-gradient: linear-gradient(90deg,#34d399,#10b981); --pill-inner-bg: rgba(16,185,129,0.06); --pill-text: var(--online-text); }
+.pill-button.blue  { --pill-border-gradient: linear-gradient(90deg,#60a5fa,#3b82f6); --pill-inner-bg: rgba(59,130,246,0.06); --pill-text: var(--section-heading-icon-color); }
+.pill-button.purple{ --pill-border-gradient: linear-gradient(90deg,#f0abfc,#a78bfa); --pill-inner-bg: rgba(167,139,250,0.06); --pill-text: #8b5cf6; }
+.pill-button.amber { --pill-border-gradient: linear-gradient(90deg,#f59e0b,#fb923c); --pill-inner-bg: rgba(245,158,11,0.06); --pill-text: var(--warning); }
+.pill-button.red   { --pill-border-gradient: linear-gradient(90deg,#ef4444,#fb7185); --pill-inner-bg: rgba(239,68,68,0.06); --pill-text: var(--danger); }
 
-.card-number {
-  color: var(--card-number-color);
-}
-
-.overview-heading {
-  color: var(--overview-heading-color);
-}
-
-.overview-subheading {
-  color: var(--overview-subheading-color);
-}
-
-.kpi-label {
-  color: var(--kpi-label-color);
-}
-
-.kpi-value {
-  color: var(--kpi-value-color);
-}
-
-.section-heading {
-  color: var(--section-heading-color);
-}
-
-.section-heading-icon {
-  color: var(--section-heading-icon-color);
-}
-
+/* Dark-mode adjustments: slightly more translucent inner fills and lighter text */
+html.dark .pill-button { box-shadow: 0 8px 22px rgba(2,6,23,0.45); }
+html.dark .pill-button { --pill-inner-bg: rgba(255,255,255,0.02); }
+html.dark .pill-button.green { --pill-inner-bg: rgba(16,185,129,0.06); --pill-text: #bbf7d0; }
+html.dark .pill-button.blue  { --pill-inner-bg: rgba(59,130,246,0.04); --pill-text: #dbeafe; }
+html.dark .pill-button.purple{ --pill-inner-bg: rgba(167,139,250,0.04); --pill-text: #f3e8ff; }
+html.dark .pill-button.amber { --pill-inner-bg: rgba(245,158,11,0.04); --pill-text: #ffedd5; }
+html.dark .pill-button.red   { --pill-inner-bg: rgba(239,68,68,0.04); --pill-text: #fee2e2; }
 .action-card-heading {
   color: var(--action-card-heading-color);
 }
@@ -1711,3 +1717,48 @@ nav *,
 [class*="cursor-pointer"] {
   cursor: pointer !important;
 }
+
+/* Theme-aware pill buttons for header utilities */
+:root {
+  --pill-bg: rgba(255,255,255,0.98);
+  --pill-text: #0f172a;
+  --pill-border: rgba(2,6,23,0.06);
+  --pill-shadow: 0 8px 20px rgba(2,6,23,0.06);
+  --pill-danger-bg: rgba(248,113,113,0.06);
+  --pill-danger-text: #991b1b;
+}
+
+html.dark, .dark {
+  --pill-bg: rgba(15,23,42,0.45);
+  --pill-text: #e6eef8;
+  --pill-border: rgba(255,255,255,0.06);
+  --pill-shadow: 0 8px 24px rgba(2,6,23,0.6);
+  --pill-danger-bg: rgba(220,38,38,0.08);
+  --pill-danger-text: #fecaca;
+}
+
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  border: 1px solid var(--pill-border);
+  box-shadow: var(--pill-shadow);
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.pill-button:active { transform: scale(0.98); }
+.pill-button.danger { background: var(--pill-danger-bg); color: var(--pill-danger-text); border-color: transparent; }
+
+/* Color variants matching EvaraTank tokens */
+.pill-button.green { background: rgba(var(--online-dot-rgb, 34,197,94), 0.08); color: var(--online-text); border-color: rgba(var(--online-dot-rgb, 34,197,94), 0.15); box-shadow: 0 6px 18px rgba(34,197,94,0.05); }
+.pill-button.blue { background: rgba(59,130,246,0.08); color: var(--section-heading-icon-color); border-color: rgba(59,130,246,0.18); box-shadow: 0 6px 18px rgba(59,130,246,0.05); }
+.pill-button.purple { background: rgba(99,102,241,0.08); color: var(--primary, #6366f1); border-color: rgba(99,102,241,0.18); box-shadow: 0 6px 18px rgba(99,102,241,0.05); }
+.pill-button.amber { background: rgba(245,158,11,0.08); color: var(--warning); border-color: rgba(245,158,11,0.18); box-shadow: 0 6px 18px rgba(245,158,11,0.05); }
+.pill-button.red { background: rgba(239,68,68,0.08); color: var(--danger); border-color: rgba(239,68,68,0.18); box-shadow: 0 6px 18px rgba(239,68,68,0.05); }
+

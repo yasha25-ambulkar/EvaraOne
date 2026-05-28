@@ -174,7 +174,7 @@ const AdminCustomers = () => {
                       <p className="font-[500] opacity-90">
                         {client?.email || "—"}
                       </p>
-                      <p className="customer-secondary">{client?.phone || "N/A"}</p>
+                      <p className="customer-secondary">{client?.phone_number || client?.phone || client?.mobile || "N/A"}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4">

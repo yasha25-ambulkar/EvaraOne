@@ -201,7 +201,9 @@ class AdminService {
    * Create a new customer.
    */
   async createCustomer(customerData: any): Promise<Customer> {
+    console.log('[AdminService] 📤 SENDING to /admin/customers:', JSON.stringify(customerData, null, 2));
     const response = await api.post("/admin/customers", customerData);
+    console.log('[AdminService] ✅ Response received:', response.data);
     return response.data;
   }
 

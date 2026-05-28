@@ -279,16 +279,23 @@ exports.deleteZone = async (req, res) => {
 // Customers
 exports.createCustomer = async (req, res) => {
     try {
-        const { confirmPassword, password, ...customerData } = req.body;
+        const { confirmPassword, password, regionFilter, zone_id, ...customerData } = req.body;
+        
+        // ✅ DEBUG LOGGING
+        console.log('[createCustomer] ─────────────────────────────────────────');
+        console.log('[createCustomer] 📨 REQUEST BODY:', JSON.stringify(req.body, null, 2));
+        console.log('[createCustomer] zone_id received:', zone_id);
+        console.log('[createCustomer] regionFilter received:', regionFilter);
         
         // Create Firebase Auth user
         let firebaseUser = null;
-        console.log('CREATE CUSTOMER DEBUG:', JSON.stringify({
+        console.log('[createCustomer] Creating Firebase Auth user:', {
             email: customerData.email,
             display_name: customerData.display_name,
             role: customerData.role,
+            zone_id: zone_id || regionFilter,
             password_length: password?.length
-        }));
+        });
         try {
             firebaseUser = await admin.auth().createUser({
                 email: customerData.email,
@@ -304,16 +311,24 @@ exports.createCustomer = async (req, res) => {
             }
         }
 
-        // Save to customers collection with Firebase UID
+        // ✅ Ensure zone_id is properly set
+        const finalZoneId = zone_id || regionFilter || "";
+        console.log('[createCustomer] Final zone_id to be saved:', finalZoneId);
+
+        // Save to customers collection with Firebase UID + Zone ID
         const customer = {
             ...customerData,
             uid: firebaseUser.uid,
             firebase_uid: firebaseUser.uid,
+            zone_id: finalZoneId,
+            regionFilter: finalZoneId,
             created_at: new Date()
         };
 
+        console.log('[createCustomer] 💾 Customer document to save:', JSON.stringify(customer, null, 2));
+
         // Also save to users collection so login works
-        await db.collection("users").doc(firebaseUser.uid).set({
+        const usersDoc = {
             uid: firebaseUser.uid,
             email: customerData.email,
             display_name: customerData.display_name,
@@ -321,10 +336,21 @@ exports.createCustomer = async (req, res) => {
             role: customerData.role || 'customer',
             status: customerData.status || 'active',
             phone_number: customerData.phone_number,
+            zone_id: finalZoneId,
             created_at: new Date()
-        });
+        };
+        console.log('[createCustomer] 📝 Users collection document:', JSON.stringify(usersDoc, null, 2));
+        await db.collection("users").doc(firebaseUser.uid).set(usersDoc);
+        console.log('[createCustomer] ✅ Users collection saved');
 
+        console.log('[createCustomer] 📝 About to save customers collection:', JSON.stringify(customer, null, 2));
         const doc = await db.collection("customers").add(customer);
+        console.log('[createCustomer] ✅ Customer created with ID:', doc.id);
+        console.log('[createCustomer] ✅ Stored zone_id:', finalZoneId);
+        
+        // Verify what was actually saved
+        const savedCustomer = await doc.get();
+        console.log('[createCustomer] ✅ VERIFICATION - Data in Firestore:', JSON.stringify(savedCustomer.data(), null, 2));
 
         await incrementCacheVersion("customers");
         await incrementCacheVersion("default");
@@ -332,7 +358,7 @@ exports.createCustomer = async (req, res) => {
 
         res.status(201).json({ success: true, id: doc.id });
     } catch (error) {
-        console.log('CREATE CUSTOMER FULL ERROR:', error.code, error.message, error.statusCode);
+        console.log('[createCustomer] ❌ ERROR:', error.code, error.message, error.statusCode);
         if (error instanceof AppError) {
             return res.status(error.statusCode).json(error.toJSON());
         }
@@ -344,6 +370,8 @@ exports.createCustomer = async (req, res) => {
 exports.getCustomers = async (req, res) => {
     try {
         const { zone_id, community_id, regionFilter, limit, cursor } = req.query;
+        
+        console.log('[getCustomers] 🔍 REQUEST PARAMS:', {zone_id, community_id, regionFilter, limit, user_role: req.user.role});
 
         const cacheParams = [
             req.user.role,
@@ -356,7 +384,10 @@ exports.getCustomers = async (req, res) => {
 
         const cacheKey = req.user.role === "superadmin" ? `user:admin:customers:${cacheParams}` : `user:${req.user.uid}:customers:${cacheParams}`;
         const cached = await cache.get(cacheKey);
-        if (cached) return res.status(200).json(cached);
+        if (cached) {
+            console.log('[getCustomers] ✅ Cache HIT, returning', cached.length, 'customers');
+            return res.status(200).json(cached);
+        }
 
         const limitStr = parseInt(limit) || 50;
         let query = db.collection("customers");
@@ -389,7 +420,19 @@ exports.getCustomers = async (req, res) => {
         }
 
         const snapshot = await query.get();
-        let customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('[getCustomers] 📊 Query executed, found:', snapshot.size, 'documents');
+        
+        let customers = snapshot.docs.map(doc => {
+            const data = doc.data();
+            console.log('[getCustomers] 👤 Customer DOC:', {
+                id: doc.id,
+                display_name: data.display_name,
+                email: data.email,
+                zone_id: data.zone_id || 'MISSING!!!',
+                regionFilter: data.regionFilter
+            });
+            return { id: doc.id, ...data };
+        });
 
         // COMPREHENSIVE FALLBACK: For superadmins, also check regionFilter when zone_id is queried
         // This handles customers created with AddCustomerForm which uses regionFilter instead of zone_id
@@ -426,6 +469,10 @@ exports.getCustomers = async (req, res) => {
         }
 
         logger.debug(`[AdminController] Successfully fetched ${customers.length} customers`);
+        console.log('[getCustomers] ✅ FINAL RESULT: Returning', customers.length, 'customers');
+        customers.forEach(c => {
+            console.log('   - ' + c.display_name || c.email, '(zone_id:', c.zone_id || 'NONE', ')');
+        });
 
         const [zonesSnap, devicesSnap] = await Promise.all([
             db.collection("zones").get(),
@@ -440,15 +487,26 @@ exports.getCustomers = async (req, res) => {
 
         const devices = devicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+        const normalizePhone = (customer) =>
+            customer.phone_number || customer.phone || customer.contact_phone || customer.mobile || null;
+
+        const resolveCustomerIds = (customer) => {
+            const ids = [customer.id, customer.uid, customer.firebase_uid, customer.customer_id]
+                .filter(Boolean)
+                .map(v => String(v));
+            return Array.from(new Set(ids));
+        };
+
         // ✅ ENRICHMENT: Add device count and last seen for each customer
         const enrichedCustomers = await Promise.all(
             customers.map(async (customer) => {
                 try {
                     const customerZoneId = customer.zone_id || customer.zoneId || customer.regionFilter || customer.community_id || customer.communityId || null;
                     const customerZone = customerZoneId ? zoneMap[customerZoneId] : null;
+                    const candidateIds = resolveCustomerIds(customer);
                     const customerDevices = devices.filter((device) => {
                         const ownerId = device.customer_id || device.customerId || device.customerID || "";
-                        return ownerId === customer.id;
+                        return candidateIds.includes(String(ownerId));
                     });
 
                     const deviceCount = customerDevices.length;
@@ -471,11 +529,16 @@ exports.getCustomers = async (req, res) => {
 
                     return {
                         ...customer,
+                        phone_number: normalizePhone(customer),
+                        phone: normalizePhone(customer),
                         devices: customerDevices.map((device) => ({
                             id: device.id,
+                            device_name: device.device_name || device.displayName || device.label || device.name || null,
+                            label: device.label || device.displayName || device.device_name || device.name || null,
                             status: device.status || device.operational_status || (isDeviceOnline(device) ? "Online" : "Offline"),
                             analytics_template: device.analytics_template || device.device_type || device.assetType || null,
-                            node_key: device.node_key || device.hardwareId || device.device_id || device.id || null
+                            node_key: device.node_key || device.hardwareId || device.device_id || device.id || null,
+                            location: device.location || device.zoneName || device.zone_name || null
                         })),
                         deviceCount,
                         onlineDeviceCount,
@@ -492,6 +555,8 @@ exports.getCustomers = async (req, res) => {
                     logger.warn(`[AdminController] Failed to enrich customer ${customer.id}:`, err.message);
                     return {
                         ...customer,
+                        phone_number: normalizePhone(customer),
+                        phone: normalizePhone(customer),
                         devices: [],
                         deviceCount: 0,
                         onlineDeviceCount: 0,
@@ -525,7 +590,55 @@ exports.getCustomerById = async (req, res) => {
         
         const doc = await db.collection("customers").doc(req.params.id).get();
         if (!doc.exists) return res.status(404).json({ error: "Customer not found" });
-        res.status(200).json({ id: doc.id, ...doc.data() });
+
+        const customer = { id: doc.id, ...doc.data() };
+        const customerIds = Array.from(new Set([
+            customer.id,
+            customer.uid,
+            customer.firebase_uid,
+            customer.customer_id,
+        ].filter(Boolean).map(v => String(v))));
+
+        const [devicesSnap, zonesSnap] = await Promise.all([
+            db.collection("devices").get(),
+            db.collection("zones").get()
+        ]);
+
+        const zoneMap = zonesSnap.docs.reduce((acc, z) => {
+            acc[z.id] = { id: z.id, ...z.data() };
+            return acc;
+        }, {});
+
+        const normalizePhone = (cust) => cust.phone_number || cust.phone || cust.contact_phone || cust.mobile || null;
+
+        const customerDevices = devicesSnap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(device => customerIds.includes(String(device.customer_id || device.customerId || device.customerID || "")));
+
+        const customerZoneId = customer.zone_id || customer.zoneId || customer.regionFilter || customer.community_id || customer.communityId || null;
+        const customerZone = customerZoneId ? zoneMap[customerZoneId] : null;
+
+        res.status(200).json({
+            ...customer,
+            phone_number: normalizePhone(customer),
+            phone: normalizePhone(customer),
+            devices: customerDevices.map((device) => ({
+                id: device.id,
+                device_name: device.device_name || device.displayName || device.label || device.name || null,
+                label: device.label || device.displayName || device.device_name || device.name || null,
+                status: device.status || device.operational_status || (isDeviceOnline(device) ? "Online" : "Offline"),
+                analytics_template: device.analytics_template || device.device_type || device.assetType || null,
+                node_key: device.node_key || device.hardwareId || device.device_id || device.id || null,
+                location: device.location || device.zoneName || device.zone_name || null,
+            })),
+            deviceCount: customerDevices.length,
+            onlineDeviceCount: customerDevices.filter(isDeviceOnline).length,
+            isActive: customerDevices.some(isDeviceOnline),
+            status: customerDevices.some(isDeviceOnline) ? "Online" : "Offline",
+            zoneName: customerZone?.zoneName || customerZone?.name || customer.zoneName || customer.communityName || null,
+            communityName: customerZone?.zoneName || customerZone?.name || customer.communityName || null,
+            last_seen: customer.last_seen || customer.lastSeen || customer.updated_at || customer.updatedAt || null,
+        });
     } catch (error) {
         res.status(500).json({ error: "Failed to get customer" });
     }
@@ -676,6 +789,8 @@ exports.createNode = async (req, res) => {
             flowRateField,
             tdsField,
             temperatureField,
+            flow_field,
+            flow_field_name,
             capacity,
             depth,
             tankLength,
@@ -703,11 +818,11 @@ exports.createNode = async (req, res) => {
         const typeNormalized = (assetType || "evaratank").toLowerCase();
 
         // Validate device type
-        const validTypes = ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'tank', 'deep', 'flow', 'tds'];
+        const validTypes = ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'evaraphase', 'evaravalve', 'tank', 'deep', 'flow', 'tds', 'phase', 'valve'];
         if (!validTypes.includes(typeNormalized)) {
             return res.status(400).json({
                 error: `Unknown asset type: "${assetType}"`,
-                validTypes: ['evaratank', 'evaradeep', 'evaraflow', 'evaratds']
+                validTypes: ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'evaraphase', 'evaravalve']
             });
         }
 
@@ -800,6 +915,48 @@ exports.createNode = async (req, res) => {
             deviceData.tdsValue = req.body.tdsValue || 0;
             deviceData.temperature = req.body.temperature || 0;
             deviceData.waterQualityRating = req.body.waterQualityRating || "Good";
+            deviceData.location = req.body.location || "";
+            deviceData.status = req.body.status || "online";
+            deviceData.lastUpdated = timestamp;
+        } else if (typeNormalized === "evaraphase" || typeNormalized === "phase") {
+            deviceData.configuration = {
+                type: "Phase",
+                unit: "V/A",
+                voltage_min: 0,
+                voltage_max: 500,
+                current_min: 0,
+                current_max: 100
+            };
+            const voltageField = req.body.voltageField || "field1";
+            const currentField = req.body.currentField || "field2";
+            const powerField = req.body.powerField || "field3";
+            const frequencyField = req.body.frequencyField || "field4";
+            deviceData.fields = { voltage: voltageField, current: currentField, power: powerField, frequency: frequencyField };
+            deviceData.sensor_field_mapping = {
+                [voltageField]: "voltageValue",
+                [currentField]: "currentValue",
+                [powerField]: "powerValue",
+                [frequencyField]: "frequencyValue"
+            };
+            deviceData.voltageValue = req.body.voltageValue || 0;
+            deviceData.currentValue = req.body.currentValue || 0;
+            deviceData.powerValue = req.body.powerValue || 0;
+            deviceData.frequencyValue = req.body.frequencyValue || 50;
+            deviceData.powerFactor = req.body.powerFactor || 1.0;
+            deviceData.status = req.body.status || "online";
+            deviceData.lastUpdated = timestamp;
+        } else if (typeNormalized === "evaravalve" || typeNormalized === "valve") {
+            deviceData.configuration = {
+                type: "Valve",
+                unit: "%",
+                min_position: 0,
+                max_position: 100
+            };
+            const selectedFlowField = (flow_field || req.body.flowField || flowRateField || "field3").trim ? (flow_field || req.body.flowField || flowRateField || "field3").trim() : (flow_field || req.body.flowField || flowRateField || "field3");
+            deviceData.flow_field = selectedFlowField;
+            deviceData.flow_field_name = flow_field_name || req.body.flow_field_name || req.body.flowFieldName || "";
+            deviceData.fields = { flow: selectedFlowField };
+            deviceData.valve_status = "OPEN";
             deviceData.location = req.body.location || "";
             deviceData.status = req.body.status || "online";
             deviceData.lastUpdated = timestamp;
@@ -1133,6 +1290,9 @@ exports.updateNode = async (req, res) => {
                 if (body.configuration.max_threshold !== undefined) config.max_threshold = parseFloat(body.configuration.max_threshold) || 2000;
             }
             if (Object.keys(config).length > 0) metaUpdate.configuration = config;
+            
+            // ✅ FIX: Store ONLY latest values for quick display, NOT history arrays
+            // Historical data should come from ThingSpeak API, not Firestore
             if (body.tdsValue !== undefined) metaUpdate.tdsValue = parseFloat(body.tdsValue) || 0;
             if (body.temperature !== undefined) metaUpdate.temperature = parseFloat(body.temperature) || 0;
             if (body.waterQualityRating) metaUpdate.waterQualityRating = trimmed(body.waterQualityRating);
@@ -1140,19 +1300,104 @@ exports.updateNode = async (req, res) => {
             if (body.status) metaUpdate.status = trimmed(body.status);
             metaUpdate.lastUpdated = new Date();
             
-            // Handle history updates if provided
-            if (body.tdsValue !== undefined) {
-                metaUpdate.tdsHistory = admin.firestore.FieldValue.arrayUnion({
-                    value: parseFloat(body.tdsValue) || 0,
-                    timestamp: new Date()
-                });
+            // ✅ REMOVED: tdsHistory and tempHistory arrays
+            // These fields bloat the document (50KB+) and belong in ThingSpeak
+            // Frontend will fetch historical data from /api/nodes/:id/analytics endpoint
+            // which retrieves data from ThingSpeak, not from Firestore device doc
+        } else if (type === "evaraphase" || type === "phase") {
+            // Phase monitoring device updates
+            const config = {};
+            if (body.configuration) {
+                if (body.configuration.voltage_max !== undefined) config.voltage_max = parseFloat(body.configuration.voltage_max) || 500;
+                if (body.configuration.current_max !== undefined) config.current_max = parseFloat(body.configuration.current_max) || 100;
             }
-            if (body.temperature !== undefined) {
-                metaUpdate.tempHistory = admin.firestore.FieldValue.arrayUnion({
-                    value: parseFloat(body.temperature) || 0,
-                    timestamp: new Date()
-                });
+            if (body.voltage_max !== undefined || body.voltageMax !== undefined) {
+                config.voltage_max = parseFloat(body.voltage_max || body.voltageMax) || 500;
             }
+            if (body.current_max !== undefined || body.currentMax !== undefined) {
+                config.current_max = parseFloat(body.current_max || body.currentMax) || 100;
+            }
+            if (Object.keys(config).length > 0) metaUpdate.configuration = config;
+            
+            // Handle field mappings
+            if (body.voltageField || body.currentField || body.powerField || body.frequencyField || body.waterLevelField ||
+                body.voltage_field || body.current_field || body.power_field || body.frequency_field || body.water_level_field) {
+                const docData = (await metaRef.get()).data() || {};
+                const currentMap = docData.sensor_field_mapping || {};
+
+                let voltF = body.voltageField || body.voltage_field;
+                if (!voltF) voltF = Object.keys(currentMap).find(k => currentMap[k] === "voltageValue") || "field1";
+
+                let currF = body.currentField || body.current_field;
+                if (!currF) currF = Object.keys(currentMap).find(k => currentMap[k] === "currentValue") || "field2";
+
+                let powF = body.powerField || body.power_field;
+                if (!powF) powF = Object.keys(currentMap).find(k => currentMap[k] === "powerValue") || "field3";
+
+                let freqF = body.frequencyField || body.frequency_field;
+                if (!freqF) freqF = Object.keys(currentMap).find(k => currentMap[k] === "frequencyValue") || "field4";
+
+                const newMapping = {
+                    [trimmed(voltF)]: "voltageValue",
+                    [trimmed(currF)]: "currentValue",
+                    [trimmed(powF)]: "powerValue",
+                    [trimmed(freqF)]: "frequencyValue"
+                };
+
+                let lvlF = body.waterLevelField || body.water_level_field;
+                if (lvlF) {
+                    newMapping[trimmed(lvlF)] = "water_level_raw_sensor_reading";
+                } else {
+                    const existingLvl = Object.keys(currentMap).find(k => currentMap[k] === "water_level_raw_sensor_reading");
+                    if (existingLvl) newMapping[existingLvl] = "water_level_raw_sensor_reading";
+                }
+
+                metaUpdate.sensor_field_mapping = newMapping;
+                metaUpdate.fields = {
+                    voltage: voltF,
+                    current: currF,
+                    power: powF,
+                    frequency: freqF,
+                    water_level: lvlF || ""
+                };
+            }
+
+            if (body.voltageValue !== undefined) metaUpdate.voltageValue = parseFloat(body.voltageValue) || 0;
+            if (body.currentValue !== undefined) metaUpdate.currentValue = parseFloat(body.currentValue) || 0;
+            if (body.powerValue !== undefined) metaUpdate.powerValue = parseFloat(body.powerValue) || 0;
+            if (body.frequencyValue !== undefined) metaUpdate.frequencyValue = parseFloat(body.frequencyValue) || 50;
+            if (body.powerFactor !== undefined) metaUpdate.powerFactor = parseFloat(body.powerFactor) || 1.0;
+            if (body.status) metaUpdate.status = trimmed(body.status);
+            metaUpdate.lastUpdated = new Date();
+        } else if (type === "evaravalve" || type === "valve") {
+            // Valve control device updates
+            const config = {};
+            if (body.configuration) {
+                if (body.configuration.max_position !== undefined) config.max_position = parseFloat(body.configuration.max_position) || 100;
+            }
+            if (Object.keys(config).length > 0) metaUpdate.configuration = config;
+            
+            const selectedFlowField = (body.flow_field || body.flowField || body.flowRateField || body.flow_rate_field || "field3");
+            if (selectedFlowField) {
+                const normalizedFlowField = trimmed(selectedFlowField);
+                metaUpdate.flow_field = normalizedFlowField;
+                if (body.flow_field_name || body.flowFieldName) {
+                    metaUpdate.flow_field_name = trimmed(body.flow_field_name || body.flowFieldName);
+                }
+                metaUpdate.fields = { flow: normalizedFlowField };
+                metaUpdate.sensor_field_mapping = { [normalizedFlowField]: "flowValue" };
+            }
+
+            // Remove legacy valve-specific fields so the document only keeps the selected flow mapping.
+            metaUpdate.position_field = admin.firestore.FieldValue.delete();
+            metaUpdate.status_field = admin.firestore.FieldValue.delete();
+            metaUpdate.positionValue = admin.firestore.FieldValue.delete();
+            metaUpdate.statusValue = admin.firestore.FieldValue.delete();
+            metaUpdate.flowValue = admin.firestore.FieldValue.delete();
+            if (body.flow_field_name === "") metaUpdate.flow_field_name = admin.firestore.FieldValue.delete();
+            if (body.location !== undefined) metaUpdate.location = trimmed(body.location);
+            if (body.status) metaUpdate.status = trimmed(body.status);
+            metaUpdate.lastUpdated = new Date();
         }
 
         await metaRef.set(metaUpdate, { merge: true });

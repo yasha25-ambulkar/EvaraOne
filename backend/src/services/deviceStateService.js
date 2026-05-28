@@ -64,6 +64,11 @@ async function getDeviceState(device, options = { light: false }) {
     return getFlowDeviceState(device, options);
   }
 
+  if (type === 'evaraphase' || type === 'phase') {
+    const { getPhaseDeviceState } = require('./phaseStateService');
+    return getPhaseDeviceState(device, options);
+  }
+
   // Return cached state if available AND it has enough history to cover the requested range
   if (_cache.has(id)) {
     const cached = _cache.get(id);
@@ -110,6 +115,11 @@ async function refreshDeviceState(device, options = { light: false }) {
 
   if (type === 'evaraflow' || type === 'flow') {
     return getFlowDeviceState(device, options);
+  }
+
+  if (type === 'evaraphase' || type === 'phase') {
+    const { getPhaseDeviceState } = require('./phaseStateService');
+    return getPhaseDeviceState(device, options);
   }
 
   const dims = resolveDimensions(device);

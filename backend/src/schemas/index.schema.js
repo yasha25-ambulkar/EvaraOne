@@ -38,6 +38,12 @@ exports.createNodeSchema = z.object({
     flowRateField: z.string().optional(),
     tdsField: z.string().optional(),         // ✅ Added missing field
     temperatureField: z.string().optional(), // ✅ Added missing field
+
+    // EvaraValve fields
+    position_field: z.string().optional(),
+    status_field: z.string().optional(),
+    flow_field: z.string().optional(),
+    flow_field_name: z.string().optional(),
     
     // Physical dimensions
     capacity: z.union([z.number(), z.string()]).optional(),
@@ -135,6 +141,44 @@ exports.updateNodeSchema = z.object({
     location: z.string().optional(),
     tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
     tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
+    // EvaraValve fields
+    position_field: z.string().optional(),
+    status_field: z.string().optional(),
+    flow_field: z.string().optional(),
+    flow_field_name: z.string().optional(),
+    // EvaraTank dimensions
+    length: z.string().optional(),
+    width: z.string().optional(),
+    height: z.string().optional(),
+    capacity: z.union([z.number(), z.string()]).optional(),
+    depth: z.union([z.number(), z.string()]).optional(),
+    tankLength: z.union([z.number(), z.string()]).optional(),
+    tankBreadth: z.union([z.number(), z.string()]).optional(),
+    staticDepth: z.union([z.number(), z.string()]).optional(),
+    dynamicDepth: z.union([z.number(), z.string()]).optional(),
+    rechargeThreshold: z.union([z.number(), z.string()]).optional(),
+    // Deep well config
+    static_water_level: z.union([z.number(), z.string()]).optional(),
+    dynamic_water_level: z.union([z.number(), z.string()]).optional(),
+    recharge_threshold: z.union([z.number(), z.string()]).optional(),
+    total_bore_depth: z.union([z.number(), z.string()]).optional(),
+    // Flow meter config
+    max_flow_rate: z.union([z.number(), z.string()]).optional(),
+    maxFlowRate: z.union([z.number(), z.string()]).optional(),
+    // Other
+    status: z.string().optional(),
+    tank_shape: z.string().optional(),
+    temperature_field: z.string().optional(),
+    status: z.string().optional(),
+    tank_shape: z.string().optional(),
+    temperature_field: z.string().optional(),
+    // TDS specific
+    tdsValue: z.number().optional(),
+    temperature: z.number().optional(),
+    waterQualityRating: z.enum(["Good", "Acceptable", "Critical"]).optional(),
+    location: z.string().optional(),
+    tdsHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
+    tempHistory: z.array(z.object({ value: z.number(), timestamp: z.any() })).optional(),
   }).strict() // ✅ ISSUE #6: Reject unknown fields
   // ✅ NO passthrough() — Zod strips unknown keys by default
 });
@@ -157,9 +201,11 @@ exports.createCustomerSchema = z.object({
         phone: z.string().optional(),
         phone_number: z.string().optional(),
         password: z.string().min(8).optional(),
+        confirmPassword: z.string().optional(),
         role: z.enum(["customer", "distributor", "operator", "viewer"]).optional(),
         status: z.enum(["active", "pending", "suspended", "inactive"]).optional(),
         regionFilter: z.string().optional(),
+        zone_id: z.string().optional(),  // ← CRITICAL FIX: zone_id must be in schema!
     })
     // REMOVED .strict() — allows extra fields without rejection
 });

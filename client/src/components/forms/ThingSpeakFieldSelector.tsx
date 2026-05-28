@@ -27,6 +27,9 @@ export interface ThingSpeakFieldSelectorProps
 
   /** Label for the "add row" button. @default "+ Add another field" */
   addLabel?: string;
+
+  /** Maximum number of selected fields allowed. Defaults to unlimited. */
+  maxSelections?: number;
 }
 
 // ── Sub-component: single row ─────────────────────────────────────────────────
@@ -112,6 +115,7 @@ export const ThingSpeakFieldSelector = ({
   onFieldsChange,
   inputClassName,
   addLabel = '+ Add another field',
+  maxSelections,
 }: ThingSpeakFieldSelectorProps) => {
 
   // ── Stable callback ref — breaks the infinite loop ─────────────────────────
@@ -133,7 +137,8 @@ export const ThingSpeakFieldSelector = ({
   const canAddMore =
     hasFetched &&
     availableFields.length > 0 &&
-    selectedFields.length < availableFields.length;
+    selectedFields.length < availableFields.length &&
+    (typeof maxSelections === 'number' ? selectedFields.length < maxSelections : true);
 
   return (
     <>
