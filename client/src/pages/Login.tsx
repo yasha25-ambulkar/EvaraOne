@@ -115,10 +115,10 @@ const Login = () => {
 
   if (step === "role-selection") {
     return (
-      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 bg-[#f8fafc] overflow-hidden">
+      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 bg-[#f8fafc] dark:bg-transparent overflow-hidden">
         {/* Modern Mesh Gradient Background Layer */}
-        <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
-        <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+        <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '10s', animationDelay: '1s' }} />
 
         <div className="text-center mb-12 relative z-10">
           <img
@@ -182,10 +182,10 @@ const Login = () => {
   const isSuperAdmin = selectedRole === "superadmin";
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f8fafc] overflow-hidden">
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f8fafc] dark:bg-transparent overflow-hidden">
       {/* Modern Mesh Gradient Background Layer */}
-      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '10s', animationDelay: '1s' }} />
 
       <div className="w-full max-w-lg relative z-10">
         <button

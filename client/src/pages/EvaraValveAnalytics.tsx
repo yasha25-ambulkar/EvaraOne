@@ -462,7 +462,7 @@ const EvaraValveAnalytics = () => {
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
                 <div className="max-w-[1400px] mx-auto w-full relative z-10 flex-1 flex flex-col">
                 {/* Breadcrumb + Page Heading row */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-2">
                     <div className="flex flex-col gap-2">
                         <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
                             <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
@@ -481,11 +481,11 @@ const EvaraValveAnalytics = () => {
                         </h2>
 
                         <p className="text-[11px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400 m-0 mt-1">
-                            Smart Water Control System
+                            Smart Water Water Control System
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap pb-1">
+                    <div className="flex items-center gap-2 flex-wrap pb-1 md:self-end lg:self-auto">
                         {/* Status Button (Pill Style) */}
                         <div className={isOnline ? 'pill-button green' : 'pill-button red'}>
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isOnline ? 'var(--online-dot)' : 'var(--offline-dot)' }} />

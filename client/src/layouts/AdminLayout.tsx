@@ -31,7 +31,7 @@ const AdminLayout = () => {
                     className={`
                         fixed inset-y-0 left-0 z-50 apple-glass-card rounded-none border-r border-[var(--card-border)] transition-all duration-300 ease-in-out flex flex-col
                         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                        lg:relative lg:translate-x-0 lg:mt-[110px] lg:mb-6 lg:ml-6 lg:rounded-[32px] lg:border lg:shadow-[0_12px_40px_rgba(0,0,0,0.08)] lg:h-[calc(100vh-134px)]
+                        md:relative md:translate-x-0 md:mt-[110px] md:mb-6 md:ml-6 md:rounded-[32px] md:border md:shadow-[0_12px_40px_rgba(0,0,0,0.08)] md:h-[calc(100vh-134px)]
                         ${isCollapsed ? 'w-[88px]' : 'w-[260px]'}
                     `}
                 >
@@ -85,7 +85,7 @@ const AdminLayout = () => {
                     </nav>
 
                     {/* Bottom Profile & Toggle */}
-                    <div className="mt-auto p-4 border-t border-[var(--card-border)] bg-black/5 dark:bg-white/5 backdrop-blur-md lg:rounded-b-[32px]">
+                    <div className="mt-auto p-4 border-t border-[var(--card-border)] bg-black/5 dark:bg-white/5 backdrop-blur-md md:rounded-b-[32px]">
                         {!isCollapsed ? (
                             <>
                                 <div className="flex items-center gap-3 mb-3">
@@ -106,7 +106,7 @@ const AdminLayout = () => {
                                     </button>
                                     <button
                                         onClick={() => setIsCollapsed(true)}
-                                        className="hidden lg:flex w-9 h-9 shrink-0 items-center justify-center rounded-[12px] border border-[var(--card-border)] bg-black/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-black/10 dark:hover:bg-white/10 hover:text-blue-500 transition-all shadow-sm"
+                                        className="hidden md:flex w-9 h-9 shrink-0 items-center justify-center rounded-[12px] border border-[var(--card-border)] bg-black/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-black/10 dark:hover:bg-white/10 hover:text-blue-500 transition-all shadow-sm"
                                         title="Collapse Sidebar"
                                     >
                                         <ChevronLeft size={16} />
@@ -127,7 +127,7 @@ const AdminLayout = () => {
                                 </button>
                                 <button
                                     onClick={() => setIsCollapsed(false)}
-                                    className="hidden lg:flex w-9 h-9 items-center justify-center rounded-[12px] border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm mt-1"
+                                    className="hidden md:flex w-9 h-9 items-center justify-center rounded-[12px] border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm mt-1"
                                     title="Expand Sidebar"
                                 >
                                     <ChevronRight size={16} />
@@ -140,7 +140,7 @@ const AdminLayout = () => {
                 {/* ─── MAIN CONTENT ─── */}
                 <div className="flex-1 flex flex-col min-w-0">
                     {/* Mobile Header */}
-                    <header className="h-16 lg:hidden flex items-center justify-between px-4 apple-glass-card rounded-none border-b border-[var(--card-border)]">
+                    <header className="h-16 md:hidden flex items-center justify-between px-4 apple-glass-card rounded-none border-b border-[var(--card-border)]">
                         <button onClick={() => setSidebarOpen(true)} className="text-[var(--text-primary)]">
                             <Menu size={24} />
                         </button>
@@ -151,13 +151,13 @@ const AdminLayout = () => {
                     {/* Backdrop for mobile */}
                     {sidebarOpen && (
                         <div
-                            className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+                            className="fixed inset-0 bg-black/20 z-40 md:hidden"
                             onClick={() => setSidebarOpen(false)}
                         />
                     )}
 
                     {/* Content Area */}
-                    <main className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-[120px] relative">
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8 md:pt-[120px] relative">
                         <Outlet />
                     </main>
                 </div>

@@ -87,7 +87,7 @@ async function fetchLatestReading(device) {
   if (!feed) return null;
 
   const distanceCm = parseFloat(feed[fieldKey]);
-  if (isNaN(distanceCm) || distanceCm <= 0) return null;
+  if (isNaN(distanceCm) || distanceCm < 0) return null;
 
   return {
     distanceCm,

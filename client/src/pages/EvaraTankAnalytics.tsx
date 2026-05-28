@@ -828,7 +828,7 @@ const EvaraTankAnalytics = () => {
 
                     {/* Breadcrumb + Page Heading row */}
 
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-2">
 
                         <div className="flex flex-col gap-2">
 
@@ -871,7 +871,7 @@ const EvaraTankAnalytics = () => {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                        <div className="flex items-center gap-2 flex-wrap pb-1 md:self-end lg:self-auto">
                             {/* Status Button (Pill Style) */}
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
