@@ -234,6 +234,14 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
       const selectedFieldName = watchTemplate === 'EvaraValve'
         ? (tsSelector.getSelectedFieldNames()[0] ?? '')
         : '';
+      const normalizedNodeKey = String(data.node_key || '').trim().toLowerCase();
+      const isValveDevice = data.device_type === 'valve';
+      const deviceEmail = isValveDevice
+        ? `esp32-${normalizedNodeKey}@evaratech.com`
+        : '';
+      const devicePassword = isValveDevice
+        ? `evlv-${normalizedNodeKey}-pass`
+        : '';
 
       // Step 5: Flat nodeData schema matching user's requested Firestore structure
       const nodeData: any = {
@@ -295,6 +303,12 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         status: "online",
       };
 
+      if (isValveDevice) {
+        nodeData.esp32_email = deviceEmail;
+        nodeData.esp32_password = devicePassword;
+        console.log('[AddDeviceForm] 🔐 Prepared Firebase Auth credentials for valve device:', deviceEmail);
+      }
+
       if (data.device_type === 'valve') {
         delete nodeData.waterLevelField;
         delete nodeData.borewellDepthField;
@@ -311,7 +325,10 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         if (!selectedFieldName) delete nodeData.flow_field_name;
       }
 
-      console.log('[AddDeviceForm] 📤 Sending to API:', nodeData);
+      console.log('[AddDeviceForm] 📤 Sending to API:', {
+        ...nodeData,
+        esp32_password: nodeData.esp32_password ? '[redacted]' : undefined,
+      });
       console.log('[AddDeviceForm] ─────────────────────────────────────────────');
 
       let result;

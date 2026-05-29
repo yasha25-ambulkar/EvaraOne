@@ -57,6 +57,8 @@ exports.createNodeSchema = z.object({
     // Connectivity / Status
     hardwareId: z.string().optional(),
     status: z.string().optional(),
+    esp32_email: z.string().email().optional(),
+    esp32_password: z.string().min(8).optional(),
     
     // TDS specific
     tdsValue: z.number().optional(),

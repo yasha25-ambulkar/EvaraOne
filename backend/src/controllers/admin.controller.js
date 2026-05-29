@@ -769,6 +769,8 @@ exports.deleteCustomer = async (req, res) => {
 
 // Nodes (Single Document Architecture)
 exports.createNode = async (req, res) => {
+    let firebaseUser = null;
+    let createdFirebaseUser = false;
     try {
         logger.debug(`\n[createNode] 📨 RECEIVED REQUEST BODY:`);
         logger.debug(`[createNode]   Complete body:`, JSON.stringify(req.body, null, 2));
@@ -800,7 +802,9 @@ exports.createNode = async (req, res) => {
             rechargeThreshold,
             latitude,
             longitude,
-            hardwareId
+            hardwareId,
+            esp32_email,
+            esp32_password
         } = req.body;
 
         const timestamp = new Date();
@@ -816,6 +820,10 @@ exports.createNode = async (req, res) => {
         }
         
         const typeNormalized = (assetType || "evaratank").toLowerCase();
+        const isValveDevice = typeNormalized === "evaravalve" || typeNormalized === "valve";
+        const normalizedNodeKey = String(idForDevice).trim().toLowerCase();
+        const deviceEmail = esp32_email || (isValveDevice ? `esp32-${normalizedNodeKey}@evaratech.com` : "");
+        const devicePassword = esp32_password || (isValveDevice ? `evlv-${normalizedNodeKey}-pass` : "");
 
         // Validate device type
         const validTypes = ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'evaraphase', 'evaravalve', 'tank', 'deep', 'flow', 'tds', 'phase', 'valve'];
@@ -824,6 +832,25 @@ exports.createNode = async (req, res) => {
                 error: `Unknown asset type: "${assetType}"`,
                 validTypes: ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'evaraphase', 'evaravalve']
             });
+        }
+
+        if (isValveDevice) {
+            try {
+                firebaseUser = await admin.auth().createUser({
+                    email: deviceEmail,
+                    password: devicePassword,
+                    displayName: displayName || deviceName || idForDevice,
+                });
+                createdFirebaseUser = true;
+                logger.debug(`[createNode] ✅ Created Firebase Auth user for valve device: ${deviceEmail}`);
+            } catch (authError) {
+                if (authError.code === "auth/email-already-exists") {
+                    firebaseUser = await admin.auth().getUserByEmail(deviceEmail);
+                    logger.debug(`[createNode] ℹ️ Reused existing Firebase Auth user for valve device: ${deviceEmail}`);
+                } else {
+                    throw new AppError(authError.message, 400);
+                }
+            }
         }
 
         // ✅ FIX #5: Generate API key for MQTT authentication
@@ -852,6 +879,9 @@ exports.createNode = async (req, res) => {
             },
             analytics_template: assetType || "EvaraTank",
             subType: subType || assetSubType || "",
+            firebase_uid: firebaseUser?.uid || "",
+            esp32_email: deviceEmail,
+            esp32_password: devicePassword,
             created_at: timestamp,
             // Metadata fields (merged)
             label: displayName || deviceName || "Unnamed",
@@ -1038,6 +1068,8 @@ exports.createNode = async (req, res) => {
             deviceId: idForDevice,
             device_id: idForDevice,
             device_type: typeNormalized,
+            esp32_email: deviceEmail,
+            esp32_password: devicePassword,
             api_key: apiKey, // ✅ FIX #5: Return the API key to client (ONE TIME ONLY)
             message: "Device created successfully",
             verification: {
@@ -1048,6 +1080,13 @@ exports.createNode = async (req, res) => {
             }
         });
     } catch (error) {
+        if (firebaseUser?.uid && createdFirebaseUser) {
+            try {
+                await admin.auth().deleteUser(firebaseUser.uid);
+            } catch (cleanupErr) {
+                logger.warn('[createNode] ⚠️ Failed to clean up Firebase Auth user after node creation error:', cleanupErr.message);
+            }
+        }
         logger.error('\n[Device] ❌ CREATE DEVICE FAILED:');
         logger.error(`[Device] Error message: ${error.message}`);
         logger.error(`[Device] Error code: ${error.code}`);
