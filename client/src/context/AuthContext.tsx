@@ -40,6 +40,7 @@ import {
 import type { User as FirebaseUser } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, isFirebaseEnabled } from "../lib/firebase";
+import api from "../services/api";
 
 export type UserRole = "superadmin" | "community_admin" | "customer";
 export type UserPlan = "free" | "pro" | "enterprise";
@@ -108,30 +109,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // Get ID token
         const idToken = await firebaseUser.getIdToken();
         
-        // Call backend API to get profile with verified role
-        const response = await fetch("/api/v1/auth/me", {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${idToken}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          console.error("[AuthContext] Failed to fetch profile:", response.status, response.statusText);
+        // Call backend API to get profile with verified role using axios instance
+        try {
+          const res = await api.get('/auth/me', {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = res.data ?? res;
+          if (data && data.success && data.user) {
+            console.log(`[AuthContext] ✅ Profile fetched - role: ${data.user.role}`);
+            setUser(extractUser(data.user));
+          } else {
+            console.error('[AuthContext] Invalid response from backend:', data);
+            setUser(null);
+          }
+        } catch (err: any) {
+          console.error('[AuthContext] Failed to fetch profile:', err.response?.status, err.message);
           setUser(null);
           setLoading(false);
           return;
-        }
-
-        const data = await response.json();
-        
-        if (data.success && data.user) {
-          console.log(`[AuthContext] ✅ Profile fetched - role: ${data.user.role}`);
-          setUser(extractUser(data.user));
-        } else {
-          console.error("[AuthContext] Invalid response from backend:", data);
-          setUser(null);
         }
       } catch (err) {
         console.error("[AuthContext] Error fetching profile:", err);
@@ -200,43 +195,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // Step 3: Verify token with backend and get profile.
         // Retried up to 3 times with backoff to handle transient network hiccups.
         console.log("[AuthContext] Verifying token with backend...");
-        let response: Response;
-        let data: any;
         try {
-          const result = await retryWithBackoff(async () => {
-            const res = await fetch("/api/v1/auth/verify-token", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ idToken }),
-            });
-            const json = await res.json();
-            return { response: res, data: json };
-          });
-          response = result.response;
-          data = result.data;
-        } catch (fetchErr: any) {
-          console.error("[AuthContext] Backend unreachable after retries:", fetchErr);
+          const res = await api.post('/auth/verify-token', { idToken });
+          const data = res.data ?? res;
+          if (data && data.success && data.user) {
+            const finalUser = extractUser(data.user);
+            console.log(`[AuthContext] ✅ Login successful - role: ${finalUser.role}`);
+            setUser(finalUser);
+            setLoading(false);
+            return { success: true, user: finalUser };
+          }
+          console.error('[AuthContext] Invalid response from backend:', data);
           setLoading(false);
-          return { success: false, error: "Cannot reach server. Please check your connection." };
-        }
-
-        if (!response.ok) {
-          console.error("[AuthContext] Token verification failed:", response.status, data);
+          return { success: false, error: 'Invalid response from server' };
+        } catch (err: any) {
+          console.error('[AuthContext] Backend unreachable or verification failed:', err?.response?.status, err?.message);
           setLoading(false);
-          return { success: false, error: data?.error ?? "Token verification failed" };
+          return { success: false, error: 'Cannot reach server. Please check your connection.' };
         }
-
-        if (data.success && data.user) {
-          const finalUser = extractUser(data.user);
-          console.log(`[AuthContext] ✅ Login successful - role: ${finalUser.role}`);
-          setUser(finalUser);
-          setLoading(false);
-          return { success: true, user: finalUser };
-        }
-
-        console.error("[AuthContext] Invalid response from backend:", data);
-        setLoading(false);
-        return { success: false, error: "Invalid response from server" };
       } catch (err: any) {
         console.error("[AuthContext] Login error:", err);
         setLoading(false);

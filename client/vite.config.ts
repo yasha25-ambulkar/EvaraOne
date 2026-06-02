@@ -11,6 +11,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
+        // Backend listens on PORT (defaults to 5002 locally). Use 3000 to match backend/.env in dev.
         target: "http://localhost:3000",
         changeOrigin: true,
         secure: false,

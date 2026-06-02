@@ -44,6 +44,9 @@ exports.createNodeSchema = z.object({
     status_field: z.string().optional(),
     flow_field: z.string().optional(),
     flow_field_name: z.string().optional(),
+    total_volume_field: z.string().optional(),
+    total_volume_field_name: z.string().optional(),
+    valve_status: z.enum(["OPEN", "CLOSED"]).optional(),
     
     // Physical dimensions
     capacity: z.union([z.number(), z.string()]).optional(),
@@ -148,6 +151,8 @@ exports.updateNodeSchema = z.object({
     status_field: z.string().optional(),
     flow_field: z.string().optional(),
     flow_field_name: z.string().optional(),
+    total_volume_field: z.string().optional(),
+    total_volume_field_name: z.string().optional(),
     // EvaraTank dimensions
     length: z.string().optional(),
     width: z.string().optional(),

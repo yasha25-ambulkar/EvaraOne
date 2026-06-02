@@ -41,6 +41,7 @@ import { deviceSchema, type DeviceInput } from "../../../schemas";
 import { FormField } from "../../forms/FormField";
 import { useThingSpeakFieldSelector } from "../../../hooks/useThingSpeakFieldSelector";
 import { ThingSpeakFieldSelector } from "../../forms/ThingSpeakFieldSelector";
+import { ValveThingSpeakFieldMapper } from "../../forms/ValveThingSpeakFieldMapper";
 import { TankDimensionsCalculator } from "../../forms/TankDimensionsCalculator";
 
 interface Props {
@@ -161,6 +162,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const watchType = watch("device_type");
   const watchTemplate = watch("analytics_template");
+  const watchFlowField = watch("flow_field");
+  const watchTotalVolumeField = watch("total_volume_field");
   const watchZoneId = watch("zone_id" as any);
   const watchLat = watch("latitude");
   const watchLng = watch("longitude");
@@ -225,15 +228,39 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
     setValue("longitude", String(lng));
   };
 
+  useEffect(() => {
+    if (watchTemplate !== 'EvaraValve' || !tsSelector.hasFetched) return;
+    const keys = new Set(tsSelector.availableFields.map((f) => f.key));
+    if (watchFlowField && !keys.has(watchFlowField)) {
+      setValue('flow_field', '');
+      setValue('flow_field_name', '');
+    }
+    if (watchTotalVolumeField && !keys.has(watchTotalVolumeField)) {
+      setValue('total_volume_field', '');
+      setValue('total_volume_field_name', '');
+    }
+  }, [
+    watchTemplate,
+    tsSelector.hasFetched,
+    tsSelector.availableFields,
+    watchFlowField,
+    watchTotalVolumeField,
+    setValue,
+  ]);
+
   const onFormSubmit = async (data: DeviceInput) => {
     try {
+      if (data.device_type === 'valve' && (!data.flow_field || !data.total_volume_field)) {
+        showToast('Select both Flow Rate Field and Total Volume Field', 'error');
+        return;
+      }
+
       console.log('[AddDeviceForm] ─────────────────────────────────────────────');
       console.log('[AddDeviceForm] 📝 FORM SUBMITTED');
       console.log('[AddDeviceForm] Device Type:', data.device_type);
       console.log('[AddDeviceForm] Full form data:', data);
-      const selectedFieldName = watchTemplate === 'EvaraValve'
-        ? (tsSelector.getSelectedFieldNames()[0] ?? '')
-        : '';
+      const flowFieldName = data.flow_field_name ?? '';
+      const totalVolumeFieldName = data.total_volume_field_name ?? '';
       const normalizedNodeKey = String(data.node_key || '').trim().toLowerCase();
       const isValveDevice = data.device_type === 'valve';
       const deviceEmail = isValveDevice
@@ -286,7 +313,9 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         position_field: data.position_field,
         status_field: data.status_field,
         flow_field: data.flow_field,
-        flow_field_name: selectedFieldName,
+        flow_field_name: flowFieldName,
+        total_volume_field: data.total_volume_field,
+        total_volume_field_name: totalVolumeFieldName,
 
         capacity: data.capacity ? Number(data.capacity) : 0,
         depth: data.max_depth ? Number(data.max_depth) : 0,
@@ -306,6 +335,7 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
       if (isValveDevice) {
         nodeData.esp32_email = deviceEmail;
         nodeData.esp32_password = devicePassword;
+        nodeData.valve_status = "CLOSED";
         console.log('[AddDeviceForm] 🔐 Prepared Firebase Auth credentials for valve device:', deviceEmail);
       }
 
@@ -322,7 +352,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         delete nodeData.frequencyField;
         delete nodeData.position_field;
         delete nodeData.status_field;
-        if (!selectedFieldName) delete nodeData.flow_field_name;
+        if (!flowFieldName) delete nodeData.flow_field_name;
+        if (!totalVolumeFieldName) delete nodeData.total_volume_field_name;
       }
 
       console.log('[AddDeviceForm] 📤 Sending to API:', {
@@ -602,45 +633,54 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                   <Wifi size={13} /> ThingSpeak Configuration
                 </div>
 
-                <ThingSpeakFieldSelector
-                  {...tsSelector}
-                  inputClassName={inp()}
-                  maxSelections={watchTemplate === 'EvaraValve' ? 1 : undefined}
-                  addLabel="+ Map another field"
-                  onFieldsChange={(fields) => {
-                    // Sync the first selected field back to the appropriate
-                    // react-hook-form field based on the current device template.
-                    const first = fields[0] ?? '';
-                    const second = fields[1] ?? '';
-                    const third = fields[2] ?? '';
-                    const fourth = fields[3] ?? '';
+                {watchTemplate === 'EvaraValve' ? (
+                  <ValveThingSpeakFieldMapper
+                    {...tsSelector}
+                    inputClassName={inp()}
+                    flowFieldKey={watchFlowField ?? ''}
+                    totalVolumeFieldKey={watchTotalVolumeField ?? ''}
+                    onMappingChange={(mapping) => {
+                      setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
+                      setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
+                      setValue('flow_field', mapping.flowFieldKey, { shouldValidate: true });
+                      setValue('flow_field_name', mapping.flowFieldName, { shouldValidate: true });
+                      setValue('total_volume_field', mapping.totalVolumeFieldKey, { shouldValidate: true });
+                      setValue('total_volume_field_name', mapping.totalVolumeFieldName, { shouldValidate: true });
+                    }}
+                  />
+                ) : (
+                  <ThingSpeakFieldSelector
+                    {...tsSelector}
+                    inputClassName={inp()}
+                    addLabel="+ Map another field"
+                    onFieldsChange={(fields) => {
+                      const first = fields[0] ?? '';
+                      const second = fields[1] ?? '';
+                      const third = fields[2] ?? '';
+                      const fourth = fields[3] ?? '';
 
-                    // Always persist channel / key into form so validation works.
-                    setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
-                    setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
+                      setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
+                      setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
 
-                    if (watchTemplate === 'EvaraTank') {
-                      setValue('water_level_field', first, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraDeep') {
-                      setValue('depth_field', first, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraFlow') {
-                      setValue('meter_reading_field', first, { shouldValidate: true });
-                      setValue('flow_rate_field', second, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraTDS') {
-                      setValue('tds_field', first, { shouldValidate: true });
-                      setValue('temperature_field', second, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraPhase') {
-                      setValue('voltage_field', first, { shouldValidate: true });
-                      setValue('current_field', second, { shouldValidate: true });
-                      setValue('power_field', third, { shouldValidate: true });
-                      setValue('frequency_field', fourth, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraValve') {
-                      setValue('position_field', '', { shouldValidate: true });
-                      setValue('status_field', '', { shouldValidate: true });
-                      setValue('flow_field', first, { shouldValidate: true });
-                    }
-                  }}
-                />
+                      if (watchTemplate === 'EvaraTank') {
+                        setValue('water_level_field', first, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraDeep') {
+                        setValue('depth_field', first, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraFlow') {
+                        setValue('meter_reading_field', first, { shouldValidate: true });
+                        setValue('flow_rate_field', second, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraTDS') {
+                        setValue('tds_field', first, { shouldValidate: true });
+                        setValue('temperature_field', second, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraPhase') {
+                        setValue('voltage_field', first, { shouldValidate: true });
+                        setValue('current_field', second, { shouldValidate: true });
+                        setValue('power_field', third, { shouldValidate: true });
+                        setValue('frequency_field', fourth, { shouldValidate: true });
+                      }
+                    }}
+                  />
+                )}
 
                 <div className="flex gap-2 items-start p-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800">
                   <Info className="text-cyan-600 dark:text-cyan-400 mt-0.5 shrink-0" size={12} />

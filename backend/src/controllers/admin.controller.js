@@ -793,6 +793,9 @@ exports.createNode = async (req, res) => {
             temperatureField,
             flow_field,
             flow_field_name,
+            total_volume_field,
+            total_volume_field_name,
+            valve_status,
             capacity,
             depth,
             tankLength,
@@ -982,11 +985,18 @@ exports.createNode = async (req, res) => {
                 min_position: 0,
                 max_position: 100
             };
-            const selectedFlowField = (flow_field || req.body.flowField || flowRateField || "field3").trim ? (flow_field || req.body.flowField || flowRateField || "field3").trim() : (flow_field || req.body.flowField || flowRateField || "field3");
+            const selectedFlowField = (flow_field || req.body.flowField || flowRateField || "field2").trim
+                ? (flow_field || req.body.flowField || flowRateField || "field2").trim()
+                : (flow_field || req.body.flowField || flowRateField || "field2");
+            const selectedTotalField = (total_volume_field || req.body.totalVolumeField || "field1").trim
+                ? (total_volume_field || req.body.totalVolumeField || "field1").trim()
+                : (total_volume_field || req.body.totalVolumeField || "field1");
             deviceData.flow_field = selectedFlowField;
             deviceData.flow_field_name = flow_field_name || req.body.flow_field_name || req.body.flowFieldName || "";
-            deviceData.fields = { flow: selectedFlowField };
-            deviceData.valve_status = "OPEN";
+            deviceData.total_volume_field = selectedTotalField;
+            deviceData.total_volume_field_name = total_volume_field_name || req.body.total_volume_field_name || req.body.totalVolumeFieldName || "";
+            deviceData.fields = { flow: selectedFlowField, total_volume: selectedTotalField };
+            deviceData.valve_status = valve_status || "CLOSED";
             deviceData.location = req.body.location || "";
             deviceData.status = req.body.status || "online";
             deviceData.lastUpdated = timestamp;
@@ -1416,15 +1426,28 @@ exports.updateNode = async (req, res) => {
             }
             if (Object.keys(config).length > 0) metaUpdate.configuration = config;
             
-            const selectedFlowField = (body.flow_field || body.flowField || body.flowRateField || body.flow_rate_field || "field3");
+            const selectedFlowField = (body.flow_field || body.flowField || body.flowRateField || body.flow_rate_field || "field2");
+            const selectedTotalField = (body.total_volume_field || body.totalVolumeField || "");
             if (selectedFlowField) {
                 const normalizedFlowField = trimmed(selectedFlowField);
                 metaUpdate.flow_field = normalizedFlowField;
                 if (body.flow_field_name || body.flowFieldName) {
                     metaUpdate.flow_field_name = trimmed(body.flow_field_name || body.flowFieldName);
                 }
-                metaUpdate.fields = { flow: normalizedFlowField };
-                metaUpdate.sensor_field_mapping = { [normalizedFlowField]: "flowValue" };
+                const fieldsUpdate = { flow: normalizedFlowField };
+                if (selectedTotalField) {
+                    const normalizedTotalField = trimmed(selectedTotalField);
+                    metaUpdate.total_volume_field = normalizedTotalField;
+                    fieldsUpdate.total_volume = normalizedTotalField;
+                    if (body.total_volume_field_name || body.totalVolumeFieldName) {
+                        metaUpdate.total_volume_field_name = trimmed(body.total_volume_field_name || body.totalVolumeFieldName);
+                    }
+                }
+                metaUpdate.fields = fieldsUpdate;
+                metaUpdate.sensor_field_mapping = {
+                    [normalizedFlowField]: "flowValue",
+                    ...(selectedTotalField ? { [trimmed(selectedTotalField)]: "totalVolume" } : {}),
+                };
             }
 
             // Remove legacy valve-specific fields so the document only keeps the selected flow mapping.
@@ -1440,6 +1463,21 @@ exports.updateNode = async (req, res) => {
         }
 
         await metaRef.set(metaUpdate, { merge: true });
+
+        // Keep devices registry in sync for valve nodes (provisioned via single-doc createNode)
+        if (type === "evaravalve" || type === "valve") {
+            const registrySync = {};
+            if (metaUpdate.thingspeak_channel_id) registrySync.thingspeak_channel_id = metaUpdate.thingspeak_channel_id;
+            if (metaUpdate.thingspeak_read_api_key) registrySync.thingspeak_read_api_key = metaUpdate.thingspeak_read_api_key;
+            if (metaUpdate.flow_field) registrySync.flow_field = metaUpdate.flow_field;
+            if (metaUpdate.flow_field_name) registrySync.flow_field_name = metaUpdate.flow_field_name;
+            if (metaUpdate.total_volume_field) registrySync.total_volume_field = metaUpdate.total_volume_field;
+            if (metaUpdate.total_volume_field_name) registrySync.total_volume_field_name = metaUpdate.total_volume_field_name;
+            if (metaUpdate.fields) registrySync.fields = metaUpdate.fields;
+            if (Object.keys(registrySync).length > 0) {
+                await db.collection("devices").doc(deviceDoc.id).set(registrySync, { merge: true });
+            }
+        }
 
         // SaaS Invalidation
         await Promise.all([

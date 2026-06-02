@@ -101,6 +101,9 @@ export const deviceSchema = z.object({
   position_field: z.string().optional(),
   status_field: z.string().optional(),
   flow_field: z.string().optional(),
+  total_volume_field: z.string().optional(),
+  total_volume_field_name: z.string().optional(),
+  flow_field_name: z.string().optional(),
   position_min: z.string().optional(),
   position_max: z.string().optional(),
   // Technical metadata fields
