@@ -6,7 +6,10 @@ const dotenv = require("dotenv");
 const nodeEnv = process.env.NODE_ENV || "development";
 console.log(`\n🔍 NODE_ENV: ${nodeEnv}`);
 
-const envFile = path.resolve(__dirname, `.env.${nodeEnv}`);
+const envFile =
+  nodeEnv === "development"
+    ? path.resolve(__dirname, "../.env.development")
+    : path.resolve(__dirname, "../.env");
 console.log(`📁 Loading from: ${envFile}`);
 
 const result = dotenv.config({ path: envFile });

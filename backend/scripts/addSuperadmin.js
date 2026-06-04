@@ -2,9 +2,12 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-// Load dev environment
+// Load env from project root
 const nodeEnv = process.env.NODE_ENV || "development";
-const envFile = path.resolve(__dirname, `../.env.${nodeEnv}`);
+const envFile =
+  nodeEnv === "development"
+    ? path.resolve(__dirname, "../../.env.development")
+    : path.resolve(__dirname, "../../.env");
 dotenv.config({ path: envFile, override: true });
 
 const admin = require("firebase-admin");
@@ -37,7 +40,7 @@ async function addSuperadmin(email, password, name) {
       });
       console.log("✅ Created Firebase Auth user:", email);
     } catch (authErr) {
-      if (authErr.code === 'auth/email-already-exists') {
+      if (authErr.code === "auth/email-already-exists") {
         console.log("⚠️  Firebase Auth user already exists:", email);
         authUser = await admin.auth().getUserByEmail(email);
       } else {
@@ -93,7 +96,9 @@ const name = process.argv[4];
 
 if (!email || !password || !name) {
   console.log("Usage: node addSuperadmin.js <email> <password> <name>");
-  console.log("Example: node addSuperadmin.js ritik@evaratech.com evaratech@1010 'Ritik'");
+  console.log(
+    "Example: node addSuperadmin.js ritik@evaratech.com evaratech@1010 'Ritik'",
+  );
   process.exit(1);
 }
 

@@ -2,9 +2,12 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-// Load dev environment
+// Load env from project root
 const nodeEnv = process.env.NODE_ENV || "development";
-const envFile = path.resolve(__dirname, `../.env.${nodeEnv}`);
+const envFile =
+  nodeEnv === "development"
+    ? path.resolve(__dirname, "../../.env.development")
+    : path.resolve(__dirname, "../../.env");
 dotenv.config({ path: envFile });
 
 const admin = require("firebase-admin");
@@ -30,7 +33,7 @@ async function seedTestData() {
     const testEmail = "mani@evaratech.com";
     const testPassword = "evaratech@1010";
     let authUser;
-    
+
     try {
       authUser = await admin.auth().createUser({
         email: testEmail,
@@ -40,7 +43,7 @@ async function seedTestData() {
       });
       console.log("✅ Created Firebase Auth user:", testEmail);
     } catch (authErr) {
-      if (authErr.code === 'auth/email-already-exists') {
+      if (authErr.code === "auth/email-already-exists") {
         console.log("⚠️  Firebase Auth user already exists:", testEmail);
         // Get the existing user
         authUser = await admin.auth().getUserByEmail(testEmail);

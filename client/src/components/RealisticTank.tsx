@@ -36,6 +36,16 @@ export default function RealisticTank({
 
   const waterHeight = (fillPct / 100) * TANK_HEIGHT;
   const waterY = TANK_Y + TANK_HEIGHT - waterHeight;
+  const bubbleConfigs = [1, 2, 3, 4, 5].map((i) => ({
+    key: i,
+    radius: 1.5 + i * 0.35,
+    fromX: TANK_X + 14 + i * 12,
+    toX: TANK_X + 22 + i * 11,
+    riseDuration: `${4 + i * 0.6}s`,
+    opacityDuration: `${4.5 + i * 0.55}s`,
+    horizontalDuration: `${3 + i * 0.35}s`,
+    begin: `${i * 0.8}s`,
+  }));
 
   return (
     <div
@@ -189,28 +199,28 @@ export default function RealisticTank({
           {/* Bubbles */}
           {!isOffline && fillPct > 10 && (
             <g opacity="0.3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <circle key={i} r={1.5 + Math.random() * 2} fill="white">
+              {bubbleConfigs.map((bubble) => (
+                <circle key={bubble.key} r={bubble.radius} fill="white">
                   <animate
                     attributeName="cx"
-                    from={TANK_X + 20 + Math.random() * 60}
-                    to={TANK_X + 20 + Math.random() * 60}
-                    dur={`${3 + Math.random() * 2}s`}
+                    from={bubble.fromX}
+                    to={bubble.toX}
+                    dur={bubble.horizontalDuration}
                     repeatCount="indefinite"
                   />
                   <animate
                     attributeName="cy"
                     from={TANK_Y + TANK_HEIGHT}
                     to={waterY}
-                    dur={`${4 + Math.random() * 4}s`}
-                    begin={`${i * 0.8}s`}
+                    dur={bubble.riseDuration}
+                    begin={bubble.begin}
                     repeatCount="indefinite"
                   />
                   <animate
                     attributeName="opacity"
                     values="0;0.5;0"
-                    dur={`${4 + Math.random() * 4}s`}
-                    begin={`${i * 0.8}s`}
+                    dur={bubble.opacityDuration}
+                    begin={bubble.begin}
                     repeatCount="indefinite"
                   />
                 </circle>

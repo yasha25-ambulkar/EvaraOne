@@ -1,43 +1,36 @@
 const logger = require("../utils/logger.js");
-const { db, admin } = require("../config/firebase.js");
-const { Filter } = require("firebase-admin/firestore");
+const { db } = require("../config/firebase.js");
 const { createNode, updateNode, deleteNode } = require("./admin.controller.js");
+const resolveDevice = require("../utils/resolveDevice.js");
 
 /**
  * GET /api/v1/evaratds
  * Get all EvaraTDS devices
  */
 
-/**
- * Helper to resolve device by document ID OR device_id/node_id
- */
-async function resolveDevice(id) {
-    if (!id) return null;
-
-    // 1. Try direct document lookup
-    const directDoc = await db.collection("devices").doc(id).get();
-    if (directDoc.exists) return directDoc;
-
-    // 2. Query by device_id field (human-readable hardware ID)
-    const q1 = await db.collection("devices").where("device_id", "==", id).limit(1).get();
-    if (!q1.empty) return q1.docs[0];
-
-    // 3. Fallback to node_id
-    const q2 = await db.collection("devices").where("node_id", "==", id).limit(1).get();
-    if (!q2.empty) return q2.docs[0];
-
-    return null;
-}
-
 exports.getEvaraTDS = async (req, res) => {
-    try {
-        const snapshot = await db.collection("evaratds").get();
-        const devices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json(devices);
-    } catch (error) {
-        logger.error("Failed to get EvaraTDS devices:", error);
-        res.status(500).json({ error: "Failed to fetch EvaraTDS devices" });
+  try {
+    let query = db.collection("devices");
+
+    if (req.user.role !== "superadmin") {
+      query = query
+        .where("customer_id", "==", req.user.customer_id || req.user.uid)
+        .where("isVisibleToCustomer", "==", true);
     }
+
+    const snapshot = await query.limit(200).get();
+    const devices = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((device) => {
+        const type = String(device.device_type || "").toLowerCase();
+        return type === "evaratds" || type === "tds";
+      });
+
+    res.status(200).json(devices);
+  } catch (error) {
+    logger.error("Failed to get EvaraTDS devices:", error);
+    res.status(500).json({ error: "Failed to fetch EvaraTDS devices" });
+  }
 };
 
 /**
@@ -45,26 +38,25 @@ exports.getEvaraTDS = async (req, res) => {
  * Get single EvaraTDS device
  */
 exports.getEvaraTDSById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        logger.debug("DEBUG TDS lookup id:", id);
-
-        const deviceDoc = await resolveDevice(id);
-        if (!deviceDoc || !deviceDoc.exists) {
-            logger.debug("DEBUG TDS doc NOT FOUND");
-            return res.status(404).json({ error: "Device not found" });
-        }
-
-        const docId = deviceDoc.id;
-        const doc = await db.collection("evaratds").doc(docId).get();
-        logger.debug("DEBUG TDS doc exists:", doc.exists);
-        
-        if (!doc.exists) return res.status(404).json({ error: "Metadata not found" });
-        res.status(200).json({ id: doc.id, ...doc.data() });
-    } catch (error) {
-        logger.error("TDS Get error:", error);
-        res.status(500).json({ error: "Failed to get TDS data" });
+  try {
+    const deviceDoc = req.deviceDoc || (await resolveDevice(req.params.id));
+    if (!deviceDoc || !deviceDoc.exists) {
+      return res.status(404).json({ error: "Device not found" });
     }
+
+    const device = { id: deviceDoc.id, ...deviceDoc.data() };
+    const metadataDoc = await db.collection("evaratds").doc(deviceDoc.id).get();
+    const metadata = metadataDoc.exists ? metadataDoc.data() : {};
+
+    res.status(200).json({
+      ...device,
+      ...metadata,
+      id: deviceDoc.id,
+    });
+  } catch (error) {
+    logger.error("TDS Get error:", error);
+    res.status(500).json({ error: "Failed to get TDS data" });
+  }
 };
 
 /**
@@ -72,9 +64,9 @@ exports.getEvaraTDSById = async (req, res) => {
  * Create new EvaraTDS device
  */
 exports.createEvaraTDS = async (req, res) => {
-    // Inject EvaraTDS assetType if not present
-    req.body.assetType = "EvaraTDS";
-    return createNode(req, res);
+  // Inject EvaraTDS assetType if not present
+  req.body.assetType = "EvaraTDS";
+  return createNode(req, res);
 };
 
 /**
@@ -82,7 +74,7 @@ exports.createEvaraTDS = async (req, res) => {
  * Update EvaraTDS device
  */
 exports.updateEvaraTDS = async (req, res) => {
-    return updateNode(req, res);
+  return updateNode(req, res);
 };
 
 /**
@@ -90,5 +82,5 @@ exports.updateEvaraTDS = async (req, res) => {
  * Delete EvaraTDS device
  */
 exports.deleteEvaraTDS = async (req, res) => {
-    return deleteNode(req, res);
+  return deleteNode(req, res);
 };

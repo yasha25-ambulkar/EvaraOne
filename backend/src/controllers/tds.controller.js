@@ -8,16 +8,23 @@ const cache = require("../config/cache.js");
 const axios = require("axios");
 const { fetchLatestData } = require("../services/thingspeakService.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
-const { checkDeviceVisibilityWithAudit } = require("../utils/checkDeviceVisibility.js");
+const {
+  checkDeviceVisibilityWithAudit,
+} = require("../utils/checkDeviceVisibility.js");
 const logger = require("../utils/logger.js");
-const { DEVICE_STATUS, STATUS_THRESHOLD_MS } = require("../utils/deviceConstants.js");
+const {
+  DEVICE_STATUS,
+  STATUS_THRESHOLD_MS,
+} = require("../utils/deviceConstants.js");
 const { resolveFieldKey } = require("../utils/fieldMappingResolver.js");
 // ✅ ISSUE #5: Centralized error handler — use AppError for all errors
 const AppError = require("../utils/AppError.js");
 
 // ✅ AUDIT FIX L2: Use shared resolveDevice utility (was duplicated in 3 controllers)
 const resolveDevice = require("../utils/resolveDevice.js");
-const { resolveDeviceMetadata } = require("../services/deviceMetadataResolver.js");
+const {
+  resolveDeviceMetadata,
+} = require("../services/deviceMetadataResolver.js");
 
 /**
  * Helper to resolve TDS metadata document
@@ -28,23 +35,22 @@ async function resolveMetadata(deviceDoc) {
   if (!deviceDoc) return null;
   const id = deviceDoc.id;
   const registry = deviceDoc.data();
-  const deviceType = registry.device_type || 'EvaraTDS';
+  const deviceType = registry.device_type || "EvaraTDS";
 
   logger.debug(`[resolveMetadata] Using centralized resolver for device ${id}`);
-  
+
   const metadata = await resolveDeviceMetadata(id, deviceType, registry);
-  
+
   if (metadata && !metadata.isPartial) {
     // Wrap in object with data() method to maintain backward compatibility with controller code
     return {
       exists: true,
-      data: () => metadata
+      data: () => metadata,
     };
   }
-  
+
   return null;
 }
-
 
 /**
  * Get TDS device telemetry
@@ -54,11 +60,13 @@ exports.getTDSTelemetry = async (req, res, next) => {
   try {
     const { id: paramId } = req.params;
     logger.debug(`[TDS-getTDSTelemetry] REQUEST: paramId=${paramId}`);
-    
+
     // Get device metadata - using resolveDevice for hardware ID support
     const deviceDoc = await resolveDevice(paramId);
     if (!deviceDoc) {
-      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 1 FAILED: Device not found for ID: ${paramId}`);
+      logger.error(
+        `[TDS-getTDSTelemetry] ❌ STEP 1 FAILED: Device not found for ID: ${paramId}`,
+      );
       throw new AppError("Device not found", 404);
     }
 
@@ -66,26 +74,35 @@ exports.getTDSTelemetry = async (req, res, next) => {
     const registry = deviceDoc.data();
     logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 1 SUCCESS: Device resolved`);
     logger.debug(`[TDS-getTDSTelemetry]    Document ID: ${id}`);
-    logger.debug(`[TDS-getTDSTelemetry]    device_type: ${registry.device_type}`);
+    logger.debug(
+      `[TDS-getTDSTelemetry]    device_type: ${registry.device_type}`,
+    );
     logger.debug(`[TDS-getTDSTelemetry]    device_id: ${registry.device_id}`);
     logger.debug(`[TDS-getTDSTelemetry]    node_id: ${registry.node_id}`);
-    
+
     // Validate device type - accept both "evaratds" and "tds"
     const deviceType = registry.device_type?.toLowerCase() || "";
-    logger.debug(`[TDS-getTDSTelemetry] STEP 2: Checking device type: "${deviceType}"`);
+    logger.debug(
+      `[TDS-getTDSTelemetry] STEP 2: Checking device type: "${deviceType}"`,
+    );
     if (deviceType !== "evaratds" && deviceType !== "tds") {
-      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 2 FAILED: Invalid device type: "${deviceType}"`);
-      throw new AppError(`Device is not a TDS sensor (found: ${deviceType})`, 400);
+      logger.error(
+        `[TDS-getTDSTelemetry] ❌ STEP 2 FAILED: Invalid device type: "${deviceType}"`,
+      );
+      throw new AppError(
+        `Device is not a TDS sensor (found: ${deviceType})`,
+        400,
+      );
     }
     logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 2 SUCCESS: Device type valid`);
-    
+
     // ✅ CRITICAL FIX: Check ownership
     if (req.user.role !== "superadmin") {
       const isOwner = await checkOwnership(
         req.user.customer_id || req.user.uid,
         id,
         req.user.role,
-        req.user.community_id
+        req.user.community_id,
       );
       if (!isOwner) {
         logger.error(`[TDS-getTDSTelemetry] ❌ Ownership check failed`);
@@ -95,16 +112,22 @@ exports.getTDSTelemetry = async (req, res, next) => {
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
     // Defense in depth: check visibility in application layer
-    if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
+    if (
+      !checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)
+    ) {
       logger.error(`[TDS-getTDSTelemetry] ❌ Visibility check failed`);
       throw new AppError("Device not visible to your account", 403);
     }
 
     // Get TDS metadata
-    logger.debug(`[TDS-getTDSTelemetry] STEP 3: Resolving metadata for device ${id}`);
+    logger.debug(
+      `[TDS-getTDSTelemetry] STEP 3: Resolving metadata for device ${id}`,
+    );
     const metaDoc = await resolveMetadata(deviceDoc);
     if (!metaDoc) {
-      logger.error(`[TDS-getTDSTelemetry] ❌ STEP 3 FAILED: Metadata not found`);
+      logger.error(
+        `[TDS-getTDSTelemetry] ❌ STEP 3 FAILED: Metadata not found`,
+      );
       throw new AppError("TDS metadata not found", 404);
     }
     logger.debug(`[TDS-getTDSTelemetry] ✅ STEP 3 SUCCESS: Metadata resolved`);
@@ -152,13 +175,13 @@ exports.getTDSHistory = async (req, res, next) => {
     let limit = limitParam;
     if (!limitParam) {
       if (hoursParam <= 3) {
-        limit = 60;  // Enough for 3 hours at any frequency
+        limit = 60; // Enough for 3 hours at any frequency
       } else if (hoursParam <= 6) {
         limit = 120;
       } else if (hoursParam <= 12) {
         limit = 200;
       } else {
-        limit = 288;  // Default for 24+ hours
+        limit = 288; // Default for 24+ hours
       }
     }
 
@@ -170,7 +193,7 @@ exports.getTDSHistory = async (req, res, next) => {
 
     const id = deviceDoc.id; // Use the actual Firestore ID for subsequent lookups
     const registry = deviceDoc.data();
-    
+
     // Validate device type - accept both "evaratds" and "tds"
     const deviceTypeHist = registry.device_type?.toLowerCase() || "";
     if (deviceTypeHist !== "evaratds" && deviceTypeHist !== "tds") {
@@ -183,7 +206,7 @@ exports.getTDSHistory = async (req, res, next) => {
         req.user.customer_id || req.user.uid,
         id,
         req.user.role,
-        req.user.community_id
+        req.user.community_id,
       );
       if (!isOwner) {
         throw new AppError("Unauthorized access", 403);
@@ -191,7 +214,9 @@ exports.getTDSHistory = async (req, res, next) => {
     }
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
-    if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
+    if (
+      !checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)
+    ) {
       throw new AppError("Device not visible to your account", 403);
     }
 
@@ -214,24 +239,18 @@ exports.getTDSHistory = async (req, res, next) => {
     const { getTDSHistory } = require("../services/tdsStateService");
     const data = await getTDSHistory({ id, ...registry, ...metadata }, limit);
 
-    logger.debug("[TDS-getTDSHistory] Returning", data.length, 'history points');
-    
-    res.status(200).json({
-      id,
-      label: metadata.label,
-      history: data,
-      count: data.length,
-      period_hours: parseInt(hoursParam),
-    });
+    logger.debug(
+      "[TDS-getTDSHistory] Returning",
+      data.length,
+      "history points",
+    );
 
-    logger.debug("[TDS-getTDSHistory] Returning", data.length, 'history points');
-    
     res.status(200).json({
       id,
       label: metadata.label,
       history: data,
       count: data.length,
-      period_hours: parseInt(hoursParam),
+      period_hours: hoursParam,
     });
   } catch (error) {
     // ✅ ISSUE #5: Delegate to centralized error handler
@@ -260,7 +279,7 @@ exports.getTDSConfig = async (req, res) => {
         req.user.customer_id || req.user.uid,
         id,
         req.user.role,
-        req.user.community_id
+        req.user.community_id,
       );
       if (!isOwner) {
         return res.status(403).json({ error: "Unauthorized access" });
@@ -268,8 +287,12 @@ exports.getTDSConfig = async (req, res) => {
     }
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
-    if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
-      return res.status(403).json({ error: "Device not visible to your account" });
+    if (
+      !checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Device not visible to your account" });
     }
 
     const metaDoc = await resolveMetadata(deviceDoc);
@@ -314,6 +337,7 @@ exports.updateTDSConfig = async (req, res) => {
     }
 
     const id = deviceDoc.id;
+    const registry = deviceDoc.data();
 
     // Check ownership
     if (req.user.role !== "superadmin") {
@@ -321,7 +345,7 @@ exports.updateTDSConfig = async (req, res) => {
         req.user.customer_id || req.user.uid,
         id,
         req.user.role,
-        req.user.community_id
+        req.user.community_id,
       );
       if (!isOwner) {
         return res.status(403).json({ error: "Unauthorized access" });
@@ -329,8 +353,12 @@ exports.updateTDSConfig = async (req, res) => {
     }
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
-    if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
-      return res.status(403).json({ error: "Device not visible to your account" });
+    if (
+      !checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Device not visible to your account" });
     }
 
     const metaDoc = await resolveMetadata(deviceDoc);
@@ -358,16 +386,17 @@ exports.updateTDSConfig = async (req, res) => {
     await cache.flushPrefix("nodes_");
 
     // ✅ FIX #16: EMIT SOCKET EVENT FOR TDS CONFIG UPDATE
-    const registryData = registry?.data?.();
-    const customerId = registryData?.customer_id || registryData?.customerId;
+    const customerId = registry?.customer_id || registry?.customerId;
     if (customerId && global.io) {
       global.io.to(`customer:${customerId}`).emit("device:updated", {
         deviceId: id,
         changes: updated,
         success: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      logger.debug(`[TDSController] ✅ device:updated event emitted for TDS config update: ${id}`);
+      logger.debug(
+        `[TDSController] ✅ device:updated event emitted for TDS config update: ${id}`,
+      );
     }
 
     res.status(200).json({ success: true, message: "Configuration updated" });
@@ -399,7 +428,7 @@ exports.getTDSAnalytics = async (req, res) => {
         req.user.customer_id || req.user.uid,
         id,
         req.user.role,
-        req.user.community_id
+        req.user.community_id,
       );
       if (!isOwner) {
         return res.status(403).json({ error: "Unauthorized access" });
@@ -407,12 +436,18 @@ exports.getTDSAnalytics = async (req, res) => {
     }
 
     // ✅ CRITICAL FIX: ENFORCE DEVICE VISIBILITY (using shared helper)
-    if (!checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)) {
-      return res.status(403).json({ error: "Device not visible to your account" });
+    if (
+      !checkDeviceVisibilityWithAudit(registry, id, req.user.uid, req.user.role)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Device not visible to your account" });
     }
 
     const metaDoc = await resolveMetadata(deviceDoc);
-    if (!metaDoc) {      logger.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);      return res.status(404).json({ error: "TDS device not found" });
+    if (!metaDoc) {
+      logger.error(`[TDS-getTDSHistory] Metadata not found for device ${id}`);
+      return res.status(404).json({ error: "TDS device not found" });
     }
 
     const metadata = metaDoc.data();
@@ -453,12 +488,12 @@ exports.getTDSAnalytics = async (req, res) => {
       max_tds: tdsValues.length > 0 ? Math.max(...tdsValues) : null,
       avg_temp:
         tempValues.length > 0
-          ? (tempValues.reduce((a, b) => a + b, 0) / tempValues.length).toFixed(2)
+          ? (tempValues.reduce((a, b) => a + b, 0) / tempValues.length).toFixed(
+              2,
+            )
           : null,
       readings_count: tdsValues.length,
     };
-
-    res.status(200).json(analytics);
 
     res.status(200).json(analytics);
   } catch (error) {

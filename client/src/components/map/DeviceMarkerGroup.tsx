@@ -10,7 +10,6 @@ import {
   isOnline,
   getAssetButtonClass,
   getDeviceIcon,
-  fullIcons,
 } from "../../utils/mapIcons";
 import { getDeviceAnalyticsRoute } from "../../utils/deviceRouting";
 import type { MapDevice } from "../../hooks/useMapDevices";
@@ -33,8 +32,7 @@ export const DeviceMarkerGroup = ({
   return (
     <>
       {devices.map((device) => {
-        const d = device as any;
-        const icon = getDeviceIcon(d.asset_type, device.status, fullIcons);
+        const icon = getDeviceIcon(device.asset_type, device.status);
 
         return (
           <Marker
@@ -48,11 +46,11 @@ export const DeviceMarkerGroup = ({
                   {device.name}
                 </h3>
                 <p className="text-[10px] font-mono text-slate-400 mb-2">
-                  {d.hardwareId || device.id}
+                  {device.hardwareId || device.id}
                 </p>
-                {d.capacity && (
+                {device.capacity && (
                   <p className="text-xs text-slate-600 mb-1">
-                    Capacity: {d.capacity}
+                    Capacity: {device.capacity}
                   </p>
                 )}
                 <div className="mb-3">
@@ -70,14 +68,14 @@ export const DeviceMarkerGroup = ({
                 <Link
                   to={getDeviceAnalyticsRoute({
                     id: device.id,
-                    hardwareId: d.hardwareId || device.id,
-                    analytics_template: d.analytics_template,
-                    asset_type: d.asset_type ?? null,
-                    device_type: d.device_type,
+                    hardwareId: device.hardwareId || device.id,
+                    analytics_template: device.analytics_template,
+                    asset_type: device.asset_type ?? null,
+                    device_type: device.device_type,
                   })}
                   className={clsx(
                     "block w-full text-center text-white text-xs font-bold py-1.5 px-3 rounded transition-colors",
-                    getAssetButtonClass(d.asset_type ?? null),
+                    getAssetButtonClass(device.asset_type ?? null),
                   )}
                 >
                   View Details →

@@ -1,5 +1,8 @@
 const express = require("express");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const {
+  requireAuth,
+  requireFirebaseIdentity,
+} = require("../middleware/auth.middleware.js");
 const authController = require("../controllers/auth.controller.js");
 const authLimiter = require("../middleware/authLimiter.js");
 const { db } = require("../config/firebase.js");
@@ -14,6 +17,12 @@ const router = express.Router();
  * ✅ TASK #8: Protected with 5 attempts / 15 min rate limit
  */
 router.post("/verify-token", authLimiter, authController.verifyToken);
+router.post(
+  "/profile",
+  authLimiter,
+  requireFirebaseIdentity,
+  authController.createCustomerProfile,
+);
 
 /**
  * GET /api/v1/auth/me
@@ -23,6 +32,13 @@ router.post("/verify-token", authLimiter, authController.verifyToken);
 router.get("/me", requireAuth, authController.getUserProfile);
 
 router.get("/debug-uid", requireAuth, async (req, res) => {
+  if (
+    process.env.NODE_ENV === "production" ||
+    req.user?.role !== "superadmin"
+  ) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
   const uid = req.user?.uid;
   const email = req.user?.email;
 
