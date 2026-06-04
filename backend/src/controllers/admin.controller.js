@@ -1,5 +1,6 @@
 const { db, admin } = require("../config/firebase.js");
 const { Filter } = require("firebase-admin/firestore");
+const deviceLookupService = require("../services/deviceLookupService.js");
 const cache = require("../config/cache.js");
 const telemetryCache = require("../services/cacheService.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
@@ -111,15 +112,19 @@ exports.createZone = async (req, res) => {
 exports.getZones = async (req, res) => {
     try {
         // ─── #2 FIX: Tenant Isolation + Query Parameter Validation ──────────
-        // ✅ PHASE 2: Task #11 - Use versioned cache keys instead of flushPrefix
-        const baseCacheKey = `zones_list_${req.user.role}_${req.query.limit || 50}_${req.query.cursor || ''}`;
-        const cacheKey = `${baseCacheKey}_v${(await (async () => {
-            const versionDoc = await db.collection('_cache_versions').doc('zones').get();
-            return versionDoc.exists ? versionDoc.data().version : 1;
-        })())}`;
-        
-        const cached = await cache.get(cacheKey);
-        if (cached) return res.status(200).json(cached);
+    // ✅ COST OPT A6: Check the simple cache key first before reading _cache_versions from Firestore.
+    // Previously, a Firestore read for the version happened on EVERY call, even cache hits.
+    const simpleCacheKey = `zones_list_${req.user.role}_${req.query.limit || 50}_${req.query.cursor || ''}`;
+    const cachedSimple = await cache.get(simpleCacheKey);
+    if (cachedSimple) return res.status(200).json(cachedSimple);
+
+    // Cache miss — now read version to build the versioned key for future writes
+    const versionDoc = await db.collection('_cache_versions').doc('zones').get();
+    const version = versionDoc.exists ? versionDoc.data().version : 1;
+    const cacheKey = `${simpleCacheKey}_v${version}`;
+    
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.status(200).json(cached);
 
         // Validate and cap limit parameter (max 100 per query schema)
         const limitStr = Math.min(parseInt(req.query.limit) || 50, 100);
@@ -140,7 +145,8 @@ exports.getZones = async (req, res) => {
 
         const snapshot = await query.get();
         const zones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        await cache.set(cacheKey, zones, 600); // 10 min
+        await cache.set(cacheKey, zones, 600); // 10 min (versioned)
+        await cache.set(simpleCacheKey, zones, 600); // also store under simple key for quick hit
         res.status(200).json(zones);
     } catch (error) {
         if (error instanceof AppError) {
@@ -812,6 +818,7 @@ exports.createNode = async (req, res) => {
         // ✅ SINGLE DOCUMENT WRITE: Use hardware ID as document ID for direct lookup
         const deviceDocRef = db.collection("devices").doc(idForDevice);
         await deviceDocRef.set(deviceData);
+        deviceLookupService.clearCache(idForDevice); // COST OPT A8 - bust cache on config change
 
         logger.debug(`[createNode] ✅ Document created successfully in devices/${idForDevice}`);
 
@@ -1044,6 +1051,7 @@ exports.updateNode = async (req, res) => {
             metaUpdate.customer_id = cid;
             // Also sync to registry
             await db.collection("devices").doc(deviceDoc.id).update({ customer_id: cid });
+            deviceLookupService.clearCache(deviceDoc.id); // COST OPT A8 - bust cache on config change
         }
 
         if (body.latitude !== undefined) metaUpdate.latitude = parseNumberSafely(body.latitude);
@@ -1156,6 +1164,7 @@ exports.updateNode = async (req, res) => {
         }
 
         await metaRef.set(metaUpdate, { merge: true });
+        deviceLookupService.clearCache(deviceDoc.id); // COST OPT A8 - bust cache on config change
 
         // SaaS Invalidation
         await Promise.all([
@@ -1253,6 +1262,12 @@ exports.getDashboardSummary = async (req, res) => {
         }
         const isSuperAdmin = req.user.role === "superadmin";
 
+        // ✅ COST OPT A2: Cache dashboard summary for 60 seconds.
+        // Previously this ran a full devices collection scan on every call with NO caching.
+        const summaryKey = `dashboard_summary_${isSuperAdmin ? 'admin' : req.user.customer_id || req.user.uid}`;
+        const cachedSummary = await cache.get(summaryKey);
+        if (cachedSummary) return res.status(200).json(cachedSummary);
+
         let nodesQuery = db.collection("devices");
         let customersQuery = db.collection("customers");
         let zonesQuery = db.collection("zones");
@@ -1295,6 +1310,9 @@ exports.getDashboardSummary = async (req, res) => {
             alerts_active: 0,
             system_health: actualNodeCount > 0 ? 92 : 0
         };
+
+        // Cache for 60 seconds — socket events handle real-time status changes
+        await cache.set(summaryKey, result, 60);
 
         logger.debug(`[Dashboard] Returning stats:`, result);
 
@@ -1558,6 +1576,7 @@ exports.updateDeviceVisibility = async (req, res) => {
         await db.collection("devices").doc(deviceDoc.id).update({
             isVisibleToCustomer
         });
+        deviceLookupService.clearCache(deviceDoc.id); // COST OPT A8 - bust cache on config change
 
         // Get customer_id so we can flush that specific customer's cache
         const customerId = deviceDoc.data().customer_id;
@@ -1635,6 +1654,7 @@ exports.updateDeviceParameters = async (req, res) => {
         await db.collection("devices").doc(deviceDoc.id).update({
             customer_config
         });
+        deviceLookupService.clearCache(deviceDoc.id); // COST OPT A8 - bust cache on config change
 
         // Flush customer-facing caches so change reflects immediately
         await Promise.all([
