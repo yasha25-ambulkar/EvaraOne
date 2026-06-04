@@ -9,7 +9,7 @@ import { auth } from "../lib/firebase";
 // API Configuration
 // Use environment variable if provided, otherwise fallback to the current origin in production
 // or localhost in development. This prevents "not showing data" errors after deployment.
-const VITE_API_URL =
+export const VITE_API_URL =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD
     ? `${window.location.origin}/api/v1`
