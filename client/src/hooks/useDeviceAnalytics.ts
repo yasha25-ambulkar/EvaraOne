@@ -16,7 +16,11 @@ export interface TelemetryData {
 export interface NodeInfoData {
   id: string;
   hardware_id: string;
+  label: string;
   name: string;
+  device_name?: string;
+  device_type?: string;
+  type?: string;
   asset_type: string;
   last_seen: string | null;
   zone_name?: string;
@@ -207,7 +211,11 @@ export const useDeviceAnalytics = (
         data: {
           id: device.id || hw,
           hardware_id: hw,
-          name: d.displayName || d.name || hw,
+          label: d.label || d.displayName || d.device_name || d.name || hw,
+          name: d.device_name || d.displayName || d.name || d.label || hw,
+          device_name: d.device_name || d.displayName || d.label || d.name || hw,
+          device_type: d.device_type || d.type || d.asset_type || d.assetType,
+          type: d.device_type || d.type || d.asset_type || d.assetType,
           asset_type: d.asset_type || 'Generic',
           last_seen: d.last_seen || null,
           zone_name: d.zone_name,

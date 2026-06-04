@@ -4,13 +4,24 @@ const path = require("path");
 const cors = require("cors");
 const schedule = require("node-schedule");
 const adminRoutes = require("./routes/admin.routes.js");
-const { getDashboardSummary, getHierarchy, getAuditLogs, getZoneStats } = require("./controllers/admin.controller.js");
-const { requireAuth, checkOwnership } = require("./middleware/auth.middleware.js");
+const {
+  getDashboardSummary,
+  getHierarchy,
+  getAuditLogs,
+  getZoneStats,
+} = require("./controllers/admin.controller.js");
+const {
+  requireAuth,
+  checkOwnership,
+} = require("./middleware/auth.middleware.js");
 const tenantCheck = require("./middleware/tenantCheck.middleware.js");
 const rbac = require("./middleware/rbac.middleware.js");
 const adminOnly = require("./middleware/adminOnly.middleware.js"); // ✅ FIX #1: RBAC gate
 const { errorHandler } = require("./middleware/errorHandler.js"); // ✅ ISSUE #5: Centralized error handler
-const { startWorker, telemetryEvents } = require("./workers/telemetryWorker.js");
+const {
+  startWorker,
+  telemetryEvents,
+} = require("./workers/telemetryWorker.js");
 const socketValidation = require("./services/socketValidation.js"); // ✅ FIX #2: Socket.io validation
 const cache = require("./config/cache.js");
 const apiLimiter = require("./middleware/rateLimit.js");
@@ -28,16 +39,17 @@ const { initializeCacheVersions } = require("./utils/cacheVersioning.js");
 // ✅ HYBRID CACHING: Telemetry archive service
 const TelemetryArchiveService = require("./services/telemetryArchiveService.js");
 // ✅ PHASE 2: Snapshot persistence (Task #2.1)
-const { initializeSnapshots, archiveOldSnapshots } = require("./services/deviceStateService.js");
+const {
+  initializeSnapshots,
+  archiveOldSnapshots,
+} = require("./services/deviceStateService.js");
 
 // Validate environment before starting
 validateEnv();
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || "",
-  integrations: [
-    Sentry.expressIntegration(),
-  ],
+  integrations: [Sentry.expressIntegration()],
 });
 
 const app = express();
@@ -46,24 +58,26 @@ const app = express();
 // Asset requests (JS/CSS) must never hit CORS logic — they are same-origin.
 // When CORS calls callback(new Error(...)), Express returns 500, not 403.
 if (process.env.NODE_ENV === "production") {
-    const staticPath = path.resolve(__dirname, '../../client/dist');
-    logger.info(`[Server] Static path: ${staticPath}`);
-    app.use(express.static(staticPath, {
-        maxAge: '1y',
-        immutable: true,
-        fallthrough: true
-    }));
+  const staticPath = path.resolve(__dirname, "../../client/dist");
+  logger.info(`[Server] Static path: ${staticPath}`);
+  app.use(
+    express.static(staticPath, {
+      maxAge: "1y",
+      immutable: true,
+      fallthrough: true,
+    }),
+  );
 }
 
 // ✅ PHASE 2: Task #14 - Lock CORS to specific domains
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
   : [
       "https://evara-iot-platform-production.up.railway.app",
       "https://app.evaratech.com",
       "http://localhost:8081",
       "http://localhost:5173",
-      "http://localhost:3000"
+      "http://localhost:3000",
     ];
 
 const isLocalDevOrigin = (origin) => {
@@ -83,19 +97,19 @@ const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (same-origin, mobile apps, curl)
     if (!origin) return callback(null, true);
-    
+
     // Check against explicit list only (no wildcards)
     if (allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
       return callback(null, true);
     }
-    
+
     // ✅ CORS FIX: Use (null, false) NOT new Error() — Error causes 500, false causes 403
-    logger.warn({ origin }, '[CORS] Origin rejected');
+    logger.warn({ origin }, "[CORS] Origin rejected");
     callback(null, false);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
 };
 
 // Pre-flight CORS and Security
@@ -104,51 +118,52 @@ app.use(cors(corsOptions));
 // ============================================================================
 // Helmet Security Headers
 // ============================================================================
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      // ✅ FIX: Allow self-hosted Vite bundles — must not block .js files
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      // ✅ FIX: Allow self-hosted CSS + Google Fonts + inline styles (Vite injects these)
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      // ✅ FIX: Allow images from common sources
-      imgSrc: [
-        "'self'",
-        "https:",
-        "data:",
-        "https://*.tile.openstreetmap.org",
-        "https://*.openstreetmap.org"
-      ],
-      // ✅ FIX: Allow WebSocket and API connections to Railway, Firebase, Google
-      connectSrc: [
-        "'self'",
-        "https://*.railway.app",
-        "wss://*.railway.app",
-        "https://identitytoolkit.googleapis.com",
-        "https://securetoken.googleapis.com",
-        "https://www.googleapis.com",
-        "https://*.firebaseio.com",
-        "https://*.googleapis.com",
-        "https://firestore.googleapis.com",
-      ],
-      // ✅ FIX: Allow Google Fonts
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"]
-    }
-  },
-  crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: true,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
-}));
-
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // ✅ FIX: Allow self-hosted Vite bundles — must not block .js files
+        scriptSrc: ["'self'"],
+        // ✅ FIX: Allow self-hosted CSS + Google Fonts + inline styles (Vite injects these)
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
+        // ✅ FIX: Allow images from common sources
+        imgSrc: [
+          "'self'",
+          "https:",
+          "data:",
+          "https://*.tile.openstreetmap.org",
+          "https://*.openstreetmap.org",
+        ],
+        // ✅ FIX: Allow WebSocket and API connections to Railway, Firebase, Google
+        connectSrc: [
+          "'self'",
+          "https://*.railway.app",
+          "wss://*.railway.app",
+          "https://identitytoolkit.googleapis.com",
+          "https://securetoken.googleapis.com",
+          "https://www.googleapis.com",
+          "https://*.firebaseio.com",
+          "https://*.googleapis.com",
+          "https://firestore.googleapis.com",
+        ],
+        // ✅ FIX: Allow Google Fonts
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: true,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  }),
+);
 
 // ============================================================================
 // Trust proxy for reverse proxy support (Railway, Nginx, etc)
 // ============================================================================
-app.set('trust proxy', process.env.TRUST_PROXY_DEPTH || 1);
+app.set("trust proxy", process.env.TRUST_PROXY_DEPTH || 1);
 
 app.use(express.json());
 
@@ -174,20 +189,20 @@ const limiter = rateLimit({
   skip: (req, res) => {
     // Apply lighter rate limit for superadmins (1000/min vs 100/min for users)
     // This allows bulk operations but still prevents DOS
-    return false;  // Never skip — all users are rate-limited
+    return false; // Never skip — all users are rate-limited
   },
   handler: (req, res) => {
     res.status(429).json({
-      error: "Too many requests, please try again later."
+      error: "Too many requests, please try again later.",
     });
-  }
+  },
 });
 app.use("/api/", limiter);
 
 const server = http.createServer(app);
 
-const io = new Server(server, { 
-    cors: { 
+const io = new Server(server, {
+  cors: {
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
@@ -195,8 +210,8 @@ const io = new Server(server, {
       }
       callback(null, false);
     },
-        credentials: true
-    } 
+    credentials: true,
+  },
 });
 
 // ============================================================================
@@ -206,21 +221,21 @@ const io = new Server(server, {
 const pubSub = cache.getPubSub();
 
 // Are we running multiple Railway instances?
-const isCluster = process.env.RAILWAY_REPLICA_COUNT 
-  ? parseInt(process.env.RAILWAY_REPLICA_COUNT) > 1 
-  : process.env.MULTIPLE_REPLICAS === 'true';
+const isCluster = process.env.RAILWAY_REPLICA_COUNT
+  ? parseInt(process.env.RAILWAY_REPLICA_COUNT) > 1
+  : process.env.MULTIPLE_REPLICAS === "true";
 
 if (isCluster && !pubSub) {
   // 🚨 LOUD CRASH — better than silent corruption
-  logger.error('');
-  logger.error('╔══════════════════════════════════════════╗');
-  logger.error('║  FATAL: Redis required for clustering    ║');
-  logger.error('║  Running without Redis in multi-instance ║');
-  logger.error('║  mode will silently break real-time.     ║');
-  logger.error('║                                          ║');
-  logger.error('║  Fix: Set REDIS_URL environment variable ║');
-  logger.error('╚══════════════════════════════════════════╝');
-  logger.error('');
+  logger.error("");
+  logger.error("╔══════════════════════════════════════════╗");
+  logger.error("║  FATAL: Redis required for clustering    ║");
+  logger.error("║  Running without Redis in multi-instance ║");
+  logger.error("║  mode will silently break real-time.     ║");
+  logger.error("║                                          ║");
+  logger.error("║  Fix: Set REDIS_URL environment variable ║");
+  logger.error("╚══════════════════════════════════════════╝");
+  logger.error("");
   process.exit(1); // 💀 Stop here. Don't continue.
 }
 
@@ -228,14 +243,21 @@ if (pubSub) {
   try {
     const { createAdapter } = require("@socket.io/redis-adapter");
     io.adapter(createAdapter(pubSub.pub, pubSub.sub));
-    logger.debug("[Socket.io] ✅ Redis adapter enabled for multi-instance clustering");
+    logger.debug(
+      "[Socket.io] ✅ Redis adapter enabled for multi-instance clustering",
+    );
   } catch (err) {
-    logger.error("[Socket.io] ❌ Redis adapter failed to initialize:", err.message);
+    logger.error(
+      "[Socket.io] ❌ Redis adapter failed to initialize:",
+      err.message,
+    );
     process.exit(1); // Also crash here — don't pretend it's fine
   }
 } else {
   // Single instance, no Redis — that's fine
-  logger.debug("[Socket.io] ⚠️  Using in-memory adapter (single instance only)");
+  logger.debug(
+    "[Socket.io] ⚠️  Using in-memory adapter (single instance only)",
+  );
 }
 
 // ============================================================================
@@ -288,9 +310,9 @@ const firestoreListeners = new Map(); // Map<socketId, unsubscribeFn | Array<uns
  */
 function registerListener(socketId, unsubscribeFn) {
   if (!socketId || !unsubscribeFn) return;
-  
+
   const existing = firestoreListeners.get(socketId);
-  if (existing && typeof existing === 'function') {
+  if (existing && typeof existing === "function") {
     // Already have one listener, convert to array
     firestoreListeners.set(socketId, [existing, unsubscribeFn]);
   } else if (Array.isArray(existing)) {
@@ -309,32 +331,38 @@ function registerListener(socketId, unsubscribeFn) {
  */
 function cleanupListeners(socketId) {
   if (!socketId) return;
-  
+
   const listeners = firestoreListeners.get(socketId);
   if (!listeners) return;
-  
+
   const listenerArray = Array.isArray(listeners) ? listeners : [listeners];
   let cleanedCount = 0;
-  
+
   for (const unsubscribeFn of listenerArray) {
     try {
       unsubscribeFn();
       cleanedCount++;
     } catch (err) {
-      logger.error('[Firestore] Listener unsubscribe failed', { socketId, error: err.message });
+      logger.error("[Firestore] Listener unsubscribe failed", {
+        socketId,
+        error: err.message,
+      });
     }
   }
-  
+
   firestoreListeners.delete(socketId);
   if (cleanedCount > 0) {
-    logger.debug('[Firestore] Listeners cleaned up', { socketId, count: cleanedCount });
+    logger.debug("[Firestore] Listeners cleaned up", {
+      socketId,
+      count: cleanedCount,
+    });
   }
 }
 
 io.use(async (socket, next) => {
   try {
     // Get user ID (prefer authenticated UID, fall back to IP)
-    const uid = socket.handshake.auth?.uid || socket.ip || 'anonymous';
+    const uid = socket.handshake.auth?.uid || socket.ip || "anonymous";
 
     // Redis key for this user's connection count
     // Using Redis means ALL instances share this number
@@ -349,16 +377,26 @@ io.use(async (socket, next) => {
     let currentCount;
     if (cache.isRedisReady && cache.redis) {
       // Call Lua script atomically: check limit, then INCR if allowed
-      const result = await cache.redis.eval(CONNECTION_LIMIT_LUA_SCRIPT, 1, redisKey, MAX_CONNECTIONS_PER_USER, CONNECTION_TTL);
-      
-      if (result === 'LIMIT_EXCEEDED') {
+      const result = await cache.redis.eval(
+        CONNECTION_LIMIT_LUA_SCRIPT,
+        1,
+        redisKey,
+        MAX_CONNECTIONS_PER_USER,
+        CONNECTION_TTL,
+      );
+
+      if (result === "LIMIT_EXCEEDED") {
         // Atomically rejected by Lua script - counter not incremented
-        logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: at max (${MAX_CONNECTIONS_PER_USER})`);
-        return next(new Error(
-          `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
-        ));
+        logger.warn(
+          `[Socket.io] ❌ Connection limit hit for ${uid}: at max (${MAX_CONNECTIONS_PER_USER})`,
+        );
+        return next(
+          new Error(
+            `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`,
+          ),
+        );
       }
-      
+
       // result is the new count
       currentCount = result;
     } else {
@@ -367,26 +405,32 @@ io.use(async (socket, next) => {
       if (currentCount > MAX_CONNECTIONS_PER_USER) {
         // Over limit - don't increment, reject
         await cache.set(redisKey, currentCount - 1, CONNECTION_TTL);
-        logger.warn(`[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`);
-        return next(new Error(
-          `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`
-        ));
+        logger.warn(
+          `[Socket.io] ❌ Connection limit hit for ${uid}: ${currentCount}/${MAX_CONNECTIONS_PER_USER}`,
+        );
+        return next(
+          new Error(
+            `Too many connections. Max ${MAX_CONNECTIONS_PER_USER} allowed per user.`,
+          ),
+        );
       }
       await cache.set(redisKey, currentCount, CONNECTION_TTL);
     }
 
-    logger.debug(`[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`);
+    logger.debug(
+      `[Socket.io] ✅ User ${uid} connected (${currentCount}/${MAX_CONNECTIONS_PER_USER})`,
+    );
 
     // ─────────────────────────────────────────
     // CLEANUP: When this socket disconnects:
     // 1. Decrement connection count in Redis
     // 2. Unsubscribe from all Firestore listeners
     // ─────────────────────────────────────────
-    socket.on('disconnect', async (reason) => {
+    socket.on("disconnect", async (reason) => {
       try {
         // ✅ CRITICAL FIX #4: Clean up Firestore listeners
         cleanupListeners(socket.id);
-        
+
         // Clean up connection count
         if (cache.isRedisReady && cache.redis) {
           const remaining = await cache.redis.decr(redisKey);
@@ -394,7 +438,9 @@ io.use(async (socket, next) => {
             await cache.redis.del(redisKey);
             logger.debug(`[Socket.io] User ${uid} fully disconnected`);
           } else {
-            logger.debug(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+            logger.debug(
+              `[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`,
+            );
           }
         } else {
           const currentOnDisconnect = parseInt(await cache.get(redisKey)) || 1;
@@ -404,22 +450,26 @@ io.use(async (socket, next) => {
             logger.debug(`[Socket.io] User ${uid} fully disconnected`);
           } else {
             await cache.set(redisKey, remaining, CONNECTION_TTL);
-            logger.debug(`[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`);
+            logger.debug(
+              `[Socket.io] User ${uid} disconnected one socket (${remaining} remaining)`,
+            );
           }
         }
       } catch (cleanupErr) {
         // Don't let cleanup errors break anything
-        logger.error('[Socket.io] Disconnect cleanup error:', cleanupErr.message);
+        logger.error(
+          "[Socket.io] Disconnect cleanup error:",
+          cleanupErr.message,
+        );
       }
     });
 
     // Allow the connection
     next();
-
   } catch (err) {
     // If Redis itself fails, let the connection through
     // (better to have no limit than to block everyone)
-    logger.error('[Socket.io] Connection limit check failed:', err.message);
+    logger.error("[Socket.io] Connection limit check failed:", err.message);
     next(); // Fail open
   }
 });
@@ -432,9 +482,9 @@ io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("Authentication error: Missing token"));
-    
+
     const decodedToken = await admin.auth().verifyIdToken(token);
-    
+
     // ============================================================================
     // PART 1: Share cache key with HTTP auth middleware (single source of truth)
     // ============================================================================
@@ -442,78 +492,98 @@ io.use(async (socket, next) => {
     let userData = await cache.get(cacheKey);
 
     if (!userData) {
-        // ====================================================================
-        // PART 2: Hard timeout with Promise.race (don't hang indefinitely)
-        // ====================================================================
-        const firestoreTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("User lookup timed out")), 3000)
-        );
+      // ====================================================================
+      // PART 2: Hard timeout with Promise.race (don't hang indefinitely)
+      // ====================================================================
+      const firestoreTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("User lookup timed out")), 3000),
+      );
 
-        const lookupTask = (async () => {
-            try {
-                // Priority 1: Superadmins by ID
-                let userDoc = await db.collection("superadmins").doc(decodedToken.uid).get();
-                if (userDoc.exists) {
-                    return userDoc.data();
-                }
-
-                // Priority 2: Customers by ID
-                userDoc = await db.collection("customers").doc(decodedToken.uid).get();
-                if (userDoc.exists) {
-                    return { ...userDoc.data(), id: userDoc.id };
-                }
-
-                // Priority 3: Customers by Email (Fallback for pre-provisioned SaaS users)
-                if (decodedToken.email) {
-                    const emailMatches = await db.collection("customers")
-                        .where("email", "==", decodedToken.email)
-                        .limit(1)
-                        .get();
-                    
-                    if (!emailMatches.empty) {
-                        const match = emailMatches.docs[0];
-                        return { ...match.data(), id: match.id };
-                    }
-                }
-
-                // If not found anywhere, return default (will be caught and rejected in next step)
-                return { role: "customer" };
-            } catch (e) {
-                logger.error("[Socket.io] Firestore lookup error:", e.message);
-                throw e;
-            }
-        })();
-
+      const lookupTask = (async () => {
         try {
-            userData = await Promise.race([lookupTask, firestoreTimeout]);
-            // ========================================================================
-            // PART 2b: Cache the result for 3 minutes (sync with HTTP auth middleware)
-            // ========================================================================
-            await cache.set(cacheKey, userData, 180);
-        } catch (dbError) {
-            // ====================================================================
-            // PART 3: REJECT on failure, never default silently
-            // ====================================================================
-            logger.error("[Socket.io Auth] User lookup failed:", dbError.message);
-            return next(new Error("Authentication error: Cannot resolve user role"));
+          // Priority 1: Superadmins by ID
+          let userDoc = await db
+            .collection("superadmins")
+            .doc(decodedToken.uid)
+            .get();
+          if (userDoc.exists) {
+            return userDoc.data();
+          }
+
+          // Priority 2: Customers by ID
+          userDoc = await db
+            .collection("customers")
+            .doc(decodedToken.uid)
+            .get();
+          if (userDoc.exists) {
+            return { ...userDoc.data(), id: userDoc.id };
+          }
+
+          // Priority 3: Customers by Email (Fallback for pre-provisioned SaaS users)
+          if (decodedToken.email) {
+            const emailMatches = await db
+              .collection("customers")
+              .where("email", "==", decodedToken.email)
+              .limit(1)
+              .get();
+
+            if (!emailMatches.empty) {
+              const match = emailMatches.docs[0];
+              return { ...match.data(), id: match.id };
+            }
+          }
+
+          // No matching application user found — reject instead of defaulting a role
+          return null;
+        } catch (e) {
+          logger.error("[Socket.io] Firestore lookup error:", e.message);
+          throw e;
         }
+      })();
+
+      try {
+        userData = await Promise.race([lookupTask, firestoreTimeout]);
+        // ========================================================================
+        // PART 2b: Cache the result for 3 minutes (sync with HTTP auth middleware)
+        // ========================================================================
+        await cache.set(cacheKey, userData, 180);
+      } catch (dbError) {
+        // ====================================================================
+        // PART 3: REJECT on failure, never default silently
+        // ====================================================================
+        logger.error("[Socket.io Auth] User lookup failed:", dbError.message);
+        return next(
+          new Error("Authentication error: Cannot resolve user role"),
+        );
+      }
+    }
+
+    if (!userData || !userData.role) {
+      logger.error(
+        "[Socket.io Auth] User profile not found for socket connection",
+      );
+      return next(
+        new Error("Authentication error: User account not provisioned"),
+      );
     }
 
     // ========================================================================
     // PART 4: Validate role is non-empty before attaching to socket
     // ========================================================================
-    const role = (userData.role || "customer").trim().toLowerCase().replace(/\s+/g, "");
-    
-    if (!role || role === '') {
-        logger.error("[Socket.io Auth] Invalid role resolved:", role);
-        return next(new Error("Authentication error: Invalid role"));
+    const role = String(userData.role).trim().toLowerCase().replace(/\s+/g, "");
+
+    if (!role) {
+      logger.error("[Socket.io Auth] Invalid role resolved:", role);
+      return next(new Error("Authentication error: Invalid role"));
     }
 
     const community_id = userData.community_id || "";
     const customer_id = userData.customer_id || userData.id || "";
-    
+
     socket.user = { uid: decodedToken.uid, role, community_id, customer_id };
-    logger.debug(`[Socket.io Auth] ✅ User ${decodedToken.uid} authenticated => role: '${role}'`);
+    logger.debug(
+      `[Socket.io Auth] ✅ User ${decodedToken.uid} authenticated => role: '${role}'`,
+    );
     next();
   } catch (err) {
     next(new Error("Authentication error: Invalid token"));
@@ -521,59 +591,77 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    logger.debug(`[Socket.io] Client connected: ${socket.user?.uid || 'Unknown'}`);
+  logger.debug(
+    `[Socket.io] Client connected: ${socket.user?.uid || "Unknown"}`,
+  );
 
-    // ✅ FIX #11: AUTO-SUBSCRIBE USER TO THEIR CUSTOMER ROOM
-    // When user connects, subscribe them to customer-specific events
-    // This allows Emit("device:added", {...}) to reach all users of that customer
-    if (socket.user?.customer_id) {
-        socket.join(`customer:${socket.user.customer_id}`);
-        logger.debug(`[Socket.io] ✅ User ${socket.user.uid} subscribed to customer:${socket.user.customer_id}`);
+  // ✅ FIX #11: AUTO-SUBSCRIBE USER TO THEIR CUSTOMER ROOM
+  // When user connects, subscribe them to customer-specific events
+  // This allows Emit("device:added", {...}) to reach all users of that customer
+  if (socket.user?.customer_id) {
+    socket.join(`customer:${socket.user.customer_id}`);
+    logger.debug(
+      `[Socket.io] ✅ User ${socket.user.uid} subscribed to customer:${socket.user.customer_id}`,
+    );
+  }
+
+  // ✅ FIX #2: Validate subscribe_device with Zod
+  socket.on("subscribe_device", async (rawData) => {
+    try {
+      // Validate input (reject __proto__, unknown fields, etc.)
+      const data = socketValidation.validateRoomJoin({
+        room: `room:${rawData}`,
+        deviceId: rawData,
+      });
+
+      // SaaS Architecture: Security Guard (Zero Trust)
+      const deviceId = data.deviceId;
+      const isOwner = await checkOwnership(
+        socket.user.customer_id || socket.user.uid,
+        deviceId,
+        socket.user.role,
+        socket.user.community_id,
+      );
+      if (isOwner) {
+        logger.debug(
+          `[Socket.io] ✅ Client ${socket.user?.uid} subscribed to device ${deviceId}`,
+        );
+        socket.join(`room:${deviceId}`);
+        socket.emit("subscribe_ack", { success: true, deviceId });
+      } else {
+        logger.warn(
+          `[Socket.io] ❌ Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`,
+        );
+        socket.emit("error", { message: "Access denied" });
+      }
+    } catch (err) {
+      logger.warn(`[Socket.io] ❌ Invalid subscribe_device data:`, err.message);
+      socket.emit("error", { message: "Invalid request" });
     }
+  });
 
-    // ✅ FIX #2: Validate subscribe_device with Zod
-    socket.on("subscribe_device", async (rawData) => {
-        try {
-            // Validate input (reject __proto__, unknown fields, etc.)
-            const data = socketValidation.validateRoomJoin({
-                room: `room:${rawData}`,
-                deviceId: rawData
-            });
+  socket.on("unsubscribe_device", (rawData) => {
+    try {
+      // Validate input
+      const data = socketValidation.validateRoomJoin({
+        room: `room:${rawData}`,
+        deviceId: rawData,
+      });
+      socket.leave(`room:${data.deviceId}`);
+      logger.debug(
+        `[Socket.io] ✅ Client ${socket.user?.uid} unsubscribed from device ${data.deviceId}`,
+      );
+    } catch (err) {
+      logger.warn(
+        `[Socket.io] ❌ Invalid unsubscribe_device data:`,
+        err.message,
+      );
+    }
+  });
 
-            // SaaS Architecture: Security Guard (Zero Trust)
-            const deviceId = data.deviceId;
-            const isOwner = await checkOwnership(socket.user.customer_id || socket.user.uid, deviceId, socket.user.role, socket.user.community_id);
-            if (isOwner) {
-                logger.debug(`[Socket.io] ✅ Client ${socket.user?.uid} subscribed to device ${deviceId}`);
-                socket.join(`room:${deviceId}`);
-                socket.emit('subscribe_ack', { success: true, deviceId });
-            } else {
-                logger.warn(`[Socket.io] ❌ Forbidden subscription attempt by ${socket.user.uid} for ${deviceId}`);
-                socket.emit('error', { message: 'Access denied' });
-            }
-        } catch (err) {
-            logger.warn(`[Socket.io] ❌ Invalid subscribe_device data:`, err.message);
-            socket.emit('error', { message: 'Invalid request' });
-        }
-    });
-
-    socket.on("unsubscribe_device", (rawData) => {
-        try {
-            // Validate input
-            const data = socketValidation.validateRoomJoin({
-                room: `room:${rawData}`,
-                deviceId: rawData
-            });
-            socket.leave(`room:${data.deviceId}`);
-            logger.debug(`[Socket.io] ✅ Client ${socket.user?.uid} unsubscribed from device ${data.deviceId}`);
-        } catch (err) {
-            logger.warn(`[Socket.io] ❌ Invalid unsubscribe_device data:`, err.message);
-        }
-    });
-
-    socket.on("disconnect", () => {
-        logger.debug(`[Socket.io] Client disconnected: ${socket.user?.uid}`);
-    });
+  socket.on("disconnect", () => {
+    logger.debug(`[Socket.io] Client disconnected: ${socket.user?.uid}`);
+  });
 });
 
 // ============================================================================
@@ -589,35 +677,28 @@ io.on("connection", (socket) => {
 // "All Nodes" list view updates are now pushed via a separate batch query
 // (handled on the frontend) rather than broadcasting every device to everyone.
 if (pubSub) {
-    const sub = pubSub.sub;
-    sub.psubscribe("device:update:*");
-    sub.on("pmessage", (pattern, channel, message) => {
-        try {
-            const payload = JSON.parse(message);
-            const deviceId = channel.split(":")[2];
-            if (deviceId) {
-                // 1. Emit to specific room (Analytics pages)
-                io.to(`room:${deviceId}`).emit("telemetry_update", payload);
-                
-                // 2. Emit global broadcast (AllNodes page)
-                io.emit("telemetry_broadcast", payload);
-            }
-        } catch (err) {}
-    });
+  const sub = pubSub.sub;
+  sub.psubscribe("device:update:*");
+  sub.on("pmessage", (pattern, channel, message) => {
+    try {
+      const payload = JSON.parse(message);
+      const deviceId = channel.split(":")[2];
+      if (deviceId) {
+        // Emit only to device-specific subscribers
+        io.to(`room:${deviceId}`).emit("telemetry_update", payload);
+      }
+    } catch (err) {}
+  });
 }
 
 // Local bridge for telemetryWorker (Dev/Single-instance fallback)
 // Node.js EventEmitter doesn't support regex patterns — use explicit wildcard
 telemetryEvents.on("device:update", (payload) => {
-    if (payload && payload.deviceId) {
-        // 1. Emit to specific room (Analytics pages)
-        io.to(`room:${payload.deviceId}`).emit("telemetry_update", payload);
-        
-        // 2. Emit global broadcast (AllNodes page)
-        io.emit("telemetry_broadcast", payload);
-    }
+  if (payload && payload.deviceId) {
+    // Emit only to device-specific subscribers
+    io.to(`room:${payload.deviceId}`).emit("telemetry_update", payload);
+  }
 });
-
 
 // Sentry Handlers
 
@@ -626,7 +707,9 @@ const globalSaaSAuth = [requireAuth, tenantCheck, rbac()];
 
 // Authentication routes (no auth required for verify-token, required for /me)
 const authRoutes = require("./routes/auth.routes.js");
+const frontendErrorsRoutes = require("./routes/frontendErrors.routes.js");
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/frontend-errors", frontendErrorsRoutes);
 
 // Main admin routes — ✅ FIX #1: Add adminOnly middleware to block non-superadmins
 app.use("/api/v1/admin", globalSaaSAuth, adminOnly, adminRoutes);
@@ -637,8 +720,7 @@ const evaratdsRoutes = require("./routes/evaratds.routes.js");
 
 // Health Check is handled below in Task #1 section
 
-
-app.use("/api/v1/nodes", nodesRoutes);  // DEBUG: auth bypassed temporarily
+app.use("/api/v1/nodes", nodesRoutes);
 app.use("/api/v1/evaratds", globalSaaSAuth, evaratdsRoutes);
 
 // TDS device routes
@@ -655,41 +737,38 @@ app.get("/api/v1/admin/audit-logs", globalSaaSAuth, getAuditLogs);
 app.get("/api/v1/stats/dashboard/summary", globalSaaSAuth, getDashboardSummary);
 app.get("/api/v1/stats/zones", globalSaaSAuth, getZoneStats);
 
-
-
 // ============================================================================
 // ✅ TASK #1 — Health check endpoint (MUST be before static catch-all)
 // ============================================================================
-app.get('/api/v1/health', (req, res) => {
+app.get("/api/v1/health", (req, res) => {
   const health = {
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()) + ' seconds',
+    uptime: Math.floor(process.uptime()) + " seconds",
     services: {
-      firebase: admin.apps.length > 0 ? 'connected' : 'disconnected',
-      redis: cache?.isRedisReady ? 'connected' : 'memory_fallback',
-      mqtt: global.mqttConnected ? 'connected' : 'disconnected'
-    }
+      firebase: admin.apps.length > 0 ? "connected" : "disconnected",
+      redis: cache?.isRedisReady ? "connected" : "memory_fallback",
+      mqtt: global.mqttConnected ? "connected" : "disconnected",
+    },
   };
   res.status(200).json(health);
 });
 
 // SPA catch-all: for all non-API, non-asset routes, serve index.html
 if (process.env.NODE_ENV === "production") {
-    const publicPath = path.resolve(__dirname, '../../client/dist');
-    app.get('/{*path}', (req, res, next) => {
-        if (path.extname(req.path)) {
-            return res.status(404).send('Asset not found: ' + req.path);
-        }
-        res.sendFile(path.join(publicPath, 'index.html'), (err) => {
-            if (err) {
-                logger.error('sendFile error:', err.message);
-                next(err);
-            }
-        });
+  const publicPath = path.resolve(__dirname, "../../client/dist");
+  app.get("/{*path}", (req, res, next) => {
+    if (path.extname(req.path)) {
+      return res.status(404).send("Asset not found: " + req.path);
+    }
+    res.sendFile(path.join(publicPath, "index.html"), (err) => {
+      if (err) {
+        logger.error("sendFile error:", err.message);
+        next(err);
+      }
     });
+  });
 }
-
 
 // ✅ ISSUE #5: Register centralized error handler (must be AFTER all routes)
 // Handles Zod validation errors, AppError errors, and unknown errors
@@ -699,74 +778,94 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5002;
 
 try {
-    server.on("error", (err) => {
-        logger.error("[Server] Fatal error event:", err);
-        if (err.code === "EADDRINUSE") {
-            logger.error(`[Server] Port ${PORT} is already in use. Please check if another process is running or change the PORT in .env.`);
-        }
-        process.exit(1);
-    });
-
-    server.listen(PORT, "0.0.0.0", async () => {
-        logger.debug(`[Server] ✅ Backend running on port ${PORT}`);
-        
-        // ✅ PHASE 2: Task #11 - Initialize cache versions on startup
-        try {
-            await initializeCacheVersions();
-            logger.info('[Server] Cache versioning initialized');
-        } catch (err) {
-            logger.warn({ error: err.message }, '[Server] Cache versioning initialization failed');
-        }
-
-        // ✅ HYBRID CACHING: Schedule daily telemetry cleanup at 2 AM
-        try {
-            const policy = TelemetryArchiveService.getRetentionPolicy();
-            const cleanupTime = `${policy.cleanupHour} ${policy.cleanupMinute} * * *`; // 2:00 AM every day
-            
-            schedule.scheduleJob(cleanupTime, async () => {
-                logger.info('🧹 [Scheduler] Starting daily telemetry cleanup');
-                const result = await TelemetryArchiveService.cleanupOldTelemetry();
-                
-                if (result.success) {
-                    logger.info(`✅ [Scheduler] Cleanup complete: ${result.devicesProcessed} devices, ${result.recordsDeleted} records deleted`);
-                } else {
-                    logger.error(`❌ [Scheduler] Cleanup failed: ${result.error}`);
-                }
-
-                // Log database statistics
-                await TelemetryArchiveService.logCleanupStats();
-            });
-
-            logger.info(`✅ [Server] Telemetry cleanup scheduled daily at ${policy.cleanupHour}:${String(policy.cleanupMinute).padStart(2, '0')}`);
-        } catch (err) {
-            logger.error({ error: err.message }, '[Server] Telemetry cleanup scheduling failed');
-        }
-
-        // Initialize midnight snapshots from Redis/Firestore
-        try {
-            await initializeSnapshots();
-            logger.info('[Server] Midnight snapshots initialized from persistence layer');
-        } catch (err) {
-            logger.error({ error: err.message }, '[Server] Snapshot initialization failed');
-        }
-
-        // Schedule daily snapshot archival at 00:05
-        try {
-            schedule.scheduleJob('5 0 * * *', async () => {
-                logger.info('[Server] Running daily snapshot archival');
-                await archiveOldSnapshots();
-            });
-            logger.info('[Server] Daily snapshot archival scheduled at 00:05');
-        } catch (err) {
-            logger.error({ error: err.message }, '[Server] Snapshot archival scheduling failed');
-        }
-
-        // Initialize our background worker
-        startWorker();
-    });
-} catch (error) {
-    logger.error("[Server] Error during startup:", error);
+  server.on("error", (err) => {
+    logger.error("[Server] Fatal error event:", err);
+    if (err.code === "EADDRINUSE") {
+      logger.error(
+        `[Server] Port ${PORT} is already in use. Please check if another process is running or change the PORT in .env.`,
+      );
+    }
     process.exit(1);
+  });
+
+  server.listen(PORT, "0.0.0.0", async () => {
+    logger.debug(`[Server] ✅ Backend running on port ${PORT}`);
+
+    // ✅ PHASE 2: Task #11 - Initialize cache versions on startup
+    try {
+      await initializeCacheVersions();
+      logger.info("[Server] Cache versioning initialized");
+    } catch (err) {
+      logger.warn(
+        { error: err.message },
+        "[Server] Cache versioning initialization failed",
+      );
+    }
+
+    // ✅ HYBRID CACHING: Schedule daily telemetry cleanup at 2 AM
+    try {
+      const policy = TelemetryArchiveService.getRetentionPolicy();
+      const cleanupTime = `${policy.cleanupHour} ${policy.cleanupMinute} * * *`; // 2:00 AM every day
+
+      schedule.scheduleJob(cleanupTime, async () => {
+        logger.info("🧹 [Scheduler] Starting daily telemetry cleanup");
+        const result = await TelemetryArchiveService.cleanupOldTelemetry();
+
+        if (result.success) {
+          logger.info(
+            `✅ [Scheduler] Cleanup complete: ${result.devicesProcessed} devices, ${result.recordsDeleted} records deleted`,
+          );
+        } else {
+          logger.error(`❌ [Scheduler] Cleanup failed: ${result.error}`);
+        }
+
+        // Log database statistics
+        await TelemetryArchiveService.logCleanupStats();
+      });
+
+      logger.info(
+        `✅ [Server] Telemetry cleanup scheduled daily at ${policy.cleanupHour}:${String(policy.cleanupMinute).padStart(2, "0")}`,
+      );
+    } catch (err) {
+      logger.error(
+        { error: err.message },
+        "[Server] Telemetry cleanup scheduling failed",
+      );
+    }
+
+    // Initialize midnight snapshots from Redis/Firestore
+    try {
+      await initializeSnapshots();
+      logger.info(
+        "[Server] Midnight snapshots initialized from persistence layer",
+      );
+    } catch (err) {
+      logger.error(
+        { error: err.message },
+        "[Server] Snapshot initialization failed",
+      );
+    }
+
+    // Schedule daily snapshot archival at 00:05
+    try {
+      schedule.scheduleJob("5 0 * * *", async () => {
+        logger.info("[Server] Running daily snapshot archival");
+        await archiveOldSnapshots();
+      });
+      logger.info("[Server] Daily snapshot archival scheduled at 00:05");
+    } catch (err) {
+      logger.error(
+        { error: err.message },
+        "[Server] Snapshot archival scheduling failed",
+      );
+    }
+
+    // Initialize our background worker
+    startWorker();
+  });
+} catch (error) {
+  logger.error("[Server] Error during startup:", error);
+  process.exit(1);
 }
 
 // ============================================================================
@@ -775,37 +874,39 @@ try {
 let isShuttingDown = false;
 
 async function gracefulShutdown() {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    
-    logger.debug("[Server] 🛑 Received shutdown signal, starting graceful shutdown...");
-    
-    // 1. Stop accepting new connections
-    server.close(() => {
-        logger.debug("[Server] HTTP server closed");
-    });
-    
-    // 2. Wait for existing requests to complete (5 second timeout)
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // 3. Disconnect all WebSocket clients orderly
-    if (global.io) {
-        global.io.disconnectSockets();
-        await new Promise(resolve => setTimeout(resolve, 2000));
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.debug(
+    "[Server] 🛑 Received shutdown signal, starting graceful shutdown...",
+  );
+
+  // 1. Stop accepting new connections
+  server.close(() => {
+    logger.debug("[Server] HTTP server closed");
+  });
+
+  // 2. Wait for existing requests to complete (5 second timeout)
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // 3. Disconnect all WebSocket clients orderly
+  if (global.io) {
+    global.io.disconnectSockets();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  // 4. Close Redis connection if available
+  if (cache && cache.redis) {
+    try {
+      await cache.redis.quit();
+      logger.debug("[Server] Redis connection closed");
+    } catch (err) {
+      logger.error("[Server] Error closing Redis:", err.message);
     }
-    
-    // 4. Close Redis connection if available
-    if (cache && cache.redis) {
-        try {
-            await cache.redis.quit();
-            logger.debug("[Server] Redis connection closed");
-        } catch (err) {
-            logger.error("[Server] Error closing Redis:", err.message);
-        }
-    }
-    
-    logger.debug("[Server] ✅ Graceful shutdown complete");
-    process.exit(0);
+  }
+
+  logger.debug("[Server] ✅ Graceful shutdown complete");
+  process.exit(0);
 }
 
 process.on("SIGTERM", gracefulShutdown);
@@ -813,25 +914,24 @@ process.on("SIGINT", gracefulShutdown);
 
 // Robust error guards for unexpected crashes
 process.on("unhandledRejection", (reason, promise) => {
-    logger.error("[Global] Unhandled Promise Rejection", { 
-        reason: reason instanceof Error ? reason.message : String(reason),
-        stack: reason instanceof Error ? reason.stack : undefined,
-        promise: promise?.toString?.() || 'unknown'
-    });
-    Sentry.captureException(reason);
+  logger.error("[Global] Unhandled Promise Rejection", {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+    promise: promise?.toString?.() || "unknown",
+  });
+  Sentry.captureException(reason);
 });
 
 process.on("uncaughtException", (err) => {
-    console.error("FATAL UNCAUGHT:", err);
-    logger.error("[Global] Uncaught Exception thrown", { 
-        message: err.message,
-        stack: err.stack,
-        code: err.code
-    });
-    Sentry.captureException(err);
-    // Give Sentry some time to send the error before exiting
-    setTimeout(() => {
-        process.exit(1);
-    }, 2000);
+  console.error("FATAL UNCAUGHT:", err);
+  logger.error("[Global] Uncaught Exception thrown", {
+    message: err.message,
+    stack: err.stack,
+    code: err.code,
+  });
+  Sentry.captureException(err);
+  // Give Sentry some time to send the error before exiting
+  setTimeout(() => {
+    process.exit(1);
+  }, 2000);
 });
- 

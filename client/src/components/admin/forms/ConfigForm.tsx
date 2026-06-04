@@ -15,6 +15,7 @@ const configSchema = z.object({
         evaraDeep: z.coerce.number().min(1).max(3600),
         evaraFlow: z.coerce.number().min(1).max(3600),
         evaraTDS: z.coerce.number().min(1).max(3600),
+        evaraValve: z.coerce.number().min(1).max(3600),
     }),
     batterySaverMode: z.boolean(),
     firmwarePolicies: z.object({
@@ -52,7 +53,8 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
                 evaraTank: 60,
                 evaraDeep: 300,
                 evaraFlow: 30,
-                evaraTDS: 120
+                evaraTDS: 120,
+                evaraValve: 60
             },
             batterySaverMode: false,
             firmwarePolicies: {
@@ -141,6 +143,9 @@ export const ConfigForm = ({ onSubmit, onCancel }: Props) => {
                             </FormField>
                             <FormField label="EvaraTDS (Min)" icon={Smartphone as any}>
                                 <input type="number" {...register('samplingIntervals.evaraTDS')} className={inputClass()} />
+                            </FormField>
+                            <FormField label="EvaraValve (Min)" icon={Smartphone as any}>
+                                <input type="number" {...register('samplingIntervals.evaraValve')} className={inputClass()} />
                             </FormField>
                         </div>
                     </div>

@@ -32,9 +32,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { login: loginFn, signup: signupFn, user, isAuthenticated } = useAuth();
 
-  // If already logged in, redirect away from login page
+  // If already logged in, redirect based on role
   if (isAuthenticated && user) {
-    return <Navigate to="/map" replace />;
+    const target = user.role === 'superadmin' ? '/superadmin/dashboard' : user.role === 'community_admin' ? '/dashboard' : '/map';
+    return <Navigate to={target} replace />;
   }
 
   // ─── Handlers ────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ const Login = () => {
       setTimeout(
         () =>
           reject(new Error("Request timed out. Please check your connection.")),
-        10000,
+        45000,
       ),
     );
 
@@ -81,8 +82,14 @@ const Login = () => {
         ])) as Awaited<ReturnType<typeof loginFn>>;
 
         if (result.success && result.user) {
-          // Redirect all users to the Map page as requested
-          navigate("/map");
+          // Role-based redirect
+          if (result.user.role === 'superadmin') {
+            navigate('/superadmin/dashboard');
+          } else if (result.user.role === 'community_admin') {
+            navigate('/dashboard');
+          } else {
+            navigate('/map');
+          }
         } else {
           setError(result.error ?? "Invalid credentials.");
         }
@@ -115,10 +122,10 @@ const Login = () => {
 
   if (step === "role-selection") {
     return (
-      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 bg-[#f8fafc] overflow-hidden">
+      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 bg-[#f8fafc] dark:bg-transparent overflow-hidden">
         {/* Modern Mesh Gradient Background Layer */}
-        <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
-        <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+        <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '10s', animationDelay: '1s' }} />
 
         <div className="text-center mb-12 relative z-10">
           <img
@@ -182,10 +189,10 @@ const Login = () => {
   const isSuperAdmin = selectedRole === "superadmin";
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f8fafc] overflow-hidden">
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f8fafc] dark:bg-transparent overflow-hidden">
       {/* Modern Mesh Gradient Background Layer */}
-      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[#4b85f0]/30 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[70%] h-[70%] bg-[#8fdc4c]/40 rounded-full blur-[120px] pointer-events-none animate-float dark:hidden" style={{ animationDuration: '10s', animationDelay: '1s' }} />
 
       <div className="w-full max-w-lg relative z-10">
         <button

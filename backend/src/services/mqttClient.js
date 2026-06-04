@@ -303,23 +303,8 @@ mqttClient.on('message', async (topic, message) => {
       });
     }
 
-    // Throttled write to Firestore
-    const now = Date.now();
-    const lastUpdate = lastUpdateMap.get(deviceId) || 0;
-    if (now - lastUpdate > UPDATE_THROTTLE_MS) {
-      try {
-        await db.collection(deviceType.toLowerCase()).doc(deviceId).update({
-          telemetry_snapshot: {
-            ...payload,                        // ✅ Only validated fields
-            last_updated: new Date(),
-            last_ingested_at: admin.firestore.FieldValue.serverTimestamp()
-          }
-        });
-        lastUpdateMap.set(deviceId, now);
-      } catch (writeErr) {
-        logger.error(`[MQTT] ❌ Failed to write telemetry for ${deviceId}:`, writeErr.message);
-      }
-    }
+    // Do not persist live telemetry into Firestore.
+    // MQTT payloads are emitted to subscribers and processed in memory only.
 
   } catch (err) {
     logger.error('[MQTT] ❌ Unexpected error processing message:', err.message);

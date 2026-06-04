@@ -114,16 +114,20 @@ class NodeService {
       null;
 
     const categoryRaw = (data.device_type || data.assetType || data.asset_type || data.category || "tank").toLowerCase();
+    const subType = (data.subType || data.assetSubType || "").toLowerCase();
     
-    // Map to UI-friendly categories used in AllNodes
-    let category: 'tank' | 'flow' | 'deep' | 'sump' | 'tds' | 'unknown' = 'unknown';
-    if (categoryRaw.includes('tank') || categoryRaw === 'oht') category = 'tank';
-    else if (categoryRaw.includes('deep') || categoryRaw.includes('bore')) category = 'deep';
-    else if (categoryRaw.includes('flow') || categoryRaw.includes('pump')) category = 'flow';
-    else if (categoryRaw.includes('sump')) category = 'sump';
-    else if (categoryRaw.includes('tds')) category = 'tds';
-    else if (categoryRaw.includes('phase') || categoryRaw.includes('ops')) category = 'phase';
-    else category = 'unknown';
+    // Map to CATEGORY_CONFIG keys used in AllNodes.tsx
+    // ✅ CRITICAL: Check subType FIRST to correctly distinguish tank vs sump
+    let category: string = 'OHT'; // Default
+    if (subType.includes('sump')) category = 'Sump';
+    else if (subType.includes('overhead') || subType.includes('oht')) category = 'OHT';
+    else if (categoryRaw.includes('tank') || categoryRaw === 'oht') category = 'OHT';
+    else if (categoryRaw.includes('deep') || categoryRaw.includes('bore')) category = 'Borewell';
+    else if (categoryRaw.includes('flow') || categoryRaw.includes('pump')) category = 'PumpHouse';
+    else if (categoryRaw.includes('sump')) category = 'Sump';
+    else if (categoryRaw.includes('tds')) category = 'EvaraTDS';
+    else if (categoryRaw.includes('phase') || categoryRaw.includes('ops')) category = 'EvaraMotor';
+    else category = 'OHT';
 
     const displayName = data.displayName || data.display_name || data.label || hardwareId;
 
@@ -159,26 +163,27 @@ class NodeService {
       hardwareId: hardwareId,
       label: data.label || displayName,
       displayName: displayName,
-      name: displayName,
+      device_name: data.device_name || displayName,
+      device_type: data.device_type || categoryRaw,
+      name: data.device_name || displayName,
       status: computeDeviceStatus(lastSeenTime),
       asset_type: categoryRaw,
       assetType: categoryRaw,
       category: category as any,
-      device_type: data.device_type || categoryRaw,
       analytics_template: data.analyticsTemplate || data.analytics_template || (
-          category === 'tank' || category === 'sump' ? 'EvaraTank' :
-          category === 'flow' ? 'EvaraFlow' :
-          category === 'deep' ? 'EvaraDeep' :
-          category === 'tds' ? 'EvaraTDS' :
-          category === 'phase' ? 'EvaraMotor' :
+          category === 'OHT' || category === 'Sump' ? 'EvaraTank' :
+          category === 'PumpHouse' ? 'EvaraFlow' :
+          category === 'Borewell' ? 'EvaraDeep' :
+          category === 'EvaraTDS' ? 'EvaraTDS' :
+          category === 'EvaraMotor' ? 'EvaraMotor' :
           null  // unknown devices get null, not EvaraTank
       ),
       analyticsTemplate: data.analyticsTemplate || data.analytics_template || (
-          category === 'tank' || category === 'sump' ? 'EvaraTank' :
-          category === 'flow' ? 'EvaraFlow' :
-          category === 'deep' ? 'EvaraDeep' :
-          category === 'tds' ? 'EvaraTDS' :
-          category === 'phase' ? 'EvaraMotor' :
+          category === 'OHT' || category === 'Sump' ? 'EvaraTank' :
+          category === 'PumpHouse' ? 'EvaraFlow' :
+          category === 'Borewell' ? 'EvaraDeep' :
+          category === 'EvaraTDS' ? 'EvaraTDS' :
+          category === 'EvaraMotor' ? 'EvaraMotor' :
           null
       ),
       last_seen: safeIso(lastSeenTime),

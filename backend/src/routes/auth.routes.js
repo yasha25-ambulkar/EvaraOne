@@ -1,7 +1,11 @@
 const express = require("express");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const {
+  requireAuth,
+  requireFirebaseIdentity,
+} = require("../middleware/auth.middleware.js");
 const authController = require("../controllers/auth.controller.js");
-const authLimiter = require("../middleware/authLimiter.js"); // ✅ TASK #8: Auth rate limiter
+const authLimiter = require("../middleware/authLimiter.js");
+const { db } = require("../config/firebase.js");
 
 const router = express.Router();
 
@@ -13,6 +17,12 @@ const router = express.Router();
  * ✅ TASK #8: Protected with 5 attempts / 15 min rate limit
  */
 router.post("/verify-token", authLimiter, authController.verifyToken);
+router.post(
+  "/profile",
+  authLimiter,
+  requireFirebaseIdentity,
+  authController.createCustomerProfile,
+);
 
 /**
  * GET /api/v1/auth/me
@@ -20,5 +30,46 @@ router.post("/verify-token", authLimiter, authController.verifyToken);
  * Protected endpoint - requires valid token
  */
 router.get("/me", requireAuth, authController.getUserProfile);
+
+router.get("/debug-uid", requireAuth, async (req, res) => {
+  if (
+    process.env.NODE_ENV === "production" ||
+    req.user?.role !== "superadmin"
+  ) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  const uid = req.user?.uid;
+  const email = req.user?.email;
+
+  try {
+    const testRead = await db.collection("superadmins").limit(1).get();
+    const superadminCount = testRead.size;
+
+    const superadminDoc = await db.collection("superadmins").doc(uid).get();
+    const customerDoc = await db.collection("customers").doc(uid).get();
+
+    const allSuperadmins = await db.collection("superadmins").limit(3).get();
+    const superadminIds = allSuperadmins.docs.map((d) => d.id);
+
+    return res.json({
+      uid,
+      email,
+      firestore_reachable: true,
+      superadmin_collection_count: superadminCount,
+      uid_in_superadmins: superadminDoc.exists,
+      uid_in_customers: customerDoc.exists,
+      first_3_superadmin_ids: superadminIds,
+    });
+  } catch (err) {
+    return res.json({
+      uid,
+      email,
+      firestore_reachable: false,
+      error: err.message,
+      error_code: err.code,
+    });
+  }
+});
 
 module.exports = router;

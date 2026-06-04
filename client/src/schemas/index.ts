@@ -48,6 +48,7 @@ export const customerSchema = z
     password: z.string().min(8, "Password must be at least 8 characters").optional(),
     confirmPassword: z.string().optional(),
     phone_number: z.string().optional(),
+    zone_id: z.string().min(1, "Please select a zone"),
     role: z.enum(["customer", "distributor", "operator", "viewer"]),
     status: z.enum(["active", "pending", "suspended", "inactive"]),
   })
@@ -89,6 +90,22 @@ export const deviceSchema = z.object({
   flow_rate_field: z.string().optional(),
   tds_field: z.string().optional(),
   temperature_field: z.string().optional(),
+  // EvaraPhase fields
+  voltage_field: z.string().optional(),
+  current_field: z.string().optional(),
+  power_field: z.string().optional(),
+  frequency_field: z.string().optional(),
+  voltage_max: z.string().optional(),
+  current_max: z.string().optional(),
+  // EvaraValve fields
+  position_field: z.string().optional(),
+  status_field: z.string().optional(),
+  flow_field: z.string().optional(),
+  total_volume_field: z.string().optional(),
+  total_volume_field_name: z.string().optional(),
+  flow_field_name: z.string().optional(),
+  position_min: z.string().optional(),
+  position_max: z.string().optional(),
   // Technical metadata fields
   max_depth: z.string().optional(),
   static_depth: z.string().optional(),

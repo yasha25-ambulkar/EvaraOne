@@ -9,11 +9,13 @@ import L from "leaflet";
 // ── Factory for PNG Icons with Status Dot ──────────────────────────────
 
 const FALLBACK_ICON = L.icon({
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   shadowSize: [41, 41],
 });
 
@@ -45,20 +47,43 @@ export const fullIcons = {};
 export const getDeviceIcon = (
   assetType: string | null | undefined,
   status: string,
-  iconSet?: any
 ): L.Icon | L.DivIcon => {
   if (!assetType) return FALLBACK_ICON;
   const t = assetType.toLowerCase();
 
   let iconUrl = "";
-  if (t.includes("tank") || t.includes("sump") || t === "oht" || t === "evaratank") {
+  if (
+    t.includes("tank") ||
+    t.includes("sump") ||
+    t === "oht" ||
+    t === "evaratank"
+  ) {
     iconUrl = "/tank.png";
-  } else if (t.includes("deep") || t.includes("bore") || t.includes("govt") || t === "evaradeep") {
+  } else if (
+    t.includes("deep") ||
+    t.includes("bore") ||
+    t.includes("govt") ||
+    t === "evaradeep"
+  ) {
     iconUrl = "/borewell.png";
-  } else if (t.includes("flow") || t.includes("meter") || t.includes("pump") || t === "evaraflow") {
+  } else if (
+    t.includes("flow") ||
+    t.includes("meter") ||
+    t.includes("pump") ||
+    t === "evaraflow"
+  ) {
     iconUrl = "/meter.png";
   } else if (t.includes("tds") || t === "evaratds") {
     iconUrl = "/tds.png";
+  } else if (t.includes("valve") || t === "evaravalve") {
+    iconUrl = "/evaravalve.png";
+  } else if (
+    t.includes("motor") ||
+    t.includes("phase") ||
+    t.includes("ops") ||
+    t === "evaramotor"
+  ) {
+    iconUrl = "/ops.png";
   }
 
   if (!iconUrl) return FALLBACK_ICON;

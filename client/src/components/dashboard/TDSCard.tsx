@@ -49,13 +49,13 @@ isOnline ? "bg-white/40 dark:bg-white/5 border-white/20" : "bg-slate-500/5 borde
         >
             <div className="p-3 flex flex-col flex-1 relative z-10 w-full gap-2 min-h-[140px]">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2 w-full overflow-hidden">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-[46px] h-[46px] bg-white dark:bg-white/10 rounded-[14px] shadow-sm flex items-center justify-center shrink-0 border border-white/50 dark:border-white/10">
                             <img src="/tds.png" alt="TDS" className="w-8 h-8 object-contain" />
                         </div>
-                        <div className="flex flex-col gap-1 overflow-hidden">
-                            <h3 className="font-[900] text-[17px] leading-tight truncate w-full tracking-tight text-[var(--text-primary)]">
+                        <div className="flex flex-col gap-1 min-w-0" style={{ maxWidth: 'calc(100% - 90px)' }}>
+                            <h3 className="font-[900] text-[17px] leading-tight truncate tracking-tight text-[var(--text-primary)]" title={node.label || node.displayName}>
                                 {node.label || node.displayName}
                             </h3>
                             <span className="w-fit bg-[#e2eaff] text-[#6366f1] text-[8.5px] font-[900] px-2.5 py-[3px] rounded-lg uppercase tracking-wider leading-none shadow-sm">

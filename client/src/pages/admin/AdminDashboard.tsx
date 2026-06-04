@@ -35,7 +35,7 @@ const AdminDashboard = () => {
 
   const handleClose = () => setActiveModal(null);
 
-  const handleFormSuccess = async () => {
+  const handleFormSuccess = async (result?: any) => {
     try {
       if (activeModal === "zone") {
         showToast("Zone created successfully!", "success");

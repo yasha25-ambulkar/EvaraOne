@@ -1,8 +1,13 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { deviceService } from "../services/DeviceService";
+import { deviceService, type MapDevice } from "../services/DeviceService";
 import { useAuth } from "../context/AuthContext";
 import { socket } from "../services/api";
+
+interface NodeUpdatePayload {
+  device_id?: string;
+  node_id?: string;
+}
 
 export const useNodes = (searchQuery: string = "") => {
   const { user } = useAuth();
@@ -10,7 +15,7 @@ export const useNodes = (searchQuery: string = "") => {
 
   // Unified real-time socket listener
   useEffect(() => {
-    const handleUpdate = (data: any) => {
+    const handleUpdate = (data: NodeUpdatePayload) => {
       const deviceId = data.device_id || data.node_id;
       if (!deviceId) return;
 
@@ -42,37 +47,15 @@ export const useNodes = (searchQuery: string = "") => {
         isSuperAdmin ? undefined : user?.customer_id,
       );
 
-      // Add mock EvaraMotor device for testing (frontend only)
-      const mockMotorDevice = {
-        id: "mock-motor-01",
-        hardwareId: "PHASE-TEST-001",
-        node_key: "PHASE-TEST-001",
-        displayName: "EvaraMotor",
-        label: "EvaraMotor",
-        category: "EvaraMotor",
-        analytics_template: "EvaraMotor",
-        online_status: false,
-        status: "Offline",
-        last_online_at: null,
-        location_name: "Mock Environment",
-        last_telemetry: {
-          voltage: 415,
-          current: 6.2,
-          motor_status: false
-        }
-      };
-
-      const finalNodes = [...mappedNodes, mockMotorDevice];
-
-      if (!searchQuery) return finalNodes;
+      if (!searchQuery) return mappedNodes;
 
       const searchLower = searchQuery.toLowerCase();
-      return finalNodes.filter(
-        (n: any) =>
-          (n.displayName || "").toLowerCase().includes(searchLower) ||
-          (n.hardwareId || "").toLowerCase().includes(searchLower) ||
-          (n.label || "").toLowerCase().includes(searchLower) ||
-          (n.id || "").toLowerCase().includes(searchLower),
+      return mappedNodes.filter(
+        (node: MapDevice) =>
+          (node.displayName || "").toLowerCase().includes(searchLower) ||
+          (node.hardwareId || "").toLowerCase().includes(searchLower) ||
+          (node.label || "").toLowerCase().includes(searchLower) ||
+          (node.id || "").toLowerCase().includes(searchLower),
       );
     },
     refetchInterval: 12000, // Balanced: fetch every 12 seconds (not too aggressive)
@@ -84,7 +67,8 @@ export const useNodes = (searchQuery: string = "") => {
   return {
     nodes,
     loading: isLoading,
-    error: error instanceof Error ? error.message : error ? String(error) : null,
+    error:
+      error instanceof Error ? error.message : error ? String(error) : null,
     refresh: refetch,
   };
 };

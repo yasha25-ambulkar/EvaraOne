@@ -19,7 +19,7 @@ import {
     Wifi, Info, Bell, Settings
 } from 'lucide-react';
 
-import api from '../services/api';
+import api, { socket } from '../services/api';
 import { useStaleDataAge } from '../hooks/useStaleDataAge';
 import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
 import { useDeviceAnalytics, type NodeInfoData } from '../hooks/useDeviceAnalytics';
@@ -29,13 +29,11 @@ import { useAnalyticsLogger } from '../utils/analyticsLogger';
 import type { TankConfig } from '../hooks/useDeviceConfig';
 
 import {
-
     computeCapacityLitres,
-    computeTankMetrics,
     formatVolume,
 } from '../utils/tankCalculations';
 
-import type { TankShape, TankDimensions } from '../utils/tankCalculations';
+import type { TankShape } from '../utils/tankCalculations';
 
 import { useWaterAnalytics } from '../hooks/useWaterAnalytics';
 import { dataMergingService } from '../services/DataMergingService';
@@ -70,6 +68,7 @@ interface TelemetryPayload {
     data_label?: 'RAW' | 'CORRECTED' | 'PREDICTED';
     prediction_mode?: boolean;
     consecutive_anomalies?: number;
+    timestampMs?: number;
 }
 
 
@@ -243,6 +242,7 @@ const EvaraTankAnalytics = () => {
         isFetching: analyticsFetching,
         refetch,
     } = useDeviceAnalytics(hardwareId, {
+        refetchInterval: 15000,
         filter: {
             range: tankChartRange === 'RANGE' ? undefined : tankChartRange,
             startDate: tankChartRange === 'RANGE' ? rangeStart : undefined,
@@ -260,6 +260,33 @@ const EvaraTankAnalytics = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hardwareId]); // IMPORTANT: Only depend on hardwareId, NOT refetch
+
+    // ── Event-driven only — no polling. 2-min dead-man watchdog fallback ────
+    // Backend polls ThingSpeak every 15s and emits 'telemetry_update' via socket.
+    // Frontend trusts the socket; HTTP refetch only fires if socket goes silent for 2 min.
+    useEffect(() => {
+        if (!hardwareId) return;
+        let watchdog: ReturnType<typeof setTimeout>;
+
+        const resetWatchdog = () => {
+            clearTimeout(watchdog);
+            watchdog = setTimeout(() => refetch(), 120000); // 2-min fallback only
+        };
+
+        const onTelemetryUpdate = (data: any) => {
+            const incomingId = data.device_id || data.deviceId || data.node_id || data.id;
+            if (incomingId !== hardwareId) return;
+            resetWatchdog(); // reset timer — do NOT call refetch(), socket data flows via useRealtimeTelemetry
+        };
+
+        socket.on('telemetry_update', onTelemetryUpdate);
+        resetWatchdog();
+
+        return () => {
+            clearTimeout(watchdog);
+            socket.off('telemetry_update', onTelemetryUpdate);
+        };
+    }, [hardwareId, refetch]);
 
 
     const deviceConfig = ('config' in (unifiedData?.config ?? {})
@@ -303,59 +330,62 @@ const EvaraTankAnalytics = () => {
 
 
 
-    // Sync initial history to live feeds
+    // Sync initial history → liveFeeds (seed last 3 hrs only)
+    const WINDOW_MS = useMemo(() => {
+        const ranges: Record<string, number> = {
+            '24H': 24 * 60 * 60 * 1000,        // 24 hours
+            '1W': 7 * 24 * 60 * 60 * 1000,     // 7 days
+            '1M': 30 * 24 * 60 * 60 * 1000,    // 30 days
+            'RANGE': 90 * 24 * 60 * 60 * 1000  // 90 days max
+        };
+        return ranges[tankChartRange] || (24 * 60 * 60 * 1000);
+    }, [tankChartRange]);
 
     useEffect(() => {
-
         const history = (unifiedData?.history as { feeds?: TelemetryPayload[] })?.feeds || [];
+        if (history.length === 0) return;
 
-        if (history.length > 0) {
+        const cutoff = Date.now() - WINDOW_MS;
+        const seeded = history
+            .map((p: TelemetryPayload) => ({
+                ...p,
+                timestampMs: new Date(p.timestamp || p.created_at || '').getTime(),
+            }))
+            .filter((p: any) => p.timestampMs >= cutoff)
+            .sort((a: any, b: any) => a.timestampMs - b.timestampMs);
 
-            setLiveFeeds(history);
-
-        }
-
-    }, [unifiedData?.history]);
+        setLiveFeeds(seeded);
+    }, [unifiedData?.history, WINDOW_MS]);
 
 
 
-    // Handle incoming real-time data
-
+    // Append-only real-time point → trim to 3hr sliding window
     useEffect(() => {
+        if (!realtimeData) return;
 
-        if (realtimeData) {
+        const ts = realtimeData.timestamp || realtimeData.created_at;
+        if (!ts) return;
+        const tsMs = new Date(ts).getTime();
+        const cutoff = Date.now() - WINDOW_MS;
 
-            setLiveFeeds(prev => {
+        setLiveFeeds(prev => {
+            // Deduplicate: skip if last point has same timestamp
+            if (prev.length > 0 && prev[prev.length - 1].timestampMs === tsMs) return prev;
 
-                const last = prev[prev.length - 1];
+            const newPoint = {
+                ...realtimeData,
+                timestamp: ts,
+                timestampMs: tsMs,
+                level_percentage: realtimeData.level_percentage ?? realtimeData.level ?? 0,
+                total_liters: realtimeData.total_liters ?? realtimeData.volume ?? 0,
+            };
 
-                // Avoid duplicates if the same timestamp comes in
-
-                if (last && last.timestamp === realtimeData.timestamp) return prev;
-
-
-
-                const ts = realtimeData.timestamp || realtimeData.created_at;
-                if (!ts) return prev;
-
-                const newPoint = {
-                    ...realtimeData,
-                    // ── AUTHORITATIVE DATA ──
-                    // Use backend-calculated smoothed values directly. 
-                    // No more local getTankLevel calculation to avoid divergence.
-                    timestamp: ts,
-                    level_percentage: realtimeData.level_percentage ?? realtimeData.level ?? 0,
-                    total_liters: realtimeData.total_liters ?? realtimeData.volume ?? 0,
-                };
-
-
-
-                // Keep extended buffer to ensure 1W and 1M views have enough data points
-                const updated = [...prev, newPoint];
-                return updated.slice(-10000); // Increased to 10k to cover a full week of high-frequency data
-            });
-        }
-    }, [realtimeData]);
+            // Append + trim to 3hr window + hard cap 2000
+            return [...prev, newPoint]
+                .filter((p: any) => (p.timestampMs ?? new Date(p.timestamp || p.created_at || '').getTime()) >= cutoff)
+                .slice(-2000);
+        });
+    }, [realtimeData, WINDOW_MS]);
 
 
 
@@ -405,10 +435,14 @@ const EvaraTankAnalytics = () => {
     // Derived Offline Message
     const { offlineMessage } = useMemo(() => {
         if (!isOffline) return { offlineMessage: '' };
-        const bestTimestamp = (activeTelemetry?.timestamp ?? deviceInfo?.last_seen) ?? null;
+        const historyFeeds = (unifiedData?.history as { feeds?: Array<{ timestamp?: string; created_at?: string }> })?.feeds || [];
+        const lastHistoryTs = historyFeeds.length > 0
+            ? (historyFeeds[historyFeeds.length - 1].timestamp ?? historyFeeds[historyFeeds.length - 1].created_at) ?? null
+            : null;
+        const bestTimestamp = (activeTelemetry?.timestamp ?? deviceInfo?.last_seen ?? lastHistoryTs) ?? null;
         const { label } = formatOfflineMessage(bestTimestamp);
         return { offlineMessage: label };
-    }, [isOffline, activeTelemetry?.timestamp, deviceInfo?.last_seen]);
+    }, [isOffline, activeTelemetry?.timestamp, deviceInfo?.last_seen, unifiedData?.history]);
 
 
 
@@ -484,57 +518,8 @@ const EvaraTankAnalytics = () => {
         if (!chartData || chartData.length === 0) return [];
 
         if (tankChartRange === '24H') {
-            const now = Date.now();
-            const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-            const startBoundary = latestBoundary - (4 * 60 * 60000); // 4 hours
-
-            let sorted = [...chartData].map((d: any) => ({
-                ...d,
-                timestampMs: new Date(d.timestamp || d.created_at).getTime(),
-                level: d.level || 0,
-                volume: d.volume || 0
-            })).sort((a: any, b: any) => a.timestampMs - b.timestampMs);
-
-            if (sorted.length === 0) return [];
-
-            const interpolated = [];
-
-            for (let t = startBoundary; t <= latestBoundary; t += 60000) {
-                let dataIdx = 0;
-                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                    dataIdx++;
-                }
-
-                let point: any = { timestampMs: t, time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), fullTime: new Date(t).toLocaleString() };
-
-                if (dataIdx >= sorted.length - 1) {
-                    point.level = sorted[sorted.length - 1].level;
-                    point.volume = sorted[sorted.length - 1].volume;
-                } else if (sorted[dataIdx].timestampMs > t) {
-                    point.level = sorted[0].level;
-                    point.volume = sorted[0].volume;
-                } else {
-                    const p1 = sorted[dataIdx];
-                    const p2 = sorted[dataIdx + 1];
-                    const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
-                    point.level = p1.level + (p2.level - p1.level) * ratio;
-                    point.volume = p1.volume + (p2.volume - p1.volume) * ratio;
-                }
-                point.levelCm = (point.level / 100) * (localCfg.heightM * 100);
-                interpolated.push(point);
-            }
-
-            // XAxis edge padding point (null values so it doesn't draw but creates whitespace)
-            interpolated.push({
-                timestampMs: latestBoundary + (5 * 60000),
-                time: new Date(latestBoundary + (5 * 60000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                fullTime: new Date(latestBoundary + (5 * 60000)).toLocaleString(),
-                level: null,
-                volume: null,
-                levelCm: null
-            });
-
-            return interpolated;
+            const cutoff = Date.now() - WINDOW_MS;
+            return chartData.filter((d: any) => new Date(d.timestamp).getTime() >= cutoff);
         } else if (tankChartRange === '1W') {
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const today = new Date();
@@ -639,19 +624,9 @@ const EvaraTankAnalytics = () => {
             return rangeFeeds;
         }
         return chartData;
-    }, [chartData, tankChartRange, rangeStart, rangeEnd, localCfg.heightM]);
+    }, [chartData, liveFeeds, tankChartRange, rangeStart, rangeEnd, localCfg.heightM]);
 
-    const chartTimeTicks = useMemo(() => {
-        if (tankChartRange !== '24H') return undefined;
-        const ticks = [];
-        const now = Date.now();
-        const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-        const startBoundary = latestBoundary - (4 * 60 * 60000);
-        for (let t = startBoundary; t <= latestBoundary; t += 30 * 60000) {
-            ticks.push(new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        }
-        return ticks;
-    }, [tankChartRange]);
+
 
     const waterAnalytics = useWaterAnalytics(
         localCfg.heightM,
@@ -828,7 +803,7 @@ const EvaraTankAnalytics = () => {
 
                     {/* Breadcrumb + Page Heading row */}
 
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-2">
 
                         <div className="flex flex-col gap-2">
 
@@ -871,7 +846,7 @@ const EvaraTankAnalytics = () => {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                        <div className="flex items-center gap-2 flex-wrap pb-1 md:self-end lg:self-auto">
                             {/* Status Button (Pill Style) */}
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
@@ -1934,9 +1909,8 @@ const EvaraTankAnalytics = () => {
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
 
                                                 <XAxis
-                                                    dataKey={tankChartRange === '24H' ? 'time' : 'time'}
-                                                    ticks={chartTimeTicks}
-                                                    interval={tankChartRange === '24H' ? 0 : 'preserveStartEnd'}
+                                                    dataKey="time"
+                                                    interval="preserveStartEnd"
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 500 }}
@@ -1969,7 +1943,7 @@ const EvaraTankAnalytics = () => {
                                                         const { active, payload } = props;
                                                         if (!active || !payload || payload.length === 0) return null;
                                                         const raw = payload[0]?.payload;
-                                                        const fullTs = raw?.timestamp;
+                                                        const fullTs = raw?.timestampMs ?? raw?.timestamp;
                                                         let dateStr = '--';
                                                         let timeStr = raw?.time || '--';
                                                         if (fullTs) {

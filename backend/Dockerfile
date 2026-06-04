@@ -1,34 +1,29 @@
-# --- Stage 1: install production dependencies only ---
-FROM node:20-alpine AS builder
+# Build with repository root as the Docker context:
+#   docker build -f backend/Dockerfile .
 
-WORKDIR /app
+FROM node:20-alpine AS client-builder
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+RUN npm run build
 
-# Copy manifests first so Docker can cache this layer on rebuild
-COPY package*.json ./
-
-# ci = clean install, exact versions from package-lock.json
-# --omit=dev = skip devDependencies (eslint, jest, nodemon, etc.)
+FROM node:20-alpine AS backend-builder
+WORKDIR /app/backend
+COPY backend/package*.json ./
 RUN npm ci --omit=dev
+COPY backend/src ./src
+COPY backend/package.json ./package.json
 
-# --- Stage 2: lean runtime image ---
 FROM node:20-alpine
-
-# Run as the built-in non-root 'node' user
-# If an attacker exploits a code path they get user-level access, not root
+WORKDIR /app/backend
+ENV NODE_ENV=production
 USER node
 
-WORKDIR /app
-
-# Copy production node_modules from builder (chown to node user)
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-
-# Copy application source - add more COPY lines here if you have other dirs
-COPY --chown=node:node src ./src
-COPY --chown=node:node package.json ./
+COPY --from=backend-builder --chown=node:node /app/backend/node_modules ./node_modules
+COPY --from=backend-builder --chown=node:node /app/backend/src ./src
+COPY --from=backend-builder --chown=node:node /app/backend/package.json ./package.json
+COPY --from=client-builder --chown=node:node /app/client/dist /app/client/dist
 
 EXPOSE 8000
-
-# Single Node.js process
-# Horizontal scaling = deploy multiple Railway replicas
-# Socket.io state is shared via Redis adapter (configured in server.js)
 CMD ["node", "src/server.js"]

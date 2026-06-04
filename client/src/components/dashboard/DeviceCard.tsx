@@ -87,14 +87,14 @@ export default function DeviceCard({ device, isLoading }: DeviceCardProps) {
     >
       {/* ── Top Row ── */}
       <div className="flex justify-between items-center min-w-0 gap-3 w-full">
-        <div className="flex items-center gap-2.5 min-w-0" style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex flex-col min-w-0" style={{ flex: 1, minWidth: 0 }}>
           <h3
             className="text-[16px] font-[800] truncate min-w-0 text-[var(--dashboard-heading)]"
             title={label}
           >
             {label}
           </h3>
-          <p className="text-[11px] hidden sm:block truncate shrink-0 opacity-70 text-[var(--text-primary)]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[11px] truncate opacity-70" style={{ color: 'var(--text-muted)' }}>
             {productLabel(device)}
           </p>
         </div>

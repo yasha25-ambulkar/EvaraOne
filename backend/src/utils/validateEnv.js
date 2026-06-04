@@ -1,59 +1,49 @@
 /**
  * Environment Variable Validator
  * Ensures all required secrets are present before the application starts.
- * 
- * ✅ CRITICAL FIX: Validate production-critical env vars
  */
-
-const { logger } = require("../config/pino.js"); // ✅ AUDIT FIX M10: Import logger for structured logging
+const { logger } = require("../config/pino.js");
 
 const REQUIRED_VARS = [
     "FIREBASE_PROJECT_ID",
     "FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY"
+    "FIREBASE_PRIVATE_KEY",
+    "ENCRYPTION_KEY"
 ];
-
-
 
 function validateEnv() {
     const isProd = process.env.NODE_ENV === 'production';
 
-    // In development, Firebase can come from ADC, emulator config, or local auth.
-    // Only hard-fail in production where explicit credentials are required.
+    // Check all required vars are present
     const missing = REQUIRED_VARS.filter(v => !process.env[v]);
 
     if (missing.length > 0) {
+        console.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
+        missing.forEach(v => console.error(`   - ${v}`));
         if (isProd) {
-            console.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
-            missing.forEach(v => console.error(`   - ${v}`));
-            logger.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:");
-            missing.forEach(v => logger.error(`   - ${v}`));
-            logger.error('Tip: For production provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.');
-            process.exit(1);
-        }
-
-        logger.debug('Missing FIREBASE_* env vars in development; continuing with Firebase ADC or emulator config if available.');
-    }
-
-
-
-    // Validate Firebase private key format
-    if (process.env.FIREBASE_PRIVATE_KEY && !process.env.FIREBASE_PRIVATE_KEY.includes("BEGIN PRIVATE KEY")) {
-        logger.warn("⚠️  WARNING: FIREBASE_PRIVATE_KEY does not look like a valid PEM key.");
-        if (isProd) {
-            logger.error("❌ PRODUCTION: Invalid Firebase private key format. Authentication will fail.");
-            // We exit here because Firebase is required for the app to function at all
             process.exit(1);
         }
     }
 
-    // ✅ PRODUCTION: Optimization Warnings (Non-fatal)
+    // Validate ENCRYPTION_KEY is correct format (64 hex characters = 32 bytes)
+    if (process.env.ENCRYPTION_KEY) {
+        const key = process.env.ENCRYPTION_KEY;
+        if (!/^[a-f0-9]{64}$/i.test(key)) {
+            console.error("❌ ENCRYPTION_KEY must be a 64-character hex string.");
+            console.error("   Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+            if (isProd) {
+                process.exit(1);
+            }
+        }
+    }
+
+    // Warn about optional but recommended vars
     if (isProd) {
         if (!process.env.REDIS_URL) {
-            logger.warn("⚠️  PRODUCTION: REDIS_URL not configured. Using in-memory fallback (performance may be impacted).");
+            logger.warn("⚠️  PRODUCTION: REDIS_URL not set. Using in-memory fallback.");
         }
         if (!process.env.SENTRY_DSN) {
-            logger.info("ℹ️  PRODUCTION: Sentry monitoring disabled (SENTRY_DSN missing).");
+            logger.info("ℹ️  PRODUCTION: Sentry disabled (SENTRY_DSN missing).");
         }
         if (!process.env.MQTT_BROKER_URL) {
             logger.info("ℹ️  PRODUCTION: MQTT disabled (MQTT_BROKER_URL missing).");
@@ -61,12 +51,11 @@ function validateEnv() {
     }
 
     logger.debug("✅ Environment Variables Validated");
-    
-    // Log security-relevant info in dev
+
     if (!isProd) {
         logger.debug(`[ENV] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-        logger.debug(`[ENV] Redis configured: ${!!process.env.REDIS_URL ? 'Yes' : 'No (in-memory only)'}`);
-        logger.debug(`[ENV] MQTT configured: ${!!process.env.MQTT_BROKER_URL ? 'Yes' : 'No'}`);
+        logger.debug(`[ENV] Encryption key set: ${!!process.env.ENCRYPTION_KEY ? 'Yes' : 'No'}`);
+        logger.debug(`[ENV] Redis configured: ${!!process.env.REDIS_URL ? 'Yes' : 'No'}`);
         logger.debug(`[ENV] Sentry configured: ${!!process.env.SENTRY_DSN ? 'Yes' : 'No'}`);
     }
 }

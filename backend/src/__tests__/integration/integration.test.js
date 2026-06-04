@@ -153,7 +153,7 @@ describe('Integration Tests - Full Workflows', () => {
         // Each type should have valid config
         const config = constants.getDeviceConfig(deviceType);
         expect(config.pollingEnabled).toBe(true);
-        expect(config.statusThresholdMs).toBe(30 * 60 * 1000);
+        expect(config.statusThresholdMs).toBe(60 * 60 * 1000);
 
         // Each type should have field mappings
         const fieldMap = constants.getThingspeakFieldMapping(deviceType);

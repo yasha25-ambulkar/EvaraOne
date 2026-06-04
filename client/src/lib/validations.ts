@@ -37,13 +37,17 @@ export const CustomerSchema = z.object({
   display_name: requiredString("Display name is required"),
   full_name: requiredString("Full name is required"),
   email: z.string().email("Valid email is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  phone_number: z.string().regex(phoneRegex, "Invalid phone number"),
-  community_id: requiredString("Community selection is required"),
-  role: z.enum(["customer", "superadmin", "technician"]).default("customer"),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
+  confirmPassword: z.string().optional(),
+  phone_number: z.string().regex(phoneRegex, "Invalid phone number").optional(),
+  zone_id: requiredString("Zone assignment is required"),
+  role: z.enum(["customer", "operator", "viewer"]).default("customer"),
+  status: z.enum(["active", "pending", "suspended"]).default("active"),
+  community_id: z.string().optional(),
 });
 
 export type CustomerFormData = z.infer<typeof CustomerSchema>;
+export type CustomerInput = z.infer<typeof CustomerSchema>;
 
 
 // -------------------------------------------------------------

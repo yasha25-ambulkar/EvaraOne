@@ -25,6 +25,8 @@ import {
   Navigation2,
   Ruler,
   Search,
+  Gauge,
+  Sliders,
 } from "lucide-react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +41,7 @@ import { deviceSchema, type DeviceInput } from "../../../schemas";
 import { FormField } from "../../forms/FormField";
 import { useThingSpeakFieldSelector } from "../../../hooks/useThingSpeakFieldSelector";
 import { ThingSpeakFieldSelector } from "../../forms/ThingSpeakFieldSelector";
+import { ValveThingSpeakFieldMapper } from "../../forms/ValveThingSpeakFieldMapper";
 import { TankDimensionsCalculator } from "../../forms/TankDimensionsCalculator";
 
 interface Props {
@@ -83,6 +86,24 @@ const DEVICE_TYPES = [
     desc: "Water quality and TDS sensors",
     color: "text-emerald-600",
     bg: "bg-emerald-50",
+  },
+  {
+    value: "phase",
+    label: "EvaraPhase",
+    icon: Zap,
+    template: "EvaraPhase",
+    desc: "3-phase electrical monitoring",
+    color: "text-yellow-600",
+    bg: "bg-yellow-50",
+  },
+  {
+    value: "valve",
+    label: "EvaraValve",
+    icon: Sliders,
+    template: "EvaraValve",
+    desc: "Valve control and monitoring",
+    color: "text-orange-600",
+    bg: "bg-orange-50",
   },
 ];
 
@@ -141,13 +162,21 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const watchType = watch("device_type");
   const watchTemplate = watch("analytics_template");
+  const watchFlowField = watch("flow_field");
+  const watchTotalVolumeField = watch("total_volume_field");
   const watchZoneId = watch("zone_id" as any);
   const watchLat = watch("latitude");
   const watchLng = watch("longitude");
   const { data: availableClients = [], isLoading: loadingClients } = useQuery({
-    queryKey: ["all_customers"],
-    queryFn: () => adminService.getClients(),
-    enabled: true,
+    queryKey: ["customers_by_zone", watchZoneId],
+    queryFn: () => {
+      // Only fetch zone-specific customers if a zone is selected
+      if (watchZoneId && watchZoneId.trim() !== '') {
+        return adminService.getClients(undefined, watchZoneId);
+      }
+      return Promise.resolve([]);
+    },
+    enabled: Boolean(watchZoneId && watchZoneId.trim() !== ''),
   });
 
   useEffect(() => {
@@ -199,12 +228,40 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
     setValue("longitude", String(lng));
   };
 
+  useEffect(() => {
+    if (watchTemplate !== 'EvaraValve' || !tsSelector.hasFetched) return;
+    const keys = new Set(tsSelector.availableFields.map((f) => f.key));
+    if (watchFlowField && !keys.has(watchFlowField)) {
+      setValue('flow_field', '');
+      setValue('flow_field_name', '');
+    }
+    if (watchTotalVolumeField && !keys.has(watchTotalVolumeField)) {
+      setValue('total_volume_field', '');
+      setValue('total_volume_field_name', '');
+    }
+  }, [
+    watchTemplate,
+    tsSelector.hasFetched,
+    tsSelector.availableFields,
+    watchFlowField,
+    watchTotalVolumeField,
+    setValue,
+  ]);
+
   const onFormSubmit = async (data: DeviceInput) => {
     try {
+      if (data.device_type === 'valve' && (!data.flow_field || !data.total_volume_field)) {
+        showToast('Select both Flow Rate Field and Total Volume Field', 'error');
+        return;
+      }
+
       console.log('[AddDeviceForm] ─────────────────────────────────────────────');
       console.log('[AddDeviceForm] 📝 FORM SUBMITTED');
       console.log('[AddDeviceForm] Device Type:', data.device_type);
-      console.log('[AddDeviceForm] Full form data:', data);
+      const flowFieldName = data.flow_field_name ?? '';
+      const totalVolumeFieldName = data.total_volume_field_name ?? '';
+      const normalizedNodeKey = String(data.node_key || '').trim().toLowerCase();
+      const isValveDevice = data.device_type === 'valve';
 
       // Step 5: Flat nodeData schema matching user's requested Firestore structure
       const nodeData: any = {
@@ -216,11 +273,15 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
           data.device_type === "deep" ? "EvaraDeep" :
           data.device_type === "flow" ? "EvaraFlow" :
           data.device_type === "tds" ? "EvaraTDS" :
+          data.device_type === "phase" ? "EvaraPhase" :
+          data.device_type === "valve" ? "EvaraValve" :
           "Custom",
         subType:
           data.device_type === "deep" ? "Borewell" :
           data.device_type === "flow" ? "Pump" :
           data.device_type === "tds" ? "TDSSensor" :
+          data.device_type === "phase" ? "3PhaseMonitor" :
+          data.device_type === "valve" ? "ControlValve" :
           assetSubType === "sump" ? "UndergroundSump" :
           "OverheadTank",
 
@@ -238,6 +299,16 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         flowRateField: data.flow_rate_field,
         tdsField: data.tds_field,
         temperatureField: data.temperature_field,
+        voltageField: data.voltage_field,
+        currentField: data.current_field,
+        powerField: data.power_field,
+        frequencyField: data.frequency_field,
+        position_field: data.position_field,
+        status_field: data.status_field,
+        flow_field: data.flow_field,
+        flow_field_name: flowFieldName,
+        total_volume_field: data.total_volume_field,
+        total_volume_field_name: totalVolumeFieldName,
 
         capacity: data.capacity ? Number(data.capacity) : 0,
         depth: data.max_depth ? Number(data.max_depth) : 0,
@@ -254,7 +325,32 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
         status: "online",
       };
 
-      console.log('[AddDeviceForm] 📤 Sending to API:', nodeData);
+      if (isValveDevice) {
+        nodeData.valve_status = "CLOSED";
+        console.log('[AddDeviceForm] 🔐 Prepared Firebase Auth credentials for valve device (generated on backend)');
+      }
+
+      if (data.device_type === 'valve') {
+        delete nodeData.waterLevelField;
+        delete nodeData.borewellDepthField;
+        delete nodeData.meterReadingField;
+        delete nodeData.flowRateField;
+        delete nodeData.tdsField;
+        delete nodeData.temperatureField;
+        delete nodeData.voltageField;
+        delete nodeData.currentField;
+        delete nodeData.powerField;
+        delete nodeData.frequencyField;
+        delete nodeData.position_field;
+        delete nodeData.status_field;
+        if (!flowFieldName) delete nodeData.flow_field_name;
+        if (!totalVolumeFieldName) delete nodeData.total_volume_field_name;
+      }
+
+      console.log('[AddDeviceForm] 📤 Sending to API:', {
+        ...nodeData,
+        esp32_password: nodeData.esp32_password ? '[redacted]' : undefined,
+      });
       console.log('[AddDeviceForm] ─────────────────────────────────────────────');
 
       let result;
@@ -528,33 +624,54 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                   <Wifi size={13} /> ThingSpeak Configuration
                 </div>
 
-                <ThingSpeakFieldSelector
-                  {...tsSelector}
-                  inputClassName={inp()}
-                  addLabel="+ Map another field"
-                  onFieldsChange={(fields) => {
-                    // Sync the first selected field back to the appropriate
-                    // react-hook-form field based on the current device template.
-                    const first = fields[0] ?? '';
-                    const second = fields[1] ?? '';
+                {watchTemplate === 'EvaraValve' ? (
+                  <ValveThingSpeakFieldMapper
+                    {...tsSelector}
+                    inputClassName={inp()}
+                    flowFieldKey={watchFlowField ?? ''}
+                    totalVolumeFieldKey={watchTotalVolumeField ?? ''}
+                    onMappingChange={(mapping) => {
+                      setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
+                      setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
+                      setValue('flow_field', mapping.flowFieldKey, { shouldValidate: true });
+                      setValue('flow_field_name', mapping.flowFieldName, { shouldValidate: true });
+                      setValue('total_volume_field', mapping.totalVolumeFieldKey, { shouldValidate: true });
+                      setValue('total_volume_field_name', mapping.totalVolumeFieldName, { shouldValidate: true });
+                    }}
+                  />
+                ) : (
+                  <ThingSpeakFieldSelector
+                    {...tsSelector}
+                    inputClassName={inp()}
+                    addLabel="+ Map another field"
+                    onFieldsChange={(fields) => {
+                      const first = fields[0] ?? '';
+                      const second = fields[1] ?? '';
+                      const third = fields[2] ?? '';
+                      const fourth = fields[3] ?? '';
 
-                    // Always persist channel / key into form so validation works.
-                    setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
-                    setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
+                      setValue('thingspeak_channel_id', tsSelector.channelId, { shouldValidate: true });
+                      setValue('thingspeak_read_key', tsSelector.readApiKey, { shouldValidate: true });
 
-                    if (watchTemplate === 'EvaraTank') {
-                      setValue('water_level_field', first, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraDeep') {
-                      setValue('depth_field', first, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraFlow') {
-                      setValue('meter_reading_field', first, { shouldValidate: true });
-                      setValue('flow_rate_field', second, { shouldValidate: true });
-                    } else if (watchTemplate === 'EvaraTDS') {
-                      setValue('tds_field', first, { shouldValidate: true });
-                      setValue('temperature_field', second, { shouldValidate: true });
-                    }
-                  }}
-                />
+                      if (watchTemplate === 'EvaraTank') {
+                        setValue('water_level_field', first, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraDeep') {
+                        setValue('depth_field', first, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraFlow') {
+                        setValue('meter_reading_field', first, { shouldValidate: true });
+                        setValue('flow_rate_field', second, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraTDS') {
+                        setValue('tds_field', first, { shouldValidate: true });
+                        setValue('temperature_field', second, { shouldValidate: true });
+                      } else if (watchTemplate === 'EvaraPhase') {
+                        setValue('voltage_field', first, { shouldValidate: true });
+                        setValue('current_field', second, { shouldValidate: true });
+                        setValue('power_field', third, { shouldValidate: true });
+                        setValue('frequency_field', fourth, { shouldValidate: true });
+                      }
+                    }}
+                  />
+                )}
 
                 <div className="flex gap-2 items-start p-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800">
                   <Info className="text-cyan-600 dark:text-cyan-400 mt-0.5 shrink-0" size={12} />
@@ -635,6 +752,40 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
                   </p>
                 </div>
               )}
+
+              {/* EvaraPhase electrical specifications */}
+              {watchTemplate === "EvaraPhase" && (
+                <div className="modal-card-glass p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 text-[11px] font-[800] text-yellow-700 dark:text-yellow-400 uppercase tracking-wider">
+                    <Zap size={13} /> 3-Phase Electrical Configuration
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField label="Max Voltage (V)" icon={Zap as any}>
+                      <input
+                        {...register("voltage_max")}
+                        type="number"
+                        step="10"
+                        placeholder="e.g. 480"
+                        className={inp()}
+                      />
+                    </FormField>
+                    <FormField label="Max Current (A)" icon={Zap as any}>
+                      <input
+                        {...register("current_max")}
+                        type="number"
+                        step="5"
+                        placeholder="e.g. 100"
+                        className={inp()}
+                      />
+                    </FormField>
+                  </div>
+                  <p className="text-[10px] text-yellow-700 dark:text-yellow-200">
+                    Configure voltage and current limits for alert thresholds
+                  </p>
+                </div>
+              )}
+
+              {/* EvaraValve control specifications removed — read values from ThingSpeak */}
 
               {/* Geospatial */}
               <div className="modal-card-glass p-4 rounded-2xl space-y-3">

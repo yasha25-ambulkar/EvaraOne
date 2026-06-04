@@ -8,7 +8,6 @@
 'use strict';
 
 const { fetchLatestData } = require('./thingspeakService');
-const { db } = require('../config/firebase');
 const { resolveFieldKey } = require('../utils/fieldMappingResolver');
 const { DEVICE_STATUS, STATUS_THRESHOLD_MS } = require('../utils/deviceConstants');
 const logger = require('../utils/logger');
@@ -131,27 +130,8 @@ async function refreshTDSDeviceState(device) {
       }
     };
 
-    // Update Firestore background update
-    // Sanitize update object to remove `undefined` values (Firestore rejects undefined)
-    const sanitize = (obj) => {
-      if (!obj || typeof obj !== 'object') return obj;
-      if (Array.isArray(obj)) return obj.map(sanitize);
-      const out = {};
-      for (const [k, v] of Object.entries(obj)) {
-        if (v === undefined) continue;
-        if (v && typeof v === 'object') out[k] = sanitize(v);
-        else out[k] = v;
-      }
-      return out;
-    };
-
-    const cleanedTelemetry = sanitize({ ...state, updated_at: new Date().toISOString() });
-
-    db.collection('devices').doc(id).update({
-      last_seen: lastUpdated.toISOString(), // Use DATA timestamp, not current time
-      online_status: status === DEVICE_STATUS.ONLINE,
-      last_telemetry: cleanedTelemetry
-    }).catch(err => logger.warn(`[tdsStateService] Firestore update failed for ${id}:`, err.message));
+    // Do not persist live telemetry back to Firestore.
+    // ThingSpeak remains the source of truth for TDS values, temperature, and voltage.
 
     _cache.set(id, state);
     return state;

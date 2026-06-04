@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNodes } from '../hooks/useNodes';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -8,6 +8,7 @@ import ReportsDownloader from '../components/dashboard/ReportsDownloader';
 import { computeDeviceStatus } from '../services/DeviceService';
 import { Link } from 'react-router-dom';
 import { getDeviceAnalyticsRoute } from '../utils/deviceRouting';
+import { useConsumptionTrend } from '../hooks/useConsumptionTrend';
 
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
@@ -101,6 +102,8 @@ export default function CustomerDashboard() {
 
   // ── Nodes for this customer ──
   const { nodes, loading: nodesLoading } = useNodes();
+  const [timeframe, setTimeframe] = useState<'24H' | '7D' | '30D'>('7D');
+  const { data: trendData, loading: trendLoading } = useConsumptionTrend(nodes as any[], timeframe);
 
   // ── Derived stats ──
   const totalDevices = (nodes as any[]).length;
@@ -214,13 +217,18 @@ export default function CustomerDashboard() {
 
       {/* ── Bottom Row ── */}
       <div className="px-4 lg:px-6 mb-8 relative z-10">
-        <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 3fr 2fr' }}>
-          <div style={{ minHeight: '320px' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[5fr_3fr_2fr] gap-4">
+          <div className="md:col-span-2 lg:col-span-1" style={{ minHeight: '320px' }}>
             <ErrorBoundary>
-              <ConsumptionTrendChart isLoading={isLoading} data={[]} />
+              <ConsumptionTrendChart
+                isLoading={isLoading || trendLoading}
+                data={trendData}
+                timeframe={timeframe}
+                onTimeframe={setTimeframe}
+              />
             </ErrorBoundary>
           </div>
-          <div className="apple-glass-card rounded-[20px] p-5 flex flex-col" style={{ minHeight: '320px' }}>
+          <div className="apple-glass-card rounded-[20px] p-5 flex flex-col md:col-span-1 lg:col-span-1" style={{ minHeight: '320px' }}>
             <h3 className="text-[11px] font-[800] uppercase tracking-[0.15em] mb-4" style={{ color: 'var(--text-muted)' }}>
               Product Distribution
             </h3>
@@ -289,7 +297,7 @@ export default function CustomerDashboard() {
               )}
             </div>
           </div>
-          <div style={{ minHeight: '320px' }}>
+          <div className="md:col-span-1 lg:col-span-1" style={{ minHeight: '320px' }}>
             <ErrorBoundary>
               <ReportsDownloader nodes={nodes as any[]} isLoading={isLoading} />
             </ErrorBoundary>

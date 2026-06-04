@@ -16,6 +16,7 @@ import api from '../services/api';
 import clsx from 'clsx';
 import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { formatOfflineMessage } from '../utils/telemetryPipeline';
+import { useAuth } from '../context/AuthContext';
 
 // Constants for Water Quality
 const QUALITY_CONFIG = {
@@ -48,6 +49,7 @@ const QUALITY_CONFIG = {
 const EvaraTDSAnalytics = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [chartRange, setChartRange] = useState<'24H' | '1W' | '1M' | 'RANGE'>('24H');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -141,11 +143,8 @@ const EvaraTDSAnalytics = () => {
             return timeA - timeB;
         });
 
-        if (chartRange === '24H') {
-            filtered = filtered.slice(-1000);
-        }
-
-        const chartData = filtered.map((h: any) => {
+        // Create base chart data with proper formatting
+        const baseChartData = filtered.map((h: any) => {
             const date = h.timestamp?._seconds
                 ? new Date(h.timestamp._seconds * 1000)
                 : new Date(h.timestamp);
@@ -158,7 +157,96 @@ const EvaraTDSAnalytics = () => {
             };
         });
 
-        const chartTicks: number[] = chartData.map((d: any) => d.timestampMs);
+        let chartData: any[] = [];
+
+        if (chartRange === '24H') {
+            // For 24H: Filter by 24h time window and downsample if > 2000 points
+            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+            let filtered24H = baseChartData.filter((d: any) => d.timestampMs >= cutoff);
+            if (filtered24H.length > 2000) {
+                const step = Math.ceil(filtered24H.length / 2000);
+                filtered24H = filtered24H.filter((_: any, i: number) => i % step === 0);
+            }
+            chartData = filtered24H;
+        } else if (chartRange === '1W') {
+            // For 1W: Group by day and calculate daily averages
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const today = new Date();
+            const result = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() - i);
+
+                const dayData = baseChartData.filter(d => {
+                    const ts = new Date(d.timestampMs);
+                    return ts.getDate() === targetDate.getDate() && ts.getMonth() === targetDate.getMonth();
+                });
+
+                let avgValue: number | null = null;
+                if (dayData.length > 0) {
+                    avgValue = dayData.reduce((sum, item) => sum + (item.value || 0), 0) / dayData.length;
+                }
+
+                result.push({
+                    timestampMs: targetDate.getTime(),
+                    time: days[targetDate.getDay()],
+                    fullTime: targetDate.toLocaleString(),
+                    value: avgValue ?? 0
+                });
+            }
+            chartData = result;
+        } else if (chartRange === '1M') {
+            // For 1M: Group by week and calculate weekly averages
+            const result = [];
+            const today = new Date();
+
+            for (let i = 3; i >= 0; i--) {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() - (i * 7));
+
+                const weekData = baseChartData.filter(d => {
+                    const ts = new Date(d.timestampMs);
+                    const diffTime = targetDate.getTime() - ts.getTime();
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    return diffDays >= 0 && diffDays < 7;
+                });
+
+                let avgValue: number | null = null;
+                if (weekData.length > 0) {
+                    avgValue = weekData.reduce((sum, item) => sum + (item.value || 0), 0) / weekData.length;
+                }
+
+                result.push({
+                    timestampMs: targetDate.getTime(),
+                    time: `Week ${4 - i}`,
+                    fullTime: targetDate.toLocaleString(),
+                    value: avgValue ?? 0
+                });
+            }
+            chartData = result;
+        } else if (chartRange === 'RANGE') {
+            // For RANGE: Use all data (can add custom date range filtering later)
+            chartData = baseChartData;
+        }
+
+        let chartTicks: any[] | undefined = undefined;
+        if (chartRange === '24H') {
+            chartTicks = [];
+            const now = Date.now();
+            const start = now - (24 * 60 * 60 * 1000);
+            const interval = 2 * 60 * 60 * 1000; // 2 hours
+            const offset = new Date().getTimezoneOffset() * 60000;
+            const snap = Math.ceil((start - offset) / interval) * interval + offset;
+            for (let t = snap; t <= now; t += interval) {
+                chartTicks.push(t);
+            }
+        } else if (chartRange === 'RANGE') {
+            chartTicks = undefined;
+        } else {
+            chartTicks = chartData.map((d: any) => d.time);
+        }
+
         return { chartData, chartTicks };
     }, [device?.tdsHistory, chartRange]);
 
@@ -209,17 +297,26 @@ const EvaraTDSAnalytics = () => {
             <main className="relative flex-grow px-4 sm:px-6 lg:px-8 pt-[110px] lg:pt-[120px] pb-8" style={{ zIndex: 1 }}>
                 <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
 
-                    {/* ── Heading + Actions ── */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    {/* Breadcrumb + Page Heading row */}
+                    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-2">
                         <div className="flex flex-col gap-2">
                             <nav className="flex items-center gap-1 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
-                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">Home</button>
-                                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
-                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: 'var(--text-muted)' }}>All Nodes</button>
-                                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
+                                <button onClick={() => navigate('/')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0">
+                                    Home
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
+                                <button onClick={() => navigate('/nodes')} className="hover:text-[#FF9500] transition-colors bg-transparent border-none cursor-pointer p-0 font-normal" style={{ color: 'var(--text-muted)' }}>
+                                    All Nodes
+                                </button>
+                                <span className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>chevron_right</span>
                                 <span className="font-bold" style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{deviceName}</span>
                             </nav>
                             <h2 className="text-[20px] font-bold tracking-tight mt-1.5" style={{ color: 'var(--text-primary)' }}>{deviceName} Analytics</h2>
+                            {device?.location_name && (
+                                <p className="text-xs text-slate-400 m-0 mt-1">
+                                    {device.location_name}
+                                </p>
+                            )}
                             {mergedDevice?.status !== 'Online' && offlineMessage && (
                                 <p className="text-xs font-bold text-red-500 m-0">
                                     {offlineMessage}
@@ -227,7 +324,8 @@ const EvaraTDSAnalytics = () => {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                        <div className="flex items-center gap-2 flex-wrap pb-1 md:self-end lg:self-auto">
+                            {/* Status Button (Pill Style) */}
                             <div className={clsx(
                                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm border",
                                 (mergedDevice.status === 'Online')
@@ -242,19 +340,36 @@ const EvaraTDSAnalytics = () => {
                                 )} />
                                 {mergedDevice.status || 'Offline'}
                             </div>
-                            <button onClick={handleRefresh} disabled={isRefreshing} className={clsx("flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95", isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10")}>
-                                <RefreshCw size={12} className={clsx('stroke-[2.5px]', isRefreshing && 'animate-spin')} />
+
+                            {/* Node Info Button */}
+                            <button
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className={clsx(
+                                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95",
+                                    isRefreshing ? "bg-gray-100 dark:bg-white/10 text-gray-400 cursor-not-allowed border-none" : "bg-[#dbeafe] hover:bg-[#bfdbfe] text-[#1e40af] border border-[#1e40af]/30 dark:bg-transparent dark:text-[#3B82F6] dark:border dark:border-[#3B82F6] dark:hover:bg-[#3B82F6]/10"
+                                )}
+                            >
+                                <span className={clsx('material-icons', isRefreshing && 'animate-spin')} style={{ fontSize: '14px' }}>
+                                    {isRefreshing ? 'sync' : 'refresh'}
+                                </span>
                                 {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
                             </button>
-                            <button onClick={() => setShowNodeInfo(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Info size={12} className="stroke-[2.5px]" /> Node Info
+
+                            <button onClick={() => setShowNodeInfo(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#f3e8ff] hover:bg-[#e9d5ff] text-[#6b21a8] border border-[#6b21a8]/30 dark:bg-transparent dark:text-[#AF52DE] dark:border dark:border-[#AF52DE] dark:hover:bg-[#AF52DE]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>info</span> Node Info
                             </button>
-                            <button onClick={() => setShowParams(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Settings size={12} className="stroke-[2.5px]" /> Parameters
+
+                            <button onClick={() => setShowParams(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] border border-[#92400e]/30 dark:bg-transparent dark:text-[#FFB340] dark:border dark:border-[#FFB340] dark:hover:bg-[#FFB340]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                <span className="material-icons" style={{ fontSize: '14px' }}>settings</span> Parameters
                             </button>
-                            <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[10px] font-extrabold uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95">
-                                <Trash2 size={12} className="stroke-[2.5px]" /> Delete Node
-                            </button>
+
+                            {/* Delete Button */}
+                            {user?.role === 'superadmin' && (
+                                <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-1.5 bg-[#fee2e2] hover:bg-[#fecaca] text-[#991b1b] border border-[#991b1b]/30 dark:bg-transparent dark:text-[#FF3B30] dark:border dark:border-[#FF3B30] dark:hover:bg-[#FF3B30]/10 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95">
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>delete_forever</span> Delete Node
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -279,19 +394,19 @@ const EvaraTDSAnalytics = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/10">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80 mb-1">Water Quality</p>
-                                    <p className="text-lg font-black text-emerald-500">{quality.toUpperCase()}</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgb(16 185 129 / 0.8)', margin: '0 0 4px 0' }}>Water Quality</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 900, color: '#10b981', margin: 0 }}>{quality.toUpperCase()}</p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/10">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-orange-500/80 mb-1">Temperature</p>
-                                    <p className="text-lg font-black text-orange-500">{mergedDevice.temperature || 0}°C</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgb(249 115 22 / 0.8)', margin: '0 0 4px 0' }}>Temperature</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 900, color: '#f97316', margin: 0 }}>{mergedDevice.temperature || 0}°C</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Right: Stats Grid + Chart */}
                         <div className="flex flex-col gap-4">
-                            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
                                 <MiniStatCard title="TDS Monitor" value={mergedDevice.tdsValue || 0} unit="ppm" icon={Droplets} accentColor="#3b82f6" iconBg="rgba(59,130,246,0.1)" />
                                 <MiniStatCard title="Temperature" value={mergedDevice.temperature || 0} unit="°C" icon={Thermometer} accentColor="#f97316" iconBg="rgba(249,115,22,0.1)" />
                                 <MiniStatCard title="Voltage" value={mergedDevice.voltage || 0} unit="V" icon={Activity} accentColor="#8b5cf6" iconBg="rgba(139,92,246,0.1)" />
@@ -299,36 +414,66 @@ const EvaraTDSAnalytics = () => {
                             </div>
 
                             {/* Chart Card */}
-                            <div className="flex-1 rounded-2xl p-6 flex flex-col" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                    <div>
-                                        <h3 className="text-[20px] font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                                            <Activity size={18} className="text-blue-500" /> TDS Level Trends
-                                        </h3>
-                                        <p className="text-[10px] font-black uppercase tracking-widest mt-0.5" style={{ color: 'var(--text-muted)' }}>24-Hour Dissolved Solids Analysis</p>
-                                    </div>
-                                    <div className="flex p-1 rounded-xl border gap-0.5" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--card-border)' }}>
-                                        {(['24H', '1W', '1M', 'RANGE'] as const).map(range => (
-                                            <button key={range} onClick={() => setChartRange(range)} className={clsx('px-4 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all', chartRange === range ? 'bg-[#0077ff] text-white shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]')}>{range}</button>
-                                        ))}
+                            <div className="apple-glass-card flex flex-col items-stretch justify-between relative overflow-hidden flex-grow" style={{
+                                background: "var(--card-bg)",
+                                backdropFilter: "var(--card-blur)",
+                                WebkitBackdropFilter: "var(--card-blur)",
+                                borderRadius: '2.5rem',
+                                border: '1px solid var(--card-border)',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+                                padding: '24px',
+                                minHeight: '350px'
+                            }}>
+                                <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
+                                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight m-0 leading-tight">TDS LEVEL TRENDS</h2>
+
+                                    <div className="flex p-1 rounded-full border relative overflow-hidden shrink-0 shadow-inner" style={{ background: 'var(--bg-primary)', borderColor: 'var(--card-border)' }}>
+                                        {(['24H', '1W', '1M', 'RANGE'] as const).map((r) => {
+                                            const active = chartRange === r;
+                                            return (
+                                                <button
+                                                    key={r}
+                                                    onClick={() => setChartRange(r)}
+                                                    className={`relative z-10 px-4 py-1.5 text-[10px] font-extrabold tracking-widest uppercase rounded-full cursor-pointer transition-all duration-300 ${active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                                                    style={{
+                                                        border: 'none',
+                                                        background: active ? '#004F94' : 'transparent',
+                                                        boxShadow: active ? '0 4px 12px rgba(0, 79, 148, 0.25)' : 'none'
+                                                    }}
+                                                >
+                                                    {r}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
-                                <div className="flex-1 min-h-[400px]">
+                                <div className="flex-1">
                                     {tdsHistory.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height={450}>
+                                        <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={tdsHistory}>
                                                 <defs>
                                                     <linearGradient id="tdsGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
                                                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                                     </linearGradient>
                                                 </defs>
-                                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.04)" />
-                                                <XAxis dataKey="timestampMs" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={chartTicks} tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} dy={10} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-                                                <Tooltip content={<PremiumTooltip />} cursor={{ stroke: 'var(--text-muted)', strokeDasharray: '3 3' }} />
-                                                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
+                                                <XAxis 
+                                                    dataKey={chartRange === '24H' || chartRange === 'RANGE' ? "timestampMs" : "time"} 
+                                                    type={chartRange === '24H' || chartRange === 'RANGE' ? "number" : "category"} 
+                                                    scale={chartRange === '24H' || chartRange === 'RANGE' ? "time" : "auto"} 
+                                                    domain={chartRange === '24H' ? [Date.now() - 24 * 60 * 60 * 1000, Date.now()] : chartRange === 'RANGE' ? ['dataMin', 'dataMax'] : undefined} 
+                                                    ticks={chartTicks} 
+                                                    tickFormatter={chartRange === '24H' || chartRange === 'RANGE' ? (tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined} 
+                                                    axisLine={false} 
+                                                    tickLine={false} 
+                                                    tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 500 }} 
+                                                    dy={10} 
+                                                />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }} />
+                                                <Tooltip content={<PremiumTooltip />} cursor={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }} />
+                                                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     ) : (
@@ -376,10 +521,10 @@ const NodeInfoModal = ({ show, onClose, device, deviceName, id }: any) => {
     if (!show) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl bg-[#ffffff] dark:bg-[#1a1c1e] border border-[var(--card-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl shadow-2xl" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }} onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>Node Information</h3>
-                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 text-[var(--text-secondary)] border-none cursor-pointer shadow-md">&times;</button>
+                    <h3 className="text-[17px] font-bold" style={{ color: '#111827' }}>Node Information</h3>
+                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full border-none cursor-pointer shadow-md" style={{ background: '#f3f4f6', color: '#374151' }}>&times;</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     {[
@@ -390,15 +535,15 @@ const NodeInfoModal = ({ show, onClose, device, deviceName, id }: any) => {
                         { label: 'Subscription', val: 'PRO' },
                         { label: 'Assigned To', val: device?.customer_name || 'Unassigned' }
                     ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] shadow-sm">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{item.label}</p>
-                            <p className="text-sm font-bold mt-1 text-[var(--text-primary)]">{item.val}</p>
+                        <div key={idx} className="rounded-xl p-4 shadow-sm" style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#6b7280' }}>{item.label}</p>
+                            <p className="text-sm font-bold mt-1" style={{ color: '#111827' }}>{item.val}</p>
                         </div>
                     ))}
                 </div>
                 <div className="mt-6 flex gap-3">
-                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white bg-[#3A7AFE] text-sm hover:scale-[1.02] transition-transform cursor-pointer" onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
-                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm hover:scale-[1.02] transition-transform cursor-pointer">Close</button>
+                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white text-sm hover:scale-[1.02] transition-transform cursor-pointer" style={{ background: '#3A7AFE', border: 'none' }} onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
+                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white text-sm hover:scale-[1.02] transition-transform cursor-pointer" style={{ background: '#9ca3af', border: 'none' }}>Close</button>
                 </div>
             </div>
         </div>
@@ -409,10 +554,10 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
     if (!show) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl bg-[#ffffff] dark:bg-[#1a1c1e] border border-[var(--card-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl shadow-2xl" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }} onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>Device Parameters</h3>
-                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 text-[var(--text-secondary)] shadow-md">&times;</button>
+                    <h3 className="text-[17px] font-bold" style={{ color: '#111827' }}>Device Parameters</h3>
+                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full shadow-md" style={{ background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer' }}>&times;</button>
                 </div>
                 <div className="grid grid-cols-1 gap-4 mb-6">
                     {[
@@ -420,13 +565,13 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
                         { label: 'Water Quality', val: quality.toUpperCase() },
                         { label: 'Temperature', val: `${device?.temperature || 'N/A'} °C` }
                     ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)]">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">{item.label}</p>
-                            <p className="text-lg font-bold text-[var(--text-primary)]">{item.val}</p>
+                        <div key={idx} className="rounded-xl p-4" style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#6b7280' }}>{item.label}</p>
+                            <p className="text-lg font-bold" style={{ color: '#111827' }}>{item.val}</p>
                         </div>
                     ))}
                 </div>
-                <button onClick={onClose} className="w-full font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm">Close</button>
+                <button onClick={onClose} className="w-full font-semibold py-3 rounded-2xl text-white text-sm" style={{ background: '#6b7280', border: 'none', cursor: 'pointer' }}>Close</button>
             </div>
         </div>
     );
@@ -435,19 +580,27 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
 // ─── UI Atomic Components ────────────────────────────────────────────────────
 
 const MiniStatCard = ({ title, value, unit, icon: Icon, accentColor, iconBg }: any) => (
-    <div className="rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden group hover:scale-[1.015] transition-all duration-300"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-        <div className="flex items-center justify-between">
-            <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>{title}</span>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: iconBg }}><Icon size={16} style={{ color: accentColor }} /></div>
+    <div className="apple-glass-card text-left rounded-2xl p-5 flex flex-col justify-between w-full min-h-[160px] max-h-[45vh] transition-all duration-300"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
+        
+        {/* Top Row: Icons */}
+        <div className="flex justify-between items-center w-full">
+            <div className="flex items-center justify-center rounded-xl w-8 h-8" style={{ background: iconBg }}>
+                <Icon size={18} style={{ color: accentColor }} />
+            </div>
+            <button className="bg-transparent border-none p-1 cursor-pointer transition-colors hover:bg-black/5 rounded-full flex items-center justify-center">
+                <Info size={14} color="#1C1C1E" />
+            </button>
         </div>
-        <div className="mt-auto">
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[26px] font-black tracking-tight" style={{ color: accentColor }}>{value}</span>
-                {unit && <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)' }}>{unit}</span>}
+
+        {/* Bottom Row: Text */}
+        <div className="flex flex-col mt-auto pt-1 gap-0.5">
+            <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0 }}>{title}</p>
+            <div className="flex items-baseline gap-1.5">
+                <span className="text-[20px] leading-[1.1] font-black m-0 tracking-tight" style={{ color: accentColor }}>{value}</span>
+                {unit && <span className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>{unit}</span>}
             </div>
         </div>
-        <div className="absolute -bottom-4 -right-4 opacity-[0.04] transition-transform group-hover:scale-110" style={{ color: accentColor }}><Icon size={64} /></div>
     </div>
 );
 

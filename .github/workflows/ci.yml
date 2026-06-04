@@ -1,90 +1,55 @@
-# Phase 21: CI/CD Pipeline
-# GitHub Actions workflow for linting, testing, and deploying
-
-name: EvaraTech CI/CD
+name: CI
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
 
 env:
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "18"
+  NODE_VERSION: "20"
 
 jobs:
-  # ─── Backend Tests ───
-  backend-test:
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          
-      - name: Install dependencies
-        run: |
-          cd server
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
-          
-      - name: Run linting
-        run: |
-          pip install ruff
-          ruff check server/ --ignore E501
-          
-      - name: Run tests
-        run: |
-          cd server
-          python -m pytest tests/ -v --tb=short
-        env:
-          ENVIRONMENT: testing
-          DATABASE_URL: sqlite+aiosqlite:///./test.db
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+      - name: Run backend tests
+        run: npm --prefix backend test -- --runInBand
+      - name: Audit backend production dependencies
+        run: npm --prefix backend audit --omit=dev --audit-level=high
 
-  # ─── Frontend Build ───
-  frontend-build:
+  client:
+    name: Client
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: client/package-lock.json
-          
-      - name: Install dependencies
-        run: |
-          cd client
-          npm ci
-          
-      - name: Type check
-        run: |
-          cd client
-          npx tsc --noEmit || true
-          
-      - name: Build
-        run: |
-          cd client
-          npm run build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Typecheck client
+        run: npm --prefix client run typecheck
+      - name: Build client
+        run: npm --prefix client run build
+      - name: Audit client production dependencies
+        run: npm --prefix client audit --omit=dev --audit-level=high
 
-  # ─── Deploy ───
-  deploy:
-    needs: [backend-test, frontend-build]
+  smoke:
+    name: Production smoke check
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend, client]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.PRODUCTION_URL != ''
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy to Render
-        run: |
-          echo "Deploying to Render via webhook..."
-          # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
-          echo "Deployment triggered successfully"
+      - name: Verify deployed health endpoint
+        run: curl --fail --silent --show-error "${{ secrets.PRODUCTION_URL }}/api/v1/health"

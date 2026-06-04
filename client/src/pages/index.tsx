@@ -1,13 +1,9 @@
-// Export Home from separate file
-export { Home } from './Home';
-
-export { default as Dashboard } from './Dashboard';
-
-export { default as AllNodes } from './AllNodes';
-export { default as Admin } from './Admin';
-export { default as NodeDetails } from './NodeDetails';
-export { default as UnifiedNodeAnalytics } from './UnifiedNodeAnalytics';
-export { default as EvaraDeepAnalytics } from './EvaraDeepAnalytics';
-export { default as EvaraTankAnalytics } from './EvaraTankAnalytics';
-export { default as EvaraFlowAnalytics } from './EvaraFlowAnalytics';
-export { default as Login } from './Login';
+export { default as Home } from "./Home";
+export { default as Dashboard } from "./Dashboard";
+export { default as AllNodes } from "./AllNodes";
+export { default as Admin } from "./Admin";
+export { default as NodeDetails } from "./NodeDetails";
+export { default as EvaraDeepAnalytics } from "./EvaraDeepAnalytics";
+export { default as EvaraTankAnalytics } from "./EvaraTankAnalytics";
+export { default as EvaraFlowAnalytics } from "./EvaraFlowAnalytics";
+export { default as Login } from "./Login";

@@ -31,7 +31,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, allowedPl
     }
 
     // Check authentication after loading is complete
-    return <Outlet />; // TEMPORARY BYPASS FOR VERIFICATION
     if (!isAuthenticated || !user) {
         return <Navigate to="/login" replace />;
     }

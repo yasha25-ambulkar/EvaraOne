@@ -17,7 +17,6 @@ import {
 import { Modal } from "../../../components/ui/Modal";
 import { AddDeviceForm } from "../../../components/admin/forms/AddDeviceForm";
 import { useToast } from "../../../components/ToastProvider";
-import { deviceService } from "../../../services/DeviceService";
 
 const CustomerDetails = () => {
   const { customerId } = useParams();
@@ -32,7 +31,6 @@ const CustomerDetails = () => {
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
 
-  // KEY CHANGE: deviceToggles now tracks isVisibleToCustomer from Firestore
   const [deviceToggles, setDeviceToggles] = useState<Record<string, boolean>>({});
   // Track which toggles are currently saving to show loading state
   const [togglingDeviceId, setTogglingDeviceId] = useState<string | null>(null);
@@ -58,45 +56,28 @@ const CustomerDetails = () => {
     fetchProfile();
   }, [customerId]);
 
-  // Real-Time Sync for Nodes via API polling
   useEffect(() => {
     if (!customerId) return;
-
-    const unsub = deviceService.subscribeToNodeUpdates(
-      (nodesData) => {
-        setNodes(prev => {
-          const index = prev.findIndex(n => n.id === nodesData.id);
-          if (index !== -1) {
-            const updated = [...prev];
-            updated[index] = { ...updated[index], ...nodesData };
-            return updated;
-          }
-          return prev;
-        });
-      },
-      { community_id: "ignore_we_are_fetching_all" }
-    );
 
     const fetchNodes = async () => {
       setNodesLoading(true);
       try {
-        const allNodes = await deviceService.getMapNodes(undefined, customerId);
-        setNodes(allNodes);
+        const expandedData = await adminService.getCustomer(customerId);
+        setNodes(Array.isArray(expandedData?.devices) ? expandedData.devices : []);
 
-        // KEY CHANGE: Initialize toggle state from isVisibleToCustomer field   
-        // Falls back to true if field doesn't exist yet (safe default)
         const toggleMap: Record<string, boolean> = {};
-        allNodes.forEach((n: any) => {
+        (expandedData?.devices || []).forEach((n: any) => {
           toggleMap[n.id] = n.isVisibleToCustomer !== false; // default true if not set
         });
         setDeviceToggles(toggleMap);
+
+        // keep client in sync with enriched payload so phone/device count renders correctly
+        setClient(expandedData);
       } finally {
         setNodesLoading(false);
       }
     };
     fetchNodes();
-
-    return () => unsub();
   }, [customerId]);
 
   // KEY CHANGE: Device visibility toggle now calls the backend API
@@ -259,7 +240,7 @@ const CustomerDetails = () => {
                     Phone Number
                   </p>
                   <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {client?.phone || "N/A"}
+                    {client?.phone_number || client?.phone || client?.mobile || "N/A"}
                   </p>
                 </div>
               </div>
@@ -273,7 +254,7 @@ const CustomerDetails = () => {
                     Location
                   </p>
                   <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {client?.address || zone?.name || "N/A"}
+                    {client?.address || zone?.name || client?.location || "N/A"}
                   </p>
                 </div>
               </div>
@@ -330,6 +311,9 @@ const CustomerDetails = () => {
                           </h4>
                           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                             {device.assetType || device.analytics_template}
+                          </p>
+                          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {device.node_key ? `Node ID: ${device.node_key}` : null}
                           </p>
                         </div>
                       </div>

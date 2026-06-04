@@ -2,7 +2,7 @@
  * AddCustomerForm — creates a customer (client) record in the clients table.
  * No auth user creation — customers are not system users.
  */
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -38,14 +38,34 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CustomerInput>({
     resolver: zodResolver(customerSchema),
     defaultValues: initialData || {
+      display_name: "",
+      full_name: "",
+      email: "",
+      phone_number: "",
+      zone_id: "",
       role: "customer",
       status: "active",
     },
   });
+
+  // Watch form values
+  const watchZoneId = watch("zone_id");
+  const watchEmail = watch("email");
+  const watchDisplayName = watch("display_name");
+
+  // Debug: Log watched values when they change
+  useEffect(() => {
+    console.log('[AddCustomerForm] 👀 Form Values:', {
+      zone_id: watchZoneId,
+      email: watchEmail,
+      display_name: watchDisplayName
+    });
+  }, [watchZoneId, watchEmail, watchDisplayName]);
 
   const sortedRegions = useMemo(
     () =>
@@ -59,16 +79,51 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
 
   const handleFormSubmit = async (data: CustomerInput) => {
     try {
+      // Debug: Log what's being sent to backend
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('[AddCustomerForm] 📝 FORM VALIDATION PASSED');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('[AddCustomerForm] ✅ Form Data:', JSON.stringify(data, null, 2));
+      console.log('[AddCustomerForm] ✅ zone_id field value:', data.zone_id);
+      console.log('[AddCustomerForm] ✅ display_name:', data.display_name);
+      console.log('[AddCustomerForm] ✅ email:', data.email);
+      console.log('═══════════════════════════════════════════════════════');
+
+      // CRITICAL: Ensure zone_id is not empty
+      if (!data.zone_id || data.zone_id.trim() === '') {
+        console.error('[AddCustomerForm] ❌ CRITICAL: zone_id is empty!', data.zone_id);
+        showToast("Zone assignment is required", "error");
+        return;
+      }
+
+      // Build request body with all fields explicitly
+      const requestBody = {
+        display_name: data.display_name,
+        full_name: data.full_name || '',
+        email: data.email,
+        phone_number: data.phone_number || '',
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        role: data.role,
+        status: data.status,
+        zone_id: data.zone_id,  // ← EXPLICITLY include zone_id
+      };
+
+      console.log('[AddCustomerForm] 📦 REQUEST BODY being sent:', JSON.stringify(requestBody, null, 2));
+
       let result;
       if (isEdit) {
-        result = await adminService.updateCustomer(initialData.id, data);
+        result = await adminService.updateCustomer(initialData.id, requestBody);
         showToast("Customer updated successfully", "success");
       } else {
-        result = await adminService.createCustomer(data);
+        console.log('[AddCustomerForm] 📤 Sending to API...');
+        result = await adminService.createCustomer(requestBody);
+        console.log('[AddCustomerForm] ✅ API Response:', result);
         showToast("Customer created successfully", "success");
       }
       onSubmit(result);
     } catch (err: any) {
+      console.error('[AddCustomerForm] ❌ SUBMISSION ERROR:', err);
       showToast(
         err.message || `Failed to ${isEdit ? "update" : "create"} customer`,
         "error",
@@ -218,10 +273,10 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
           <MapPin size={16} className="text-blue-500" /> Zone Assignment
         </div>
         <div className="grid grid-cols-1 gap-4">
-          <FormField label="Assign Zone" required icon={MapPin}>
+          <FormField label="Assign Zone" required icon={MapPin} error={errors.zone_id?.message}>
             <select
-              {...register("regionFilter" as any)}
-              className={inputClass()}
+              {...register("zone_id")}
+              className={inputClass(errors.zone_id)}
               disabled={loadingRegions}
             >
               <option value="">Select Zone...</option>
@@ -250,8 +305,14 @@ export const AddCustomerForm = ({ onSubmit, onCancel, initialData }: Props) => {
           whileTap={{ scale: 0.98 }}
           type="submit"
           disabled={isSubmitting}
-          className="flex items-center gap-2 px-8 py-3 bg-[#3A7AFE] text-white text-sm font-bold rounded-xl hover:bg-[#2563EB] transition-all disabled:opacity-50 shadow-md"
-        >
+          className="flex items-center gap-2 px-8 py-3 bg-[#3A7AFE] text-white text-sm font-bold rounded-xl hover:bg-[#2563EB] transition-all disabled:opacity-50 shadow-md"          onClick={(e) => {
+            console.log('[AddCustomerForm] 🔍 FORM ERRORS BEFORE SUBMIT:', errors);
+            console.log('[AddCustomerForm] 🔍 FORM STATE:', {
+              isSubmitting,
+              isDirty: true,
+              isValid: Object.keys(errors).length === 0
+            });
+          }}        >
           {isSubmitting ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (

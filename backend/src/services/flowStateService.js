@@ -219,51 +219,12 @@ function buildOfflineState(deviceId, reason = 'No live flow data available') {
 
 async function persistFlowState(device, state, latestFeed, config) {
   try {
-    const registryRef = db.collection('devices').doc(device.id);
-    const typedRef = db.collection('evaraflow').doc(device.id);
-    const lastSeen = state.lastUpdated || new Date().toISOString();
-    const onlineStatus = state.online ? 'ONLINE' : 'OFFLINE';
-    const nowIso = new Date().toISOString();
-
-    const updateObj = {
-      last_seen: lastSeen,
-      last_updated_at: lastSeen,
-      last_online_at: state.online ? lastSeen : null,
-      status: onlineStatus,
-      online: state.online,
-      online_status: state.online,
-      total_liters: state.totalLiters,
-      flow_rate: state.flowRate,
-      fields: {
-        total_liters: config.totalLitersField,
-        flow_rate: config.flowRateField,
-      },
-      sensor_field_mapping: {
-        [config.totalLitersField]: 'current_reading',
-        [config.flowRateField]: 'flow_rate',
-      },
-      telemetry_snapshot: {
-        timestamp: state.telemetrySnapshot.timestamp,
-        total_liters: state.totalLiters,
-        flow_rate: state.flowRate,
-        raw_data: latestFeed ?? null,
-      },
-      telemetrySnapshot: {
-        timestamp: state.telemetrySnapshot.timestamp,
-        total_liters: state.totalLiters,
-        flow_rate: state.flowRate,
-        status: onlineStatus,
-      },
-      raw_data: latestFeed ?? null,
-      lastTelemetryFetch: nowIso,
-      last_telemetry_fetch: nowIso,
-      updated_at: nowIso,
-    };
-
-    await Promise.all([
-      registryRef.set(updateObj, { merge: true }),
-      typedRef.set(updateObj, { merge: true }),
-    ]);
+    // Keep Firestore free of live telemetry payloads. The API state and cache still use ThingSpeak.
+    // The device registry already retains configuration such as channel ids and read keys.
+    void device;
+    void state;
+    void latestFeed;
+    void config;
   } catch (err) {
     logger.warn(`[flowStateService] Failed to persist flow state for ${device.id}: ${err.message}`);
   }
