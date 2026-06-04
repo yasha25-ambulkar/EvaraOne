@@ -3,16 +3,15 @@ import clsx from 'clsx';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import api from '../services/api';
+import api, { socket } from '../services/api';
 import { Info, Settings, Droplets, Bell, Timer } from 'lucide-react';
 import {
-    ComposedChart, Area, AreaChart,
+    Area, AreaChart,
     XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer
 } from 'recharts';
 import { useStaleDataAge } from '../hooks/useStaleDataAge';
 import { useDeviceAnalytics } from '../hooks/useDeviceAnalytics';
-import { useRealtimeTelemetry } from '../hooks/useRealtimeTelemetry';
 import { useFirestoreFlowData } from '../hooks/useFirestoreFlowData';
 import type { NodeInfoData } from '../hooks/useDeviceAnalytics';
 import { computeOnlineStatus, formatOfflineMessage } from '../utils/telemetryPipeline';
@@ -61,89 +60,80 @@ const safeParseDate = (ts: any): Date => {
 /** Consumption Pattern (Area chart) */
 const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: string; value: number }[] }) => {
     const [period, setPeriod] = useState<'1H' | '24H' | '1W' | '1M' | 'RANGE'>('1H');
-    const [rangeStart, setRangeStart] = useState<string>('');
-    const [rangeEnd, setRangeEnd] = useState<string>('');
+    const [rangeStart] = useState<string>('');
+    const [rangeEnd] = useState<string>('');
 
     const chartData = useMemo(() => {
         if (history.length === 0) return [];
 
-        if (period === '1H') {
-            const now = new Date();
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            let sorted = [...history].map((d) => ({
-                ...d,
-                timestampMs: new Date(d.date!).getTime(),
-                current: d.value || 0
-            })).sort((a, b) => a.timestampMs - b.timestampMs)
-                .filter(d => d.timestampMs >= oneHourAgo.getTime());
-
-            if (sorted.length === 0) return [];
-
-            const interpolated = [];
-            const startBoundary = Math.floor(oneHourAgo.getTime() / 60000) * 60000;
-            const endBoundary = Math.floor(now.getTime() / 60000) * 60000;
-
-            for (let t = startBoundary; t <= endBoundary; t += 60000) {
-                let dataIdx = 0;
-                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                    dataIdx++;
+        // Linear interpolation helper: fills gaps between real data points
+        const interpolate = (
+            sorted: { timestampMs: number; current: number }[],
+            startMs: number,
+            endMs: number,
+            stepMs: number
+        ) => {
+            const result = [];
+            for (let t = startMs; t <= endMs; t += stepMs) {
+                // Find surrounding real points
+                let idx = 0;
+                while (idx < sorted.length - 1 && sorted[idx + 1].timestampMs <= t) idx++;
+                const p1 = sorted[idx];
+                const p2 = sorted[idx + 1];
+                let value = p1?.current ?? 0;
+                if (p2 && p1 && p2.timestampMs !== p1.timestampMs) {
+                    const ratio = (t - p1.timestampMs) / (p2.timestampMs - p1.timestampMs);
+                    value = p1.current + (p2.current - p1.current) * ratio;
                 }
-                const point = sorted[dataIdx];
-                const nextPoint = sorted[dataIdx + 1];
-                let value = point?.current || 0;
-                if (nextPoint && point && nextPoint.timestampMs !== point.timestampMs) {
-                    const progress = (t - point.timestampMs) / (nextPoint.timestampMs - point.timestampMs);
-                    value = point.current + (nextPoint.current - point.current) * progress;
-                }
-                interpolated.push({
-                    timestampMs: t,
-                    time: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    fullTime: new Date(t).toLocaleString(),
+                result.push({
                     label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    fullTime: new Date(t).toLocaleString(),
                     current: value
                 });
             }
-            return interpolated;
-        } else if (period === '24H') {
-            let sorted = [...history].map((d) => ({
-                ...d,
-                timestampMs: new Date(d.date!).getTime(),
-                current: d.value || 0
-            })).sort((a, b) => a.timestampMs - b.timestampMs);
+            return result;
+        };
+
+        if (period === '1H') {
+            const now = Date.now();
+            const oneHourAgo = now - 60 * 60 * 1000;
+
+            const sorted = history
+                .filter(d => d.date && new Date(d.date).getTime() >= oneHourAgo)
+                .map(d => ({
+                    timestampMs: new Date(d.date!).getTime(),
+                    current: d.value || 0
+                }))
+                .sort((a, b) => a.timestampMs - b.timestampMs);
 
             if (sorted.length === 0) return [];
 
+            // Light interpolation: one point every 5 minutes → ~12 points/hour
+            const stepMs = 5 * 60000;
+            const startMs = Math.floor(oneHourAgo / stepMs) * stepMs;
+            const endMs = Math.floor(now / stepMs) * stepMs;
+            return interpolate(sorted, startMs, endMs, stepMs);
+
+        } else if (period === '24H') {
             const now = Date.now();
-            const latestBoundary = Math.floor(now / (15 * 60000)) * (15 * 60000);
-            const startBoundary = latestBoundary - (24 * 60 * 60000);
+            const dayAgo = now - 24 * 60 * 60 * 1000;
 
-            const interpolated = [];
-            for (let t = startBoundary; t <= latestBoundary; t += 60000) {
-                let dataIdx = 0;
-                while (dataIdx < sorted.length - 1 && sorted[dataIdx + 1].timestampMs <= t) {
-                    dataIdx++;
-                }
+            const sorted = history
+                .filter(d => d.date && new Date(d.date).getTime() >= dayAgo)
+                .map(d => ({
+                    timestampMs: new Date(d.date!).getTime(),
+                    current: d.value || 0
+                }))
+                .sort((a, b) => a.timestampMs - b.timestampMs);
 
-                let point = {
-                    timestampMs: t,
-                    label: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    fullTime: new Date(t).toLocaleString(),
-                    current: 0
-                };
+            if (sorted.length === 0) return [];
 
-                if (dataIdx >= sorted.length - 1) {
-                    point.current = sorted[sorted.length - 1].current;
-                } else if (sorted[dataIdx].timestampMs > t) {
-                    point.current = sorted[0].current;
-                } else {
-                    const p1 = sorted[dataIdx];
-                    const p2 = sorted[dataIdx + 1];
-                    const ratio = (t - p1.timestampMs) / Math.max(1, p2.timestampMs - p1.timestampMs);
-                    point.current = p1.current + (p2.current - p1.current) * ratio;
-                }
-                interpolated.push(point);
-            }
-            return interpolated;
+            // Light interpolation: one point every 10 minutes → ~144 points/day
+            const stepMs = 10 * 60000;
+            const startMs = Math.floor(dayAgo / stepMs) * stepMs;
+            const endMs = Math.floor(now / stepMs) * stepMs;
+            return interpolate(sorted, startMs, endMs, stepMs);
+
         } else if (period === '1W' || period === '1M') {
             return history.map(d => ({ label: d.time, current: d.value }));
         } else if (period === 'RANGE') {
@@ -170,7 +160,7 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
             minHeight: '350px',
             borderRadius: '2.5rem'
         }}>
-            <div className="flex flex-row justify-between items-start mb-6">
+            <div className="flex flex-row justify-between items-start mb-6 relative z-[1]">
         <div className="flex flex-col">
                     <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em', textTransform: 'uppercase' }}>Consumption Pattern</h3>
                     <div className="flex items-center gap-4 mt-1">
@@ -201,8 +191,8 @@ const ConsumptionPatternCard = ({ history }: { history: { date?: Date, time: str
                 </div>
             </div>
 
-            <div className="flex-grow w-full">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="flex-grow w-full min-h-[280px] relative z-[1]">
+                <ResponsiveContainer width="100%" height={280}>
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="usageGradient" x1="0" y1="0" x2="0" y2="1">
@@ -419,8 +409,7 @@ const EvaraFlowAnalytics = () => {
         isFetching: analyticsFetching,
         refetch,
         error: analyticsError,
-    } = useDeviceAnalytics(hardwareId, { refetchInterval: 300000 });
-    useRealtimeTelemetry(hardwareId);
+    } = useDeviceAnalytics(hardwareId, { refetchInterval: 60000 });
 
     // ── Auto-fetch data when device is selected ────────────────────────────────
     useEffect(() => {
@@ -430,6 +419,36 @@ const EvaraFlowAnalytics = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hardwareId]); // IMPORTANT: Only depend on hardwareId, NOT refetch
+
+    // ── Event-driven refetch + 90s silent-death watchdog ────────────────────
+    // Backend polls ThingSpeak every 15s and emits 'telemetry_update' via socket.
+    // Watchdog guarantees data is never older than 90s even if the socket
+    // connection dies without emitting a 'disconnect' event.
+    useEffect(() => {
+        if (!hardwareId) return;
+        let watchdog: ReturnType<typeof setTimeout>;
+
+        const resetWatchdog = () => {
+            clearTimeout(watchdog);
+            watchdog = setTimeout(() => refetch(), 90000);
+        };
+
+        const onTelemetryUpdate = (data: any) => {
+            const incomingId = data.device_id || data.deviceId || data.node_id || data.id;
+            if (incomingId === hardwareId) {
+                refetch();
+                resetWatchdog();
+            }
+        };
+
+        socket.on('telemetry_update', onTelemetryUpdate);
+        resetWatchdog(); // start initial 90s timer
+
+        return () => {
+            clearTimeout(watchdog);
+            socket.off('telemetry_update', onTelemetryUpdate);
+        };
+    }, [hardwareId, refetch]);
 
     const deviceConfig = ('config' in (unifiedData?.config ?? {})
         ? (unifiedData!.config as any).config
@@ -441,7 +460,6 @@ const EvaraFlowAnalytics = () => {
         ? (unifiedData.info as any).data
         : undefined) as NodeInfoData | undefined;
 
-    const alertsCount = (deviceInfo as any)?.alerts_count || 0;
     const customerConfig = (deviceInfo as any)?.customer_config || {};
     const isSuperAdmin = user?.role === 'superadmin';
 
@@ -498,7 +516,6 @@ const EvaraFlowAnalytics = () => {
     // The backend TelemetryWorker polls ThingSpeak every 60s, processes the data,
     // and writes to Firestore. We subscribe to that document for live updates.
     const deviceDocId = deviceInfo?.id || hardwareId;
-    const configId = deviceConfig?.id || (unifiedData as any)?.config?.id;
     const deviceType = deviceConfig?.device_type || (unifiedData as any)?.config?.config?.device_type || 'evaraflow';
     const firestoreFlow = useFirestoreFlowData(deviceDocId, deviceType);
 
@@ -511,6 +528,9 @@ const EvaraFlowAnalytics = () => {
 
     // Build a single authoritative "freshest timestamp" across all available sources.
     const resolvedTimestamp = useMemo(() => {
+        const lastHistoryTs = historyFeeds.length > 0
+            ? (historyFeeds[historyFeeds.length - 1].timestamp ?? historyFeeds[historyFeeds.length - 1].created_at) ?? null
+            : null;
         const candidates = [
             telemetryData?.timestamp,
             (telemetryData as any)?.created_at,
@@ -518,6 +538,7 @@ const EvaraFlowAnalytics = () => {
             (deviceInfo as any)?.last_updated_at,
             deviceInfo?.last_seen,
             (deviceInfo as any)?.last_online_at,
+            lastHistoryTs,
         ].filter(Boolean);
 
         let latestRaw: any = null;
@@ -533,7 +554,7 @@ const EvaraFlowAnalytics = () => {
         }
 
         return latestRaw;
-    }, [telemetryData, tsCreatedAt, deviceInfo]);
+    }, [telemetryData, tsCreatedAt, deviceInfo, historyFeeds]);
 
     // Resolve online/offline from freshest timestamp first, booleans only as fallback.
     const onlineStatus: 'Online' | 'Offline' = useMemo(() => {
@@ -1260,7 +1281,7 @@ const EvaraFlowAnalytics = () => {
 
                             {/* Bottom row — capped so it doesn't balloon on large screens */}
                             {showConsumptionPatternParam && (
-                                <div className="flex-1 overflow-hidden relative">
+                                <div className="flex-1 overflow-hidden relative min-h-[350px]">
                                     {isSuperAdmin && customerConfig.showConsumptionPattern === false && (
                                         <span className="absolute top-4 right-20 z-20 text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">Hidden from Customer</span>
                                     )}

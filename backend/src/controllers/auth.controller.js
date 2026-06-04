@@ -1,5 +1,8 @@
 const { db, admin } = require("../config/firebase.js");
+const cache = require("../config/cache.js");
 const logger = require("../utils/logger.js");
+
+const AUTH_CACHE_TTL = 3600; // 1 hour
 /**
  * Get the current user's profile with role
  * This endpoint has backend permissions to read from Firestore
@@ -18,34 +21,61 @@ exports.getUserProfile = async (req, res) => {
 
     logger.debug(`[AuthController] Getting profile for user: ${uid}`);
 
+    // Cache hit — zero Firestore reads
+    const cacheKey = `auth_role_${uid}`;
+    const cached = await cache.get(cacheKey);
+    if (cached && cached.role) {
+      logger.debug(`[AuthController] Cache hit for uid: ${uid}`);
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: uid,
+          email: req.user?.email || cached.email || "",
+          displayName: cached.display_name || cached.full_name || req.user?.email?.split("@")[0] || "User",
+          role: cached.role,
+          plan: cached.plan || "pro",
+          community_id: cached.community_id || undefined,
+          customer_id: req.user?.customer_id || cached.customer_id || cached.uid || uid,
+          sourceCollection: cached.sourceCollection || "cache"
+        }
+      });
+    }
+
     let profileData = null;
     let sourceCollection = "customers";
     let role = "customer";
 
     try {
-      // Try superadmins collection first (Priority 1)
-      const superadminRef = db.collection("superadmins").doc(uid);
-      const superadminSnap = await superadminRef.get();
+      // Try users collection first (Priority 1) - stores superadmin roles
+      const usersRef = db.collection("users").doc(uid);
+      const usersSnap = await usersRef.get();
       
-      // Check if snapshot exists - handle both REST and Admin SDK formats
-      let superadminExists = false;
-      if (superadminSnap && superadminSnap.exists === true) {
-        superadminExists = true;
-      } else if (superadminSnap && typeof superadminSnap.exists === 'function' && superadminSnap.exists()) {
-        superadminExists = true;
-      } else if (superadminSnap && superadminSnap._document) {
-        // REST API format
-        superadminExists = !!superadminSnap._document;
+      let usersExists = false;
+      if (usersSnap && usersSnap.exists === true) {
+        usersExists = true;
+      } else if (usersSnap && typeof usersSnap.exists === 'function' && usersSnap.exists()) {
+        usersExists = true;
+      } else if (usersSnap && usersSnap._document) {
+        usersExists = !!usersSnap._document;
       }
       
-      if (superadminExists) {
-        profileData = superadminSnap.data?.() || superadminSnap.data || superadminSnap;
-        sourceCollection = "superadmins";
-        role = "superadmin";
-        logger.debug(`[AuthController] ✅ User found in SUPERADMINS collection`);
+      if (usersExists) {
+        profileData = usersSnap.data?.() || usersSnap.data || usersSnap;
+        sourceCollection = "users";
+        
+        // Get role from users profile
+        if (profileData?.role) {
+          role = (profileData.role).trim().toLowerCase().replace(/\s+/g, "");
+        } else {
+          role = "superadmin"; // Default to superadmin if in users collection
+        }
+        logger.debug(`[AuthController] ✅ User found in USERS collection with role: ${role}`);
       }
     } catch (err) {
-      logger.error(`[AuthController] Error checking superadmins: ${err.message}`);
+      logger.error(`[AuthController] Error checking users:`, {
+        message: err.message,
+        code: err.code,
+      });
     }
 
     // If not found in superadmins, try customers (Priority 2)
@@ -76,11 +106,25 @@ exports.getUserProfile = async (req, res) => {
           logger.debug(`[AuthController] ✅ User found in CUSTOMERS collection`);
         }
       } catch (err) {
-        logger.error(`[AuthController] Error checking customers: ${err.message}`);
+        logger.error(`[AuthController] Error checking customers:`, {
+          message: err.message,
+          code: err.code,
+          stack: err.stack,
+          details: err.details,
+        });
       }
     }
 
     logger.debug(`[AuthController] 🎯 User ${uid} => role: '${role}' (from ${sourceCollection})`);
+
+    // Cache the result for 1 hour
+    if (profileData) {
+      await cache.set(cacheKey, {
+        ...profileData,
+        role,
+        sourceCollection,
+      }, AUTH_CACHE_TTL);
+    }
 
     // Return user profile with correct role
     return res.status(200).json({
@@ -92,6 +136,7 @@ exports.getUserProfile = async (req, res) => {
         role: role,
         plan: profileData?.plan || "pro",
         community_id: profileData?.community_id || undefined,
+        customer_id: req.user?.customer_id || profileData?.customer_id || profileData?.uid || uid,
         sourceCollection: sourceCollection
       }
     });
@@ -136,39 +181,63 @@ exports.verifyToken = async (req, res) => {
     logger.debug(`[AuthController] 🔐 Token verified for user: ${decodedToken.uid}`);
     logger.debug(`[AuthController] Email: ${decodedToken.email}`);
 
+    // Cache hit — zero Firestore reads
+    const cacheKey = `auth_role_${decodedToken.uid}`;
+    const cached = await cache.get(cacheKey);
+    if (cached && cached.role) {
+      logger.debug(`[AuthController] Cache hit for uid: ${decodedToken.uid}`);
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: decodedToken.uid,
+          email: decodedToken.email || "",
+          displayName: cached.display_name || cached.full_name || decodedToken.email?.split("@")[0] || "User",
+          role: cached.role,
+          plan: cached.plan || "pro",
+          community_id: cached.community_id || undefined,
+          customer_id: cached.customer_id || cached.uid || decodedToken.uid
+        }
+      });
+    }
+
     // Get the user's profile data
     let profileData = null;
     let sourceCollection = "customers";
     let role = "customer";
 
     try {
-      // Check superadmins first
-      logger.debug(`[AuthController] Checking superadmins collection for ${decodedToken.uid}...`);
-      const superadminSnap = await db.collection("superadmins").doc(decodedToken.uid).get();
+      // Check users collection first (Priority 1)
+      logger.debug(`[AuthController] Checking users collection for ${decodedToken.uid}...`);
+      const usersSnap = await db.collection("users").doc(decodedToken.uid).get();
       
-      // Check if snapshot exists - handle both REST and Admin SDK formats
-      let superadminExists = false;
-      if (superadminSnap && superadminSnap.exists === true) {
-        superadminExists = true;
-      } else if (superadminSnap && typeof superadminSnap.exists === 'function' && superadminSnap.exists()) {
-        superadminExists = true;
-      } else if (superadminSnap && superadminSnap._document) {
-        // REST API format
-        superadminExists = !!superadminSnap._document;
+      let usersExists = false;
+      if (usersSnap && usersSnap.exists === true) {
+        usersExists = true;
+      } else if (usersSnap && typeof usersSnap.exists === 'function' && usersSnap.exists()) {
+        usersExists = true;
+      } else if (usersSnap && usersSnap._document) {
+        usersExists = !!usersSnap._document;
       }
       
-      logger.debug(`[AuthController] Superadmins check - Exists: ${superadminExists}`);
+      logger.debug(`[AuthController] Users check - Exists: ${usersExists}`);
       
-      if (superadminExists) {
-        // Try different data access patterns
-        profileData = superadminSnap.data?.() || superadminSnap.data || superadminSnap;
-        sourceCollection = "superadmins";
-        role = "superadmin";
-        logger.debug(`[AuthController] ✅ User FOUND in SUPERADMINS collection`);
-        logger.debug(`[AuthController] Profile data:`, profileData);
+      if (usersExists) {
+        profileData = usersSnap.data?.() || usersSnap.data || usersSnap;
+        sourceCollection = "users";
+        
+        // Get role from profile
+        if (profileData?.role) {
+          role = (profileData.role).trim().toLowerCase().replace(/\s+/g, "");
+        } else {
+          role = "superadmin"; // Default to superadmin if in users collection
+        }
+        logger.debug(`[AuthController] ✅ User FOUND in USERS collection with role: ${role}`);
       }
     } catch (err) {
-      logger.error(`[AuthController] Error checking superadmins:`, err.message);
+      logger.error(`[AuthController] Error checking users:`, {
+        message: err.message,
+        code: err.code,
+      });
     }
 
     // If not in superadmins, check customers
@@ -203,11 +272,25 @@ exports.verifyToken = async (req, res) => {
           logger.debug(`[AuthController] ⚠️ User NOT found in either superadmins or customers`);
         }
       } catch (err) {
-        logger.error(`[AuthController] Error checking customers:`, err.message);
+        logger.error(`[AuthController] Error checking customers:`, {
+          message: err.message,
+          code: err.code,
+          stack: err.stack,
+          details: err.details,
+        });
       }
     }
 
     logger.debug(`[AuthController] ✨ FINAL RESPONSE: role=${role}, sourceCollection=${sourceCollection}`);
+
+    // Cache the result for 1 hour
+    if (profileData) {
+      await cache.set(cacheKey, {
+        ...profileData,
+        role,
+        sourceCollection,
+      }, AUTH_CACHE_TTL);
+    }
 
     return res.status(200).json({
       success: true,
@@ -217,7 +300,8 @@ exports.verifyToken = async (req, res) => {
         displayName: profileData?.display_name || profileData?.full_name || decodedToken.email?.split("@")[0] || "User",
         role: role,
         plan: profileData?.plan || "pro",
-        community_id: profileData?.community_id || undefined
+        community_id: profileData?.community_id || undefined,
+        customer_id: profileData?.customer_id || profileData?.uid || decodedToken.uid
       }
     });
 

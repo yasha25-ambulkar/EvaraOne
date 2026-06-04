@@ -4,32 +4,9 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
-// ─── Retry helper ────────────────────────────────────────────────────────────
-// Retries an async fn up to `maxAttempts` times with exponential backoff.
-// Only retries on network / 5xx errors; stops immediately on 4xx auth errors.
-async function retryWithBackoff<T>(
-  fn: () => Promise<{ response: Response; data: T }>,
-  maxAttempts = 3,
-  baseDelayMs = 600,
-): Promise<{ response: Response; data: T }> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const result = await fn();
-      // Don't retry on genuine 4xx auth errors — only on 5xx / network issues
-      if (result.response.status < 500) return result;
-      lastError = new Error(`Server error ${result.response.status}`);
-    } catch (err) {
-      lastError = err; // network failure
-    }
-    if (attempt < maxAttempts) {
-      await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
-    }
-  }
-  throw lastError;
-}
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -52,6 +29,7 @@ export interface User {
   role: UserRole;
   plan: UserPlan;
   community_id?: string;
+  customer_id?: string;
 }
 
 interface AuthContextType {
@@ -80,6 +58,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const userRef = useRef<User | null>(null);
+  const loginCompleteRef = useRef(false); // blocks onAuthStateChanged from racing login()
+
+  // Keep ref in sync with state
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Extract user metadata from API response
   const extractUser = useCallback(
@@ -92,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         role: apiResponse.role as UserRole,
         plan: (apiResponse.plan as UserPlan) || "pro",
         community_id: apiResponse.community_id,
+        customer_id: apiResponse.customer_id || apiResponse.id,
       };
     },
     [],
@@ -101,14 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
    * Fetch user profile from backend API
    * Backend has permissions to read from Firestore and determine correct role
    */
+  const VALID_ROLES: UserRole[] = ["superadmin", "community_admin", "customer"];
+
   const fetchProfile = useCallback(
     async (firebaseUser: FirebaseUser) => {
       try {
         console.log("[AuthContext] Starting profile fetch for:", firebaseUser.email);
-        
-        // Get ID token
+
+        // Get ID token and persist it for interceptor fallback
         const idToken = await firebaseUser.getIdToken();
-        
+        localStorage.setItem('auth_token', idToken);
+
         // Call backend API to get profile with verified role using axios instance
         try {
           const res = await api.get('/auth/me', {
@@ -116,21 +103,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           });
           const data = res.data ?? res;
           if (data && data.success && data.user) {
-            console.log(`[AuthContext] ✅ Profile fetched - role: ${data.user.role}`);
-            setUser(extractUser(data.user));
+            const profile = data.user;
+            // Guard: never accept a response without a valid role
+            if (!profile?.role || !VALID_ROLES.includes(profile.role)) {
+              console.error('[AuthContext] Invalid role received:', profile?.role);
+              setUser(null);
+              return;
+            }
+            console.log(`[AuthContext] ✅ Profile fetched - role: ${profile.role}`);
+            setUser(extractUser(profile));
           } else {
             console.error('[AuthContext] Invalid response from backend:', data);
             setUser(null);
           }
         } catch (err: any) {
-          console.error('[AuthContext] Failed to fetch profile:', err.response?.status, err.message);
-          setUser(null);
-          setLoading(false);
-          return;
+          const status = err?.response?.status;
+          if (status === 503) {
+            // Server temporarily down — keep existing session, don't wipe user
+            console.warn('[AuthContext] Auth service 503 — keeping existing session');
+            return;
+          }
+          if (status === 401) {
+            // Genuinely unauthorized — clear session
+            console.error('[AuthContext] 401 Unauthorized — clearing session');
+            setUser(null);
+            localStorage.removeItem('auth_token');
+            return;
+          }
+          console.error('[AuthContext] Failed to fetch profile:', status, err?.message);
+          // Don't wipe user on unknown errors — preserve existing session
         }
       } catch (err) {
         console.error("[AuthContext] Error fetching profile:", err);
-        setUser(null);
+        // Don't wipe user on token fetch failure — preserve existing session
       } finally {
         setLoading(false);
       }
@@ -150,9 +155,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       auth,
       async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
+          // Skip if login() already handled this — prevents double-fetch race
+          if (loginCompleteRef.current) {
+            console.log('[AuthContext] Login already handled, skipping onAuthStateChanged fetch');
+            setLoading(false);
+            return;
+          }
+          // Skip redundant fetch if we already have this user loaded
+          if (userRef.current && userRef.current.id === firebaseUser.uid) {
+            console.log('[AuthContext] User already loaded, skipping redundant profile fetch');
+            setLoading(false);
+            return;
+          }
           await fetchProfile(firebaseUser);
         } else {
+          loginCompleteRef.current = false; // reset on logout
           setUser(null);
+          localStorage.removeItem('auth_token');
           setLoading(false);
         }
       },
@@ -192,16 +211,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         //         cached token that the backend might not have indexed yet)
         const idToken = await credential.user.getIdToken(true);
 
+        // Persist token for interceptor fallback (prevents race conditions)
+        localStorage.setItem('auth_token', idToken);
+
         // Step 3: Verify token with backend and get profile.
         // Retried up to 3 times with backoff to handle transient network hiccups.
         console.log("[AuthContext] Verifying token with backend...");
         try {
-          const res = await api.post('/auth/verify-token', { idToken });
+          const res = await api.post('/auth/verify-token', { idToken }, { timeout: 40000 });
           const data = res.data ?? res;
           if (data && data.success && data.user) {
             const finalUser = extractUser(data.user);
+            // Guard: validate role before accepting
+            if (!finalUser?.role || !VALID_ROLES.includes(finalUser.role)) {
+              console.error('[AuthContext] Invalid role from verify-token:', finalUser?.role);
+              setLoading(false);
+              return { success: false, error: 'Server returned invalid user role' };
+            }
             console.log(`[AuthContext] ✅ Login successful - role: ${finalUser.role}`);
             setUser(finalUser);
+            loginCompleteRef.current = true; // blocks onAuthStateChanged race
             setLoading(false);
             return { success: true, user: finalUser };
           }
@@ -280,6 +309,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async (): Promise<void> => {
+    loginCompleteRef.current = false; // allow onAuthStateChanged to process logout
+    localStorage.removeItem('auth_token');
     if (!auth) {
       setUser(null);
       return;

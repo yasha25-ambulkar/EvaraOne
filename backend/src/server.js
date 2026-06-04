@@ -109,9 +109,9 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       // ✅ FIX: Allow self-hosted Vite bundles — must not block .js files
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       // ✅ FIX: Allow self-hosted CSS + Google Fonts + inline styles (Vite injects these)
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
       // ✅ FIX: Allow images from common sources
       imgSrc: [
         "'self'",

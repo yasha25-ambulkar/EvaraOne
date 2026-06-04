@@ -258,17 +258,10 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
       console.log('[AddDeviceForm] ─────────────────────────────────────────────');
       console.log('[AddDeviceForm] 📝 FORM SUBMITTED');
       console.log('[AddDeviceForm] Device Type:', data.device_type);
-      console.log('[AddDeviceForm] Full form data:', data);
       const flowFieldName = data.flow_field_name ?? '';
       const totalVolumeFieldName = data.total_volume_field_name ?? '';
       const normalizedNodeKey = String(data.node_key || '').trim().toLowerCase();
       const isValveDevice = data.device_type === 'valve';
-      const deviceEmail = isValveDevice
-        ? `esp32-${normalizedNodeKey}@evaratech.com`
-        : '';
-      const devicePassword = isValveDevice
-        ? `evlv-${normalizedNodeKey}-pass`
-        : '';
 
       // Step 5: Flat nodeData schema matching user's requested Firestore structure
       const nodeData: any = {
@@ -333,10 +326,8 @@ export const AddDeviceForm = ({ onSubmit, onCancel, initialData }: Props) => {
       };
 
       if (isValveDevice) {
-        nodeData.esp32_email = deviceEmail;
-        nodeData.esp32_password = devicePassword;
         nodeData.valve_status = "CLOSED";
-        console.log('[AddDeviceForm] 🔐 Prepared Firebase Auth credentials for valve device:', deviceEmail);
+        console.log('[AddDeviceForm] 🔐 Prepared Firebase Auth credentials for valve device (generated on backend)');
       }
 
       if (data.device_type === 'valve') {

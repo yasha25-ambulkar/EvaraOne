@@ -4,7 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { io } from 'socket.io-client';
-import { auth, isFirebaseEnabled } from "../lib/firebase";
+import { auth } from "../lib/firebase";
 
 // API Configuration
 // Use environment variable if provided, otherwise fallback to the current origin in production
@@ -24,11 +24,14 @@ export const socket = io(SOCKET_URL, {
   auth: async (cb) => {
     const user = auth?.currentUser;
     if (user) {
-      const token = await user.getIdToken();
-      cb({ token });
-    } else {
-      cb({});
+      try {
+        const token = await user.getIdToken();
+        cb({ token });
+        return;
+      } catch { /* fall through to localStorage */ }
     }
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    cb(token ? { token } : {});
   }
 });
 
@@ -38,29 +41,40 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 15000, // 15 seconds global timeout for telemetry stability
+  timeout: 30000, // 30 seconds global timeout (auth cold-start can be slow)
 });
 
-// Request Interceptor: Inject Firebase Auth Token (CRITICAL)
+// Request Interceptor: Inject Auth Token (CRITICAL)
+// Priority: localStorage first (avoids async Firebase race right after login),
+// then fallback to Firebase currentUser.
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
-      // Get Firebase user with timeout protection
-      const user = auth?.currentUser;
-      
-      if (!isFirebaseEnabled || !user) {
-        console.warn('[API Interceptor] Firebase auth disabled or no user logged in, skipping token injection');
+      // 1. Try stored token FIRST (fastest, avoids async Firebase race)
+      const storedToken = localStorage.getItem('auth_token')
+        || localStorage.getItem('token')
+        || localStorage.getItem('access_token');
+      if (storedToken) {
+        config.headers.Authorization = `Bearer ${storedToken}`;
         return config;
       }
 
-      // Get ID token (Firebase handles caching and refresh automatically)
-      const token = await user.getIdToken(); 
-      config.headers.Authorization = `Bearer ${token}`;
-      
-      // console.log(`[API Interceptor] ✅ Token injected for ${config.method?.toUpperCase()} ${config.url}`);
+      // 2. Fallback to Firebase if no stored token
+      const firebaseUser = auth?.currentUser;
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          localStorage.setItem('auth_token', token); // cache for next request
+          config.headers.Authorization = `Bearer ${token}`;
+          return config;
+        } catch (e) {
+          console.warn('[API Interceptor] Firebase token fetch failed:', e);
+        }
+      }
+
+      console.warn('[API Interceptor] No token found — request will be unauthorized');
     } catch (error) {
       console.error("[API Interceptor] Failed to get token:", error);
-      // Don't throw - let request proceed (will fail with 401, which is correct)
     }
     return config;
   }

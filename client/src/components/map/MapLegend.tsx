@@ -42,6 +42,20 @@ const ASSET_FILTERS: FilterItem[] = [
     activeBg: "bg-blue-100 dark:bg-blue-900/30",
     activeRing: "ring-blue-400 text-blue-600 dark:text-blue-400",
   },
+  {
+    key: "EvaraValve",
+    label: "EvaraValve",
+    iconUrl: "/evaravalve.png",
+    activeBg: "bg-emerald-100",
+    activeRing: "ring-emerald-400",
+  },
+  {
+    key: "EvaraMotor",
+    label: "EvaraMotor",
+    iconUrl: "/meter.png",
+    activeBg: "bg-purple-100",
+    activeRing: "ring-purple-400",
+  },
 ];
 
 

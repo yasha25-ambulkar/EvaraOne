@@ -160,8 +160,14 @@ const EvaraTDSAnalytics = () => {
         let chartData: any[] = [];
 
         if (chartRange === '24H') {
-            // For 24H: Show last 1000 raw data points with proper formatting
-            chartData = baseChartData.slice(-1000);
+            // For 24H: Filter by 24h time window and downsample if > 2000 points
+            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+            let filtered24H = baseChartData.filter((d: any) => d.timestampMs >= cutoff);
+            if (filtered24H.length > 2000) {
+                const step = Math.ceil(filtered24H.length / 2000);
+                filtered24H = filtered24H.filter((_: any, i: number) => i % step === 0);
+            }
+            chartData = filtered24H;
         } else if (chartRange === '1W') {
             // For 1W: Group by day and calculate daily averages
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -224,7 +230,23 @@ const EvaraTDSAnalytics = () => {
             chartData = baseChartData;
         }
 
-        const chartTicks: number[] = chartData.map((d: any) => d.timestampMs);
+        let chartTicks: any[] | undefined = undefined;
+        if (chartRange === '24H') {
+            chartTicks = [];
+            const now = Date.now();
+            const start = now - (24 * 60 * 60 * 1000);
+            const interval = 2 * 60 * 60 * 1000; // 2 hours
+            const offset = new Date().getTimezoneOffset() * 60000;
+            const snap = Math.ceil((start - offset) / interval) * interval + offset;
+            for (let t = snap; t <= now; t += interval) {
+                chartTicks.push(t);
+            }
+        } else if (chartRange === 'RANGE') {
+            chartTicks = undefined;
+        } else {
+            chartTicks = chartData.map((d: any) => d.time);
+        }
+
         return { chartData, chartTicks };
     }, [device?.tdsHistory, chartRange]);
 
@@ -437,7 +459,18 @@ const EvaraTDSAnalytics = () => {
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid-color)" />
-                                                <XAxis dataKey="timestampMs" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={chartTicks} tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 500 }} dy={10} />
+                                                <XAxis 
+                                                    dataKey={chartRange === '24H' || chartRange === 'RANGE' ? "timestampMs" : "time"} 
+                                                    type={chartRange === '24H' || chartRange === 'RANGE' ? "number" : "category"} 
+                                                    scale={chartRange === '24H' || chartRange === 'RANGE' ? "time" : "auto"} 
+                                                    domain={chartRange === '24H' ? [Date.now() - 24 * 60 * 60 * 1000, Date.now()] : chartRange === 'RANGE' ? ['dataMin', 'dataMax'] : undefined} 
+                                                    ticks={chartTicks} 
+                                                    tickFormatter={chartRange === '24H' || chartRange === 'RANGE' ? (tick) => new Date(tick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined} 
+                                                    axisLine={false} 
+                                                    tickLine={false} 
+                                                    tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 500 }} 
+                                                    dy={10} 
+                                                />
                                                 <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }} />
                                                 <Tooltip content={<PremiumTooltip />} cursor={{ stroke: '#3b82f6', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.5 }} />
                                                 <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#tdsGradient)" animationDuration={1500} />
@@ -488,10 +521,10 @@ const NodeInfoModal = ({ show, onClose, device, deviceName, id }: any) => {
     if (!show) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl bg-[#ffffff] dark:bg-[#1a1c1e] border border-[var(--card-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl shadow-2xl" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }} onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>Node Information</h3>
-                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 text-[var(--text-secondary)] border-none cursor-pointer shadow-md">&times;</button>
+                    <h3 className="text-[17px] font-bold" style={{ color: '#111827' }}>Node Information</h3>
+                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full border-none cursor-pointer shadow-md" style={{ background: '#f3f4f6', color: '#374151' }}>&times;</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     {[
@@ -502,15 +535,15 @@ const NodeInfoModal = ({ show, onClose, device, deviceName, id }: any) => {
                         { label: 'Subscription', val: 'PRO' },
                         { label: 'Assigned To', val: device?.customer_name || 'Unassigned' }
                     ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)] shadow-sm">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{item.label}</p>
-                            <p className="text-sm font-bold mt-1 text-[var(--text-primary)]">{item.val}</p>
+                        <div key={idx} className="rounded-xl p-4 shadow-sm" style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#6b7280' }}>{item.label}</p>
+                            <p className="text-sm font-bold mt-1" style={{ color: '#111827' }}>{item.val}</p>
                         </div>
                     ))}
                 </div>
                 <div className="mt-6 flex gap-3">
-                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white bg-[#3A7AFE] text-sm hover:scale-[1.02] transition-transform cursor-pointer" onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
-                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm hover:scale-[1.02] transition-transform cursor-pointer">Close</button>
+                    <button className="flex-1 font-semibold py-3 rounded-2xl text-white text-sm hover:scale-[1.02] transition-transform cursor-pointer" style={{ background: '#3A7AFE', border: 'none' }} onClick={() => { navigator.clipboard.writeText(`Hardware ID: ${id}`); alert('ID copied!'); }}>Copy ID</button>
+                    <button onClick={onClose} className="flex-1 font-semibold py-3 rounded-2xl text-white text-sm hover:scale-[1.02] transition-transform cursor-pointer" style={{ background: '#9ca3af', border: 'none' }}>Close</button>
                 </div>
             </div>
         </div>
@@ -521,10 +554,10 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
     if (!show) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl bg-[#ffffff] dark:bg-[#1a1c1e] border border-[var(--card-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl p-6 flex flex-col w-full max-w-2xl shadow-2xl" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }} onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>Device Parameters</h3>
-                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 text-[var(--text-secondary)] shadow-md">&times;</button>
+                    <h3 className="text-[17px] font-bold" style={{ color: '#111827' }}>Device Parameters</h3>
+                    <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full shadow-md" style={{ background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer' }}>&times;</button>
                 </div>
                 <div className="grid grid-cols-1 gap-4 mb-6">
                     {[
@@ -532,13 +565,13 @@ const ParamsModal = ({ show, onClose, device, quality }: any) => {
                         { label: 'Water Quality', val: quality.toUpperCase() },
                         { label: 'Temperature', val: `${device?.temperature || 'N/A'} °C` }
                     ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl p-4 bg-[var(--card-bg)] border border-[var(--card-border)]">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">{item.label}</p>
-                            <p className="text-lg font-bold text-[var(--text-primary)]">{item.val}</p>
+                        <div key={idx} className="rounded-xl p-4" style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#6b7280' }}>{item.label}</p>
+                            <p className="text-lg font-bold" style={{ color: '#111827' }}>{item.val}</p>
                         </div>
                     ))}
                 </div>
-                <button onClick={onClose} className="w-full font-semibold py-3 rounded-2xl text-white bg-gray-400 text-sm">Close</button>
+                <button onClick={onClose} className="w-full font-semibold py-3 rounded-2xl text-white text-sm" style={{ background: '#6b7280', border: 'none', cursor: 'pointer' }}>Close</button>
             </div>
         </div>
     );

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Play, Square, Settings, Activity, Zap, Droplets, Clock, AlertCircle, CheckCircle2 
+  Play, Square, Settings, Zap, Clock, CheckCircle2 
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
@@ -23,14 +23,7 @@ const trendData = [
 const EvaraMotorAnalytics = () => {
   const { hardwareId } = useParams<{ hardwareId: string }>();
   const { user } = useAuth();
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [isRunning, setIsRunning] = useState(true);
-
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   if (!hardwareId) return <Navigate to="/nodes" replace />;
 

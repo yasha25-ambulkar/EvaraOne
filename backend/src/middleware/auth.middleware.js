@@ -3,17 +3,12 @@ const cache = require("../config/cache.js");
 const logger = require("../utils/logger.js"); // ✅ AUDIT FIX M10
 const Sentry = require("@sentry/node");
 
-const AUTH_CACHE_TTL = 180; // 3 minutes
+const AUTH_CACHE_TTL = 3600; // 1 hour — drastically reduces Firestore reads on Spark plan
 
 const requireAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    
-    // DEBUG: Log incoming auth header
-    console.log(`[Auth Middleware] Request: ${req.method} ${req.originalUrl}`);
-    console.log(`[Auth Middleware] Authorization Header: ${authHeader ? (authHeader.substring(0, 20) + '...') : 'MISSING'}`);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        console.warn(`[Auth Middleware] ❌ Missing or invalid Bearer token format`);
         return res.status(401).json({ error: "Missing auth token" });
     }
 
@@ -28,19 +23,23 @@ const requireAuth = async (req, res, next) => {
         let userData = await cache.get(cacheKey);
 
         if (!userData) {
-            // Not cached — fetch from Firestore with timeout
-            try {
+            // Not cached — fetch from Firestore with generous timeout + retry
+            const firestoreLookup = async (attempt = 1) => {
                 const firestoreTimeout = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Firestore lookup timed out")), 3000)
+                    setTimeout(() => reject(new Error(`Firestore lookup timed out (attempt ${attempt})`)), 8000)
                 );
 
                 const lookupTask = (async () => {
                     try {
-                        // Priority 1: Superadmins by ID
-                        let userDoc = await db.collection("superadmins").doc(decodedToken.uid).get();
+                        // Priority 1: Users collection (for superadmin and other roles)
+                        let userDoc = await db.collection("users").doc(decodedToken.uid).get();
+                        if (userDoc.exists) return userDoc.data();
+                        
+                        // Priority 2: Superadmins by ID (legacy)
+                        userDoc = await db.collection("superadmins").doc(decodedToken.uid).get();
                         if (userDoc.exists) return userDoc.data();
 
-                        // Priority 2: Customers by ID
+                        // Priority 3: Customers by ID
                         userDoc = await db.collection("customers").doc(decodedToken.uid).get();
                         if (userDoc.exists) return { ...userDoc.data(), id: userDoc.id };
 
@@ -65,11 +64,21 @@ const requireAuth = async (req, res, next) => {
                     }
                 })();
 
-                userData = await Promise.race([lookupTask, firestoreTimeout]);
-                // Cache the result for 10 minutes
+                return Promise.race([lookupTask, firestoreTimeout]);
+            };
+
+            try {
+                userData = await firestoreLookup(1);
+                // Retry once on null from timeout (transient failure) — not on explicit "not found"
+                if (userData === null) {
+                    // Distinguish timeout-null from genuine-not-found by checking if error was logged
+                    // For safety, retry once — if user truly doesn't exist, second attempt also returns null quickly
+                    userData = await firestoreLookup(2);
+                }
+                // Cache the result for 5 minutes
                 await cache.set(cacheKey, userData, AUTH_CACHE_TTL);
             } catch (dbError) {
-                logger.error("Firestore lookup failed", null, { category: 'auth', detail: dbError.message });
+                logger.error("Firestore lookup failed after retry", null, { category: 'auth', detail: dbError.message });
                 return res.status(503).json({ error: "Authentication service temporarily unavailable. Please try again." });
             }
         }
@@ -87,31 +96,14 @@ const requireAuth = async (req, res, next) => {
             role: role,
             display_name: userData.display_name || userData.full_name || decodedToken.name,
             community_id: userData.community_id || "",
-            customer_id: userData.customer_id || userData.id || "" // Robust fallback to doc.id
+            customer_id: userData.customer_id || userData.uid || userData.id || decodedToken.uid
         };
 
         next();
     } catch (error) {
-        // ✅ FIX #3: Log full error server-side, send generic message to client
-        console.error(`[Auth Middleware] ❌ Token verification FAILED for token: ${idToken ? idToken.substring(0, 10) + '...' : 'NONE'}`);
-        console.error(`[Auth Middleware] Error: ${error.message}`);
-        
-        logger.error('[Auth] ❌ Token verification FAILED:');
-        logger.error('[Auth] Error name:', error.name);
-        logger.error('[Auth] Error message:', error.message);
-        logger.error('[Auth] Error code:', error.code);
-        logger.error('[Auth] Token (first 50 chars):', idToken ? idToken.substring(0, 50) + '...' : 'NONE');
-        logger.error('[Auth] Full error:', error);
-        
-        logger.error("Token verification failed", error, { category: 'auth' });
-
-        // Send generic message (no details exposed)
+        logger.error({ err: error, url: req.originalUrl }, "Auth token verification failed");
         Sentry.captureException(error);
-        return res.status(401).json({ 
-            error: "Unauthorized",
-            details: error.message,
-            code: error.code
-        });
+        return res.status(401).json({ error: "Unauthorized" });
 
     }
 };

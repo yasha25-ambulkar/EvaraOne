@@ -11,6 +11,8 @@ const { getVersionKey, incrementCacheVersion } = require("../utils/cacheVersioni
 const { logAudit } = require("../utils/auditLogger.js");
 // ✅ PHASE 2: HTTP status codes (Task #13)
 const AppError = require("../utils/AppError.js");
+// ✅ SECURITY: ESP32 password encryption
+const { encrypt } = require("../utils/crypto.js");
 const { updateCustomerSchema } = require("../schemas/customer.schema.js");
 const { updateZoneSchema } = require("../schemas/zone.schema.js");
 
@@ -354,6 +356,8 @@ exports.createCustomer = async (req, res) => {
 
         await incrementCacheVersion("customers");
         await incrementCacheVersion("default");
+        // Flush customer list cache (getCustomers uses user: prefix keys)
+        await cache.flushPrefix("user:");
         // logAudit(req.user.uid, 'CREATE', 'customers', doc.id, customerData);
 
         res.status(201).json({ success: true, id: doc.id });
@@ -699,6 +703,8 @@ exports.updateCustomer = async (req, res) => {
 
         // ✅ PHASE 2: Task #11 - Use incrementCacheVersion instead of flushPrefix
         await incrementCacheVersion("customers");
+        // Flush customer list cache (getCustomers uses user: prefix keys)
+        await cache.flushPrefix("user:");
         // ✅ PHASE 2: Task #12 - Log audit trail
         logAudit(req.user.uid, 'UPDATE', 'customers', req.params.id, normalizedData);
         res.status(200).json({ success: true });
@@ -825,8 +831,14 @@ exports.createNode = async (req, res) => {
         const typeNormalized = (assetType || "evaratank").toLowerCase();
         const isValveDevice = typeNormalized === "evaravalve" || typeNormalized === "valve";
         const normalizedNodeKey = String(idForDevice).trim().toLowerCase();
-        const deviceEmail = esp32_email || (isValveDevice ? `esp32-${normalizedNodeKey}@evaratech.com` : "");
-        const devicePassword = esp32_password || (isValveDevice ? `evlv-${normalizedNodeKey}-pass` : "");
+
+        let deviceEmail = esp32_email || "";
+        let devicePassword = esp32_password || "";
+
+        if (isValveDevice && !deviceEmail) {
+            deviceEmail = `esp32-${normalizedNodeKey}@evaratech.com`;
+            devicePassword = `evlv-${normalizedNodeKey}-pass`;
+        }
 
         // Validate device type
         const validTypes = ['evaratank', 'evaradeep', 'evaraflow', 'evaratds', 'evaraphase', 'evaravalve', 'tank', 'deep', 'flow', 'tds', 'phase', 'valve'];
@@ -1028,6 +1040,7 @@ exports.createNode = async (req, res) => {
                 cache.flushPrefix("dashboard_init_"),
                 cache.flushPrefix("dashboard_summary_")
             ]);
+            await incrementCacheVersion("devices"); // invalidates zone_stats cache
         } catch (cacheErr) {
             // Cache clear failure is not fatal — device was already created successfully
             logger.warn('[Device] Cache clear failed:', cacheErr.message);
@@ -1248,8 +1261,9 @@ exports.updateNode = async (req, res) => {
         if (body.customerId || body.customer_id) {
             const cid = trimmed(body.customerId || body.customer_id);
             metaUpdate.customer_id = cid;
+            metaUpdate.isVisibleToCustomer = true; // Auto-visible on assignment
             // Also sync to registry
-            await db.collection("devices").doc(deviceDoc.id).update({ customer_id: cid });
+            await db.collection("devices").doc(deviceDoc.id).update({ customer_id: cid, isVisibleToCustomer: true });
         }
 
         if (body.latitude !== undefined) metaUpdate.latitude = parseNumberSafely(body.latitude);
@@ -1486,6 +1500,7 @@ exports.updateNode = async (req, res) => {
             cache.flushPrefix("dashboard_init_"),
             cache.flushPrefix("dashboard_summary_")
         ]);
+        await incrementCacheVersion("devices"); // invalidates zone_stats cache
         if (typeof telemetryCache !== 'undefined') {
             telemetryCache.del(`telemetry_${deviceDoc.id}`);
             telemetryCache.del(`status_${deviceDoc.id}`);
@@ -1535,6 +1550,7 @@ exports.deleteNode = async (req, res) => {
             cache.flushPrefix("dashboard_init_"),
             cache.flushPrefix("dashboard_summary_")
         ]);
+        await incrementCacheVersion("devices"); // invalidates zone_stats cache
         if (typeof telemetryCache !== 'undefined') {
             telemetryCache.del(`telemetry_${deviceId}`);
             telemetryCache.del(`status_${deviceId}`);
@@ -1704,7 +1720,13 @@ exports.getAuditLogs = async (req, res) => {
 
 exports.getZoneStats = async (req, res) => {
     try {
-        const cacheKey = "zone_stats_all";
+        // Versioned cache key: automatically invalidated whenever zones/customers/devices are mutated
+        const [zonesVer, customersVer, devicesVer] = await Promise.all([
+            db.collection('_cache_versions').doc('zones').get().then(d => d.exists ? d.data().version : 1).catch(() => 1),
+            db.collection('_cache_versions').doc('customers').get().then(d => d.exists ? d.data().version : 1).catch(() => 1),
+            db.collection('_cache_versions').doc('devices').get().then(d => d.exists ? d.data().version : 1).catch(() => 1)
+        ]);
+        const cacheKey = `zone_stats_all_z${zonesVer}_c${customersVer}_d${devicesVer}`;
         const cached = await cache.get(cacheKey);
         if (cached) return res.status(200).json(cached);
 

@@ -66,6 +66,22 @@ const RegionsOverview = () => {
     }
   }, [authLoading]);
 
+  // Refetch when tab regains focus or becomes visible — prevents stale data after mutations elsewhere
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!authLoading) fetchData();
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !authLoading) fetchData();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [authLoading]);
+
   const getStatsForRegion = (regionId: string) => {
     const s = stats.find((st) => st.zone_id === regionId);
     return {

@@ -32,9 +32,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { login: loginFn, signup: signupFn, user, isAuthenticated } = useAuth();
 
-  // If already logged in, redirect away from login page
+  // If already logged in, redirect based on role
   if (isAuthenticated && user) {
-    return <Navigate to="/map" replace />;
+    const target = user.role === 'superadmin' ? '/superadmin/dashboard' : user.role === 'community_admin' ? '/dashboard' : '/map';
+    return <Navigate to={target} replace />;
   }
 
   // ─── Handlers ────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ const Login = () => {
       setTimeout(
         () =>
           reject(new Error("Request timed out. Please check your connection.")),
-        10000,
+        45000,
       ),
     );
 
@@ -81,8 +82,14 @@ const Login = () => {
         ])) as Awaited<ReturnType<typeof loginFn>>;
 
         if (result.success && result.user) {
-          // Redirect all users to the Map page as requested
-          navigate("/map");
+          // Role-based redirect
+          if (result.user.role === 'superadmin') {
+            navigate('/superadmin/dashboard');
+          } else if (result.user.role === 'community_admin') {
+            navigate('/dashboard');
+          } else {
+            navigate('/map');
+          }
         } else {
           setError(result.error ?? "Invalid credentials.");
         }
