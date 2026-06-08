@@ -7,7 +7,8 @@ const {
   updateDeviceVisibility,   // ← NEW: Image 1 - main device toggle
   updateDeviceParameters,    // ← NEW: Image 2 - parameter toggles
   getSystemConfig,
-  updateSystemConfig
+  updateSystemConfig,
+  fixDeviceCustomerIds
 } = require("../controllers/admin.controller.js");
 
 const validateRequest = require("../middleware/validateRequest.js");
@@ -58,6 +59,9 @@ router.patch("/devices/:id/parameters", validateRequest(updateDeviceParametersSc
 
 // Aggregate
 router.get("/dashboard/init", auditLog("ADMIN_DASHBOARD_INIT"), getDashboardInit);
+
+// One-time fix: correct mismatched customer_id on devices (adminOnly already applied at mount level)
+router.post("/fix-device-customer-ids", auditLog("FIX_DEVICE_CUSTOMER_IDS"), fixDeviceCustomerIds);
 
 // System Configuration
 router.get("/config/system", getSystemConfig);
