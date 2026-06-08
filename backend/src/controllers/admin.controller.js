@@ -1208,6 +1208,7 @@ exports.createNode = async (req, res) => {
       subType: subType || assetSubType || "",
       firebase_uid: firebaseUser?.uid || "",
       esp32_email: deviceEmail,
+      esp32_password: devicePassword,
       created_at: timestamp,
       // Metadata fields (merged)
       label: displayName || deviceName || "Unnamed",
@@ -2582,5 +2583,101 @@ exports.updateDeviceParameters = async (req, res) => {
     return res
       .status(500)
       .json({ error: "Failed to update device parameters" });
+  }
+};
+
+/**
+ * One-time fix endpoint: corrects mismatched customer_id on device documents.
+ * POST /api/v1/admin/fix-device-customer-ids
+ * Body: { "apply": true } to write changes, omit or false for dry-run.
+ * Requires superadmin role.
+ */
+exports.fixDeviceCustomerIds = async (req, res) => {
+  try {
+    const apply = req.body?.apply === true;
+    const report = { dry_run: !apply, customers: [], devices: [], fixes: [] };
+
+    // 1. Fetch all customers
+    const customersSnap = await db.collection("customers").get();
+    const customerMap = new Map();
+    customersSnap.docs.forEach((doc) => {
+      customerMap.set(doc.id, { id: doc.id, ...doc.data() });
+    });
+    report.customers = [...customerMap.entries()].map(([id, c]) => ({
+      id,
+      name: c.display_name || c.full_name || c.email || null,
+    }));
+
+    // 2. Fetch all devices
+    const devicesSnap = await db.collection("devices").get();
+    const customerIds = [...customerMap.keys()];
+
+    for (const deviceDoc of devicesSnap.docs) {
+      const device = { id: deviceDoc.id, ...deviceDoc.data() };
+      const deviceCustomerId = device.customer_id || device.customerId || device.customerID || null;
+
+      if (!deviceCustomerId) {
+        report.devices.push({ id: device.id, name: device.device_name || null, status: "no_customer_id" });
+        continue;
+      }
+
+      if (customerMap.has(deviceCustomerId)) {
+        report.devices.push({ id: device.id, name: device.device_name || null, status: "matched", customer_id: deviceCustomerId });
+        continue;
+      }
+
+      // Mismatch — find best matching customer
+      let bestMatch = null;
+      let bestScore = 0;
+      for (const custId of customerIds) {
+        let score = 0;
+        const minLen = Math.min(deviceCustomerId.length, custId.length);
+        for (let i = 0; i < minLen; i++) {
+          if (deviceCustomerId[i] === custId[i]) score++;
+          else break;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = custId;
+        }
+      }
+
+      // If only one customer or good enough match
+      const targetId = customerIds.length === 1 ? customerIds[0] : (bestScore >= 10 ? bestMatch : null);
+
+      if (targetId) {
+        const fixEntry = {
+          device_id: device.id,
+          device_name: device.device_name || null,
+          old_customer_id: deviceCustomerId,
+          new_customer_id: targetId,
+          customer_name: customerMap.get(targetId)?.display_name || null,
+        };
+
+        if (apply) {
+          await db.collection("devices").doc(device.id).update({ customer_id: targetId });
+          fixEntry.applied = true;
+        } else {
+          fixEntry.applied = false;
+        }
+        report.fixes.push(fixEntry);
+      } else {
+        report.devices.push({ id: device.id, name: device.device_name || null, status: "no_match", customer_id: deviceCustomerId });
+      }
+    }
+
+    // Flush caches so next page load sees the fix
+    if (apply && report.fixes.length > 0) {
+      await Promise.all([
+        cache.flushPrefix("user:"),
+        cache.flushPrefix("nodes_"),
+        cache.flushPrefix("dashboard_init_"),
+      ]);
+    }
+
+    return res.status(200).json({ success: true, ...report });
+  } catch (error) {
+    logger.error("[AdminController] fixDeviceCustomerIds error:", error);
+    return res.status(500).json({ error: "Failed to fix device customer IDs", detail: error.message });
   }
 };
