@@ -409,7 +409,7 @@ exports.getCustomers = async (req, res) => {
   try {
     const { zone_id, community_id, regionFilter, limit, cursor } = req.query;
 
-    console.log("[getCustomers] 🔍 REQUEST PARAMS:", {
+    logger.debug("[getCustomers] REQUEST PARAMS:", {
       zone_id,
       community_id,
       regionFilter,
@@ -432,10 +432,8 @@ exports.getCustomers = async (req, res) => {
         : `user:${req.user.uid}:customers:${cacheParams}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
-      console.log(
-        "[getCustomers] ✅ Cache HIT, returning",
-        cached.length,
-        "customers",
+      logger.debug(
+        `[getCustomers] Cache HIT, returning ${cached.length} customers`,
       );
       return res.status(200).json(cached);
     }
@@ -475,21 +473,12 @@ exports.getCustomers = async (req, res) => {
     }
 
     const snapshot = await query.get();
-    console.log(
-      "[getCustomers] 📊 Query executed, found:",
-      snapshot.size,
-      "documents",
+    logger.debug(
+      `[getCustomers] Query executed, found ${snapshot.size} documents`,
     );
 
     let customers = snapshot.docs.map((doc) => {
       const data = doc.data();
-      console.log("[getCustomers] 👤 Customer DOC:", {
-        id: doc.id,
-        display_name: data.display_name,
-        email: data.email,
-        zone_id: data.zone_id || "MISSING!!!",
-        regionFilter: data.regionFilter,
-      });
       return { id: doc.id, ...data };
     });
 
@@ -544,19 +533,9 @@ exports.getCustomers = async (req, res) => {
     logger.debug(
       `[AdminController] Successfully fetched ${customers.length} customers`,
     );
-    console.log(
-      "[getCustomers] ✅ FINAL RESULT: Returning",
-      customers.length,
-      "customers",
+    logger.info(
+      `[getCustomers] Returning ${customers.length} customers`,
     );
-    customers.forEach((c) => {
-      console.log(
-        "   - " + c.display_name || c.email,
-        "(zone_id:",
-        c.zone_id || "NONE",
-        ")",
-      );
-    });
 
     const [zonesSnap, devicesSnap] = await Promise.all([
       db.collection("zones").get(),
@@ -863,6 +842,7 @@ exports.getCustomerById = async (req, res) => {
         null,
     });
   } catch (error) {
+    logger.error("[AdminController] getCustomerById error:", error);
     res.status(500).json({ error: "Failed to get customer" });
   }
 };
@@ -950,6 +930,9 @@ exports.updateCustomer = async (req, res) => {
     await incrementCacheVersion("customers");
     // Flush customer list cache (getCustomers uses user: prefix keys)
     await cache.flushPrefix("user:");
+    // Flush dashboard cache since customer data affects dashboard summary
+    await cache.flushPrefix("dashboard_init_");
+    await cache.flushPrefix("dashboard_summary_");
     // ✅ PHASE 2: Task #12 - Log audit trail
     logAudit(
       req.user.uid,
@@ -2635,6 +2618,9 @@ exports.fixDeviceCustomerIds = async (req, res) => {
         cache.flushPrefix("user:"),
         cache.flushPrefix("nodes_"),
         cache.flushPrefix("dashboard_init_"),
+        cache.flushPrefix("dashboard_summary_"),
+        incrementCacheVersion("customers"),
+        incrementCacheVersion("devices"),
       ]);
     }
 

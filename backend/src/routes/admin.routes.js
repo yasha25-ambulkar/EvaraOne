@@ -25,7 +25,6 @@ const {
 } = require("../schemas/index.schema.js");
 
 const auditLog = require("../middleware/audit.middleware.js");
-const adminOnly = require("../middleware/adminOnly.middleware.js");
 
 // ─── #10 FIX: Validate ALL endpoints, including GET query parameters ──────────
 // ORIGINAL BUG: GET /zones had no validation at all.
@@ -61,8 +60,8 @@ router.patch("/devices/:id/parameters", validateRequest(updateDeviceParametersSc
 // Aggregate
 router.get("/dashboard/init", auditLog("ADMIN_DASHBOARD_INIT"), getDashboardInit);
 
-// One-time fix: correct mismatched customer_id on devices
-router.post("/fix-device-customer-ids", adminOnly, auditLog("FIX_DEVICE_CUSTOMER_IDS"), fixDeviceCustomerIds);
+// One-time fix: correct mismatched customer_id on devices (adminOnly already applied at mount level)
+router.post("/fix-device-customer-ids", auditLog("FIX_DEVICE_CUSTOMER_IDS"), fixDeviceCustomerIds);
 
 // System Configuration
 router.get("/config/system", getSystemConfig);
