@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { db, admin } = require("../config/firebase.js");
 const { Filter } = require("firebase-admin/firestore");
+const deviceLookupService = require("../services/deviceLookupService.js");
 const cache = require("../config/cache.js");
 const telemetryCache = require("../services/cacheService.js");
 const { checkOwnership } = require("../middleware/auth.middleware.js");
@@ -118,20 +119,17 @@ exports.createZone = async (req, res) => {
 };
 
 exports.getZones = async (req, res) => {
-  try {
-    // ─── #2 FIX: Tenant Isolation + Query Parameter Validation ──────────
-    // ✅ PHASE 2: Task #11 - Use versioned cache keys instead of flushPrefix
-    const baseCacheKey = `zones_list_${req.user.role}_${req.query.limit || 50}_${req.query.cursor || ""}`;
-    const cacheKey = `${baseCacheKey}_v${await (async () => {
-      const versionDoc = await db
-        .collection("_cache_versions")
-        .doc("zones")
-        .get();
-      return versionDoc.exists ? versionDoc.data().version : 1;
-    })()}`;
-
-    const cached = await cache.get(cacheKey);
-    if (cached) return res.status(200).json(cached);
+    try {
+        // ─── #2 FIX: Tenant Isolation + Query Parameter Validation ──────────
+        // ✅ PHASE 2: Task #11 - Use versioned cache keys instead of flushPrefix
+        const baseCacheKey = `zones_list_${req.user.role}_${req.query.limit || 50}_${req.query.cursor || ''}`;
+        const cacheKey = `${baseCacheKey}_v${(await (async () => {
+            const versionDoc = await db.collection('_cache_versions').doc('zones').get();
+            return versionDoc.exists ? versionDoc.data().version : 1;
+        })())}`;
+        
+        const cached = await cache.get(cacheKey);
+        if (cached) return res.status(200).json(cached);
 
     // Validate and cap limit parameter (max 100 per query schema)
     const limitStr = Math.min(parseInt(req.query.limit) || 50, 100);
@@ -154,20 +152,17 @@ exports.getZones = async (req, res) => {
       }
     }
 
-    const snapshot = await query.get();
-    const zones = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    await cache.set(cacheKey, zones, 600); // 10 min
-    res.status(200).json(zones);
-  } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(error.toJSON());
+        const snapshot = await query.get();
+        const zones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        await cache.set(cacheKey, zones, 600); // 10 min
+        res.status(200).json(zones);
+    } catch (error) {
+        if (error instanceof AppError) {
+            return res.status(error.statusCode).json(error.toJSON());
+        }
+        req.log?.error({ error: error.message }, '[AdminController] Get zones error');
+        res.status(500).json({ error: "Failed to get zones" });
     }
-    req.log?.error(
-      { error: error.message },
-      "[AdminController] Get zones error",
-    );
-    res.status(500).json({ error: "Failed to get zones" });
-  }
 };
 
 exports.getZoneById = async (req, res) => {
@@ -1359,9 +1354,9 @@ exports.createNode = async (req, res) => {
     logger.debug(`[createNode]   Device type: ${typeNormalized}`);
     logger.debug(`[createNode]   Keys:`, Object.keys(deviceData));
 
-    // ✅ SINGLE DOCUMENT WRITE: Use hardware ID as document ID for direct lookup
-    const deviceDocRef = db.collection("devices").doc(idForDevice);
-    await deviceDocRef.set(deviceData);
+        // ✅ SINGLE DOCUMENT WRITE: Use hardware ID as document ID for direct lookup
+        const deviceDocRef = db.collection("devices").doc(idForDevice);
+        await deviceDocRef.set(deviceData);
 
     logger.debug(
       `[createNode] ✅ Document created successfully in devices/${idForDevice}`,
@@ -1641,16 +1636,12 @@ exports.updateNode = async (req, res) => {
     const channelId = body.thingspeakChannelId || body.thingspeak_channel_id;
     if (channelId) metaUpdate.thingspeak_channel_id = trimmed(channelId);
 
-    if (body.customerId || body.customer_id) {
-      const cid = trimmed(body.customerId || body.customer_id);
-      metaUpdate.customer_id = cid;
-      metaUpdate.isVisibleToCustomer = true; // Auto-visible on assignment
-      // Also sync to registry
-      await db
-        .collection("devices")
-        .doc(deviceDoc.id)
-        .update({ customer_id: cid, isVisibleToCustomer: true });
-    }
+        if (body.customerId || body.customer_id) {
+            const cid = trimmed(body.customerId || body.customer_id);
+            metaUpdate.customer_id = cid;
+            // Also sync to registry
+            await db.collection("devices").doc(deviceDoc.id).update({ customer_id: cid });
+        }
 
     if (body.latitude !== undefined)
       metaUpdate.latitude = parseNumberSafely(body.latitude);
@@ -1956,33 +1947,7 @@ exports.updateNode = async (req, res) => {
       metaUpdate.lastUpdated = new Date();
     }
 
-    await metaRef.set(metaUpdate, { merge: true });
-
-    // Keep devices registry in sync for valve nodes (provisioned via single-doc createNode)
-    if (type === "evaravalve" || type === "valve") {
-      const registrySync = {};
-      if (metaUpdate.thingspeak_channel_id)
-        registrySync.thingspeak_channel_id = metaUpdate.thingspeak_channel_id;
-      if (metaUpdate.thingspeak_read_api_key)
-        registrySync.thingspeak_read_api_key =
-          metaUpdate.thingspeak_read_api_key;
-      if (metaUpdate.flow_field)
-        registrySync.flow_field = metaUpdate.flow_field;
-      if (metaUpdate.flow_field_name)
-        registrySync.flow_field_name = metaUpdate.flow_field_name;
-      if (metaUpdate.total_volume_field)
-        registrySync.total_volume_field = metaUpdate.total_volume_field;
-      if (metaUpdate.total_volume_field_name)
-        registrySync.total_volume_field_name =
-          metaUpdate.total_volume_field_name;
-      if (metaUpdate.fields) registrySync.fields = metaUpdate.fields;
-      if (Object.keys(registrySync).length > 0) {
-        await db
-          .collection("devices")
-          .doc(deviceDoc.id)
-          .set(registrySync, { merge: true });
-      }
-    }
+        await metaRef.set(metaUpdate, { merge: true });
 
     // SaaS Invalidation
     await Promise.all([
@@ -2084,13 +2049,11 @@ exports.deleteNode = async (req, res) => {
 };
 
 exports.getDashboardSummary = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: Missing user information" });
-    }
-    const isSuperAdmin = req.user.role === "superadmin";
+    try {
+        if (!req.user) {
+            return res.status(401).json({ error: "Unauthorized: Missing user information" });
+        }
+        const isSuperAdmin = req.user.role === "superadmin";
 
     let nodesQuery = db.collection("devices");
     let customersQuery = db.collection("customers");
@@ -2134,14 +2097,14 @@ exports.getDashboardSummary = async (req, res) => {
 
     const totalZones = zonesSnap.data().count;
 
-    const result = {
-      total_nodes: actualNodeCount,
-      total_customers: totalCustomers,
-      total_zones: totalZones,
-      online_nodes: onlineNodes,
-      alerts_active: 0,
-      system_health: actualNodeCount > 0 ? 92 : 0,
-    };
+        const result = {
+            total_nodes: actualNodeCount,
+            total_customers: totalCustomers,
+            total_zones: totalZones,
+            online_nodes: onlineNodes,
+            alerts_active: 0,
+            system_health: actualNodeCount > 0 ? 92 : 0
+        };
 
     logger.debug(`[Dashboard] Returning stats:`, result);
 
@@ -2457,9 +2420,9 @@ exports.updateDeviceVisibility = async (req, res) => {
         .json({ error: "Not authorized to update this device" });
     }
 
-    await db.collection("devices").doc(deviceDoc.id).update({
-      isVisibleToCustomer,
-    });
+        await db.collection("devices").doc(deviceDoc.id).update({
+            isVisibleToCustomer
+        });
 
     // Get customer_id so we can flush that specific customer's cache
     const customerId = deviceDoc.data().customer_id;
@@ -2548,9 +2511,9 @@ exports.updateDeviceParameters = async (req, res) => {
         .json({ error: "Not authorized to update this device" });
     }
 
-    await db.collection("devices").doc(deviceDoc.id).update({
-      customer_config,
-    });
+        await db.collection("devices").doc(deviceDoc.id).update({
+            customer_config
+        });
 
     // Flush customer-facing caches so change reflects immediately
     await Promise.all([
