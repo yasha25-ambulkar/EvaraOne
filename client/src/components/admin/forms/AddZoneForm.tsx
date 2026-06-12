@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { adminService } from "../../../services/admin";
-import { useToast } from "../../ToastProvider";
+import { useToast } from "../../ui/ToastProvider";
 import { regionSchema, type RegionInput } from "../../../schemas";
 import { FormField } from "../../forms/FormField";
 

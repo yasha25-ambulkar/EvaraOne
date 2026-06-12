@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import api from "../services/api";
+import api from "../../services/api";
 
 interface Props {
   children?: ReactNode;

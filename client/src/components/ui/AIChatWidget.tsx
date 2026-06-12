@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Bot, User } from 'lucide-react';
-import { sendMessageToAI, type ChatMessage } from '../services/ai';
+import { sendMessageToAI, type ChatMessage } from '../../services/ai';
 
 export default function AIChatWidget() {
     const [isOpen, setIsOpen] = useState(false);

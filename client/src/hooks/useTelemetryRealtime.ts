@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { deviceService } from '../services/DeviceService';
+import { deviceService } from '../services/realtime/DeviceService';
 
 interface RealtimeOptions {
     deviceId: string;

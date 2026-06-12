@@ -12,6 +12,8 @@ import {
 import clsx from "clsx";
 import { useAuth } from "../context/AuthContext";
 import type { UserRole } from "../types/database_custom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../lib/firebase";
 
 type Mode = "signin" | "register";
 type LoginStep = "role-selection" | "credentials";
@@ -75,24 +77,10 @@ const Login = () => {
 
     try {
       if (mode === "signin") {
-        // Race login against timeout
-        const result = (await Promise.race([
-          loginFn(email, password),
-          timeoutPromise,
-        ])) as Awaited<ReturnType<typeof loginFn>>;
-
-        if (result.success && result.user) {
-          // Role-based redirect
-          if (result.user.role === 'superadmin') {
-            navigate('/superadmin/dashboard');
-          } else if (result.user.role === 'community_admin') {
-            navigate('/dashboard');
-          } else {
-            navigate('/map');
-          }
-        } else {
-          setError(result.error ?? "Invalid credentials.");
-        }
+        await signInWithEmailAndPassword(auth, email, password);
+        // Do not navigate immediately!
+        // We wait for AuthContext's onAuthStateChanged to fetch the user profile,
+        // and the automatic redirect at the top of Login.tsx will route the user.
       } else {
         if (!displayName.trim()) {
           setError("Please enter your name.");

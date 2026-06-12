@@ -13,14 +13,14 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
   type MapDevice,
-} from "../../services/DeviceService";
+} from "../../services/realtime/DeviceService";
 import type { MapPipeline } from "../../hooks/useMapPipelines";
-import { computeDeviceStatus } from "../../services/DeviceService";
+import { computeDeviceStatus } from "../../services/realtime/DeviceService";
 import { getTankLevel } from "../../utils/telemetryPipeline";
 import { socket } from "../../services/api";
 import { getDeviceAnalyticsRoute } from "../../utils/deviceRouting";
 import { useTelemetry } from "../../hooks/useTelemetry";
-import { type TelemetryData } from "../../services/TelemetryService";
+import { type TelemetryData } from "../../services/realtime/TelemetryService";
 import { useFirestoreFlowData } from "../../hooks/useFirestoreFlowData";
 import { getDeviceIcon } from "../../utils/mapIcons";
 import clsx from "clsx";

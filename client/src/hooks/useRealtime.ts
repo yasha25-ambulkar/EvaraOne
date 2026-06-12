@@ -3,7 +3,7 @@
  * Uses Firestore onSnapshot subscriptions
  */
 import { useEffect, useState } from 'react';
-import { deviceService } from '../services/DeviceService';
+import { deviceService } from '../services/realtime/DeviceService';
 import { useAuth } from '../context/AuthContext';
 
 /**

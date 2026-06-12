@@ -3,7 +3,7 @@ import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 import { MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { computeDeviceStatus } from '../../services/DeviceService';
+import { computeDeviceStatus } from '../../services/realtime/DeviceService';
 
 interface TDSCardProps {
     node: any;

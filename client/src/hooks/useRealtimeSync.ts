@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { auth, isFirebaseEnabled } from '../lib/firebase';
-import realtimeSync from '../services/RealtimeSyncService';
+import realtimeSync from '../services/realtime/RealtimeSyncService';
 
 interface UseRealtimeSyncOptions {
   deviceId?: string;

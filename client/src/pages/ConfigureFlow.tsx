@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Settings } from 'lucide-react';
 import flowIcon from '../../public/meter.png';
-import { deviceService } from '../services/DeviceService';
+import { deviceService } from '../services/realtime/DeviceService';
 
 const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => {
     return (

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { deviceService, type MapDevice } from "../services/DeviceService";
+import { deviceService, type MapDevice } from "../services/realtime/DeviceService";
 import { useAuth } from "../context/AuthContext";
 import { socket } from "../services/api";
 

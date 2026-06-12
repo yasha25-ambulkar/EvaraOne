@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { deviceService, type MapDevice } from "../services/DeviceService";
+import { deviceService, type MapDevice } from "../services/realtime/DeviceService";
 import { useAuth } from "../context/AuthContext";
 
 export type { MapDevice };

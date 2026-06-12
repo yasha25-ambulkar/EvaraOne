@@ -5,7 +5,7 @@ import { adminService } from "../../services/admin";
 import { User, Search, MapPin, Filter, Plus, PencilLine, Trash2 } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { AddCustomerForm } from "../../components/admin/forms/AddCustomerForm";
-import { useToast } from "../../components/ToastProvider";
+import { useToast } from "../../components/ui/ToastProvider";
 import { useConfirm } from "../../components/ui/ConfirmProvider";
 
 const AdminCustomers = () => {

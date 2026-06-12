@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth, type UserRole, type UserPlan } from '../context/AuthContext';
+import { useAuth, type UserRole, type UserPlan } from '../../context/AuthContext';
 
 interface ProtectedRouteProps {
     allowedRoles?: UserRole[];

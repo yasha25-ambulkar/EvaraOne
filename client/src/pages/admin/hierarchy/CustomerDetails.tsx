@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { adminService } from "../../../services/admin";
 import {
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Modal } from "../../../components/ui/Modal";
 import { AddDeviceForm } from "../../../components/admin/forms/AddDeviceForm";
-import { useToast } from "../../../components/ToastProvider";
+import { useToast } from "../../../components/ui/ToastProvider";
 
 const CustomerDetails = () => {
   const { customerId } = useParams();

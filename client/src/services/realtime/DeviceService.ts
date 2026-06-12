@@ -1,4 +1,4 @@
-import api, { socket } from "./api";
+import api, { socket } from "../api";
 import type { Device } from "../types/entities";
 
 export interface MapDevice extends Device {

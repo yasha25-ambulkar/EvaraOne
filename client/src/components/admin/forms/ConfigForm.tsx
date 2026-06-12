@@ -6,7 +6,7 @@ import { Save, Loader2, Smartphone, Shield, RefreshCcw, Clock, Save as SaveIcon 
 import { z } from 'zod';
 
 import { adminService } from '../../../services/admin';
-import { useToast } from '../../ToastProvider';
+import { useToast } from '../../ui/ToastProvider';
 import { FormField } from '../../forms/FormField';
 
 const configSchema = z.object({

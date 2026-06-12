@@ -9,12 +9,12 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MainLayout from "./layouts/MainLayout";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/ui/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
-import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { TenancyProvider } from "./context/TenancyContext";
-import { ToastProvider } from "./components/ToastProvider";
+import { ToastProvider } from "./components/ui/ToastProvider";
 import SplashScreen from "./components/ui/SplashScreen";
 import ConfirmProvider from "./components/ui/ConfirmProvider";
 import { setTourNavigate } from "./utils/tourNavigate";

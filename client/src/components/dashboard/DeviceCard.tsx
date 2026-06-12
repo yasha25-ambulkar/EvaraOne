@@ -13,7 +13,7 @@ const productLabel = (device: any): string => {
   return 'Device';
 };
 
-import { computeDeviceStatus } from '../../services/DeviceService';
+import { computeDeviceStatus } from '../../services/realtime/DeviceService';
 
 const isNodeOnline = (device: any): boolean => {
   // 1. Authoritative backend flag — highest priority (same logic as AllNodes & TDSCard)

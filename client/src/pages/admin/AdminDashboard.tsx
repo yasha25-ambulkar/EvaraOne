@@ -1,6 +1,6 @@
 import { useState } from "react"; // HMR Re-trigger
 import { Users, Network, MapPin, Settings, Activity } from "lucide-react";
-import { useToast } from "../../components/ToastProvider";
+import { useToast } from "../../components/ui/ToastProvider";
 import { ActionCard } from "../../components/admin/ActionCard";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/AuthContext";

@@ -35,7 +35,7 @@ import { MapPicker } from "../MapPicker";
 
 import { adminService } from "../../../services/admin";
 import { useZones } from "../../../hooks/useZones";
-import { useToast } from "../../ToastProvider";
+import { useToast } from "../../ui/ToastProvider";
 import { useAuth } from "../../../context/AuthContext";
 import { deviceSchema, type DeviceInput } from "../../../schemas";
 import { FormField } from "../../forms/FormField";

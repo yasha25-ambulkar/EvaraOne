@@ -19,10 +19,10 @@ import {
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { useNodes } from "../hooks/useNodes";
-import { useToast } from "../components/ToastProvider";
+import { useToast } from "../components/ui/ToastProvider";
 import { getDeviceAnalyticsRoute } from "../utils/deviceRouting";
 import { socket } from "../services/api";
-import { computeDeviceStatus } from "../services/DeviceService";
+import { computeDeviceStatus } from "../services/realtime/DeviceService";
 import { getTankLevel } from "../utils/telemetryPipeline";
 import TDSCard from "../components/dashboard/TDSCard";
 

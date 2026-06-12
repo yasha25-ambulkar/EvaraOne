@@ -4,8 +4,8 @@ import { ArrowLeft, Settings, Loader2 } from 'lucide-react';
 import tankIcon from '../../public/tank.png';
 import tdsIcon from '../../public/tds.png';
 import { adminService } from '../services/admin';
-import { deviceService } from '../services/DeviceService';
-import { useToast } from '../components/ToastProvider';
+import { deviceService } from '../services/realtime/DeviceService';
+import { useToast } from '../components/ui/ToastProvider';
 
 
 const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => {

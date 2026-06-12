@@ -203,6 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             setLoading(false);
             return;
           }
+          setLoading(true);
           await fetchProfile(firebaseUser);
         } else {
           loginCompleteRef.current = false; // reset on logout

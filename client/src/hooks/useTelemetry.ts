@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { telemetryService, type TelemetryData } from '../services/TelemetryService';
+import { telemetryService, type TelemetryData } from '../services/realtime/TelemetryService';
 import { socket } from '../services/api';
 
 export const useTelemetry = (nodeId: string | undefined) => {

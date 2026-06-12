@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { TankShape } from "../utils/tankCalculations";
+import type { TankShape } from "../../utils/tankCalculations";
 
 interface RealisticTankProps {
   percentage: number; // 0 - 100

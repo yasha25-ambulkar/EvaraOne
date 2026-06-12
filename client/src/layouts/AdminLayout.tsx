@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-import Navbar from '../components/Navbar';
+import Navbar from '../components/layout/Navbar';
 
 const AdminLayout = () => {
     const { user, logout } = useAuth();

@@ -9,7 +9,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);

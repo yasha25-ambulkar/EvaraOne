@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Eye } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import type { UserRole, UserPlan } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import type { UserRole, UserPlan } from '../../context/AuthContext';
 
 /**
  * RolePreviewButton - Allows super admins to preview the application as different user roles

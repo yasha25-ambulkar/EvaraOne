@@ -14,7 +14,7 @@ import {
   Globe,
 } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
-import { useToast } from "../../../components/ToastProvider";
+import { useToast } from "../../../components/ui/ToastProvider";
 import { useConfirm } from '../../../components/ui/ConfirmProvider';
 import type { Zone as RegionRow } from "../../../types/entities";
 

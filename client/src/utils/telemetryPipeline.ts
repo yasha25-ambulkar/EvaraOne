@@ -1,4 +1,4 @@
-import { computeDeviceStatus } from '../services/DeviceService';
+import { computeDeviceStatus } from '../services/realtime/DeviceService';
 
 export const computeOnlineStatus = (lastSeen: string | null): 'Online' | 'Offline' => {
     return computeDeviceStatus(lastSeen);

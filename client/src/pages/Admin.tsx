@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { adminService } from "../services/admin";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import ErrorBoundary from "../components/ErrorBoundary";
+import ErrorBoundary from "../components/ui/ErrorBoundary";
 import { AddZoneForm } from "../components/admin/forms/AddZoneForm";
 
 import { AddCustomerForm } from "../components/admin/forms/AddCustomerForm";

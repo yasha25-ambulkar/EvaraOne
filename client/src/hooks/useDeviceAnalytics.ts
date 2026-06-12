@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { deviceService } from "../services/DeviceService";
+import { deviceService } from "../services/realtime/DeviceService";
 import { useRealtimeTelemetry } from "./useRealtimeTelemetry";
 import type { Device, TelemetrySnapshot } from "../types/entities";
 

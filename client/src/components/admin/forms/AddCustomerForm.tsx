@@ -20,7 +20,7 @@ import {
 
 import { adminService } from "../../../services/admin";
 import { useZones } from "../../../hooks/useZones";
-import { useToast } from "../../ToastProvider";
+import { useToast } from "../../ui/ToastProvider";
 import { FormField } from "../../forms/FormField";
 import { customerSchema, type CustomerInput } from "../../../schemas";
 

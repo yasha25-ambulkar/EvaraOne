@@ -11,9 +11,9 @@ import {
   HelpCircle,
 } from "lucide-react";
 import clsx from "clsx";
-import { useAuth } from "../context/AuthContext";
-import { useTenancy } from "../context/TenancyContext";
-import { startOnboardingTour } from "../utils/onboardingTour";
+import { useAuth } from "../../context/AuthContext";
+import { useTenancy } from "../../context/TenancyContext";
+import { startOnboardingTour } from "../../utils/onboardingTour";
 
 const Navbar = () => {
   const location = useLocation();

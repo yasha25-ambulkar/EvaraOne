@@ -1,6 +1,6 @@
 import React from 'react';
-import type { WaterAnalytics } from '../hooks/useWaterAnalytics';
-import { formatTimeDuration, formatRate } from '../hooks/useWaterAnalytics';
+import type { WaterAnalytics } from '../../hooks/useWaterAnalytics';
+import { formatTimeDuration, formatRate } from '../../hooks/useWaterAnalytics';
 
 interface WaterAnalyticsCardsProps {
   analytics: WaterAnalytics;

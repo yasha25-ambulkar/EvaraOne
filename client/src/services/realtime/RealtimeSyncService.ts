@@ -4,7 +4,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import { auth, isFirebaseEnabled } from '../lib/firebase';
+import { auth, isFirebaseEnabled } from '../../lib/firebase';
 
 interface RealtimeConfig {
   enabled: boolean;
@@ -60,7 +60,7 @@ class RealtimeSyncService {
 
       const SOCKET_URL =
         import.meta.env.VITE_WS_URL ||
-        (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:3000');
+        (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:5002');
 
       this.socket = io(SOCKET_URL, {
         auth: { token },

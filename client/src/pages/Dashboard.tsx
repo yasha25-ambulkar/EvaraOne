@@ -1,5 +1,5 @@
 import { useAuth } from "../context/AuthContext";
-import ErrorBoundary from "../components/ErrorBoundary";
+import ErrorBoundary from "../components/ui/ErrorBoundary";
 import SuperAdminDashboard from "./SuperAdminDashboard";
 import CustomerDashboard from "./CustomerDashboard";
 

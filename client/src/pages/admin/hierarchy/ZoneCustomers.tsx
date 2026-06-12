@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Modal } from "../../../components/ui/Modal";
 import { AddCustomerForm } from "../../../components/admin/forms/AddCustomerForm";
-import { useToast } from "../../../components/ToastProvider";
+import { useToast } from "../../../components/ui/ToastProvider";
 import { useConfirm } from '../../../components/ui/ConfirmProvider';
 import type {
   Zone as RegionRow,

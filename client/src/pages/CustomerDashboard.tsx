@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNodes } from '../hooks/useNodes';
-import ErrorBoundary from '../components/ErrorBoundary';
+import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DeviceCard from '../components/dashboard/DeviceCard';
 import ConsumptionTrendChart from '../components/dashboard/ConsumptionTrendChart';
 import ReportsDownloader from '../components/dashboard/ReportsDownloader';
-import { computeDeviceStatus } from '../services/DeviceService';
+import { computeDeviceStatus } from '../services/realtime/DeviceService';
 import { Link } from 'react-router-dom';
 import { getDeviceAnalyticsRoute } from '../utils/deviceRouting';
 import { useConsumptionTrend } from '../hooks/useConsumptionTrend';

@@ -84,7 +84,7 @@ function manualChunks(id: string) {
 
 // https://vite.dev/config/
 export default defineConfig({
-  envDir: path.resolve(__dirname, ".."),
+  envDir: path.resolve(__dirname, "."),
   plugins: [react(), tailwindcss()],
   server: {
     port: 8081,
@@ -92,13 +92,13 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        // Backend listens on PORT (defaults to 5002 locally). Use 3000 to match backend/.env in dev.
-        target: "http://localhost:3000",
+        // Backend runs on PORT 5002 locally (see backend/.env)
+        target: "http://localhost:5002",
         changeOrigin: true,
         secure: false,
       },
       "/ws": {
-        target: "http://localhost:3000",
+        target: "http://localhost:5002",
         ws: true,
       },
     },

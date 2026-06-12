@@ -36,7 +36,7 @@ import {
 import type { TankShape } from '../utils/tankCalculations';
 
 import { useWaterAnalytics } from '../hooks/useWaterAnalytics';
-import { dataMergingService } from '../services/DataMergingService';
+import { dataMergingService } from '../services/realtime/DataMergingService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

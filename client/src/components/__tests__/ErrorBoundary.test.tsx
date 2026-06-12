@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import ErrorBoundary from '../ErrorBoundary';
+import ErrorBoundary from '../ui/ErrorBoundary';
 import api from '../../services/api';
 
 vi.mock('../../services/api', () => ({

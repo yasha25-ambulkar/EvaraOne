@@ -13,8 +13,8 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { telemetryService } from '../services/TelemetryService';
-import type { TelemetryData } from '../services/TelemetryService';
+import { telemetryService } from '../services/realtime/TelemetryService';
+import type { TelemetryData } from '../services/realtime/TelemetryService';
 import { computeOnlineStatus } from '../utils/telemetryPipeline';
 import { useEffect, useState } from 'react';
 import { socket } from '../services/api';

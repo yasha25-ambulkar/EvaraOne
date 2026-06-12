@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import { adminService } from "../../services/admin";
 import type { NodeCategory, AnalyticsType } from "../../types/database";
-import { useToast } from "../../components/ToastProvider";
-import { deviceService } from "../../services/DeviceService";
+import { useToast } from "../../components/ui/ToastProvider";
+import { deviceService } from "../../services/realtime/DeviceService";
 
 const AdminNodes = () => {
   const navigate = useNavigate();
